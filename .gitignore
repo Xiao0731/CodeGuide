@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Data
+data/raw/
+outputs/
+
+# Training artifacts
+*.pt
+*.bin
+*.safetensors
+*.ckpt
+*.log
+
+# Env
+.env
