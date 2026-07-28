@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 
 import yaml
@@ -9,6 +10,7 @@ from scripts.build_sft_dataset import _is_accepted_verification
 from scripts.evaluate_model import validate_manifest
 from scripts.validate_config import validate
 from src.reward.execution import verify_code
+from src.reward import execution
 from src.reward.format import _score_format
 
 
@@ -53,6 +55,59 @@ def test_docker_backend_fails_closed_without_pinned_image():
     assert result.unsupported is True
     assert result.execution_backend == "docker"
     assert result.pass_rate == 0.0
+
+
+def test_docker_timeout_forces_unique_container_cleanup(monkeypatch, tmp_path):
+    harness = tmp_path / "runner.py"
+    harness.write_text("while True: pass\n", encoding="utf-8")
+    calls = []
+
+    monkeypatch.setattr(execution.shutil, "which", lambda _: "docker")
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if command[1] == "run":
+            raise subprocess.TimeoutExpired(command, timeout=3.0)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(execution.subprocess, "run", fake_run)
+    result = execution._run_harness_docker(
+        harness,
+        1.0,
+        image="python@sha256:" + "a" * 64,
+    )
+
+    run_command, cleanup_command = calls
+    name = run_command[run_command.index("--name") + 1]
+    assert name.startswith("codeguide-verifier-")
+    assert ["docker", "rm", "--force", name] == cleanup_command
+    assert "--network" in run_command
+    assert "none" in run_command
+    assert "--read-only" in run_command
+    assert "--memory-swap" in run_command
+    assert "--workdir" in run_command
+    assert result.error == "container timeout after 1.0s"
+
+
+def test_docker_cpu_limit_exit_is_reported_as_timeout(monkeypatch, tmp_path):
+    harness = tmp_path / "runner.py"
+    harness.write_text("while True: pass\n", encoding="utf-8")
+
+    monkeypatch.setattr(execution.shutil, "which", lambda _: "docker")
+
+    def fake_run(command, **kwargs):
+        if command[1] == "run":
+            return subprocess.CompletedProcess(command, 137, "", "")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(execution.subprocess, "run", fake_run)
+    result = execution._run_harness_docker(
+        harness,
+        1.0,
+        image="python@sha256:" + "a" * 64,
+    )
+
+    assert result.error == "container timeout/resource limit after 1.0s (exit code 137)"
 
 
 def test_main_config_contract_is_static_valid_but_lengths_unfrozen():

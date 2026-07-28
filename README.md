@@ -89,12 +89,15 @@ accepted SFT：
 正式执行使用 Docker 后端，并要求：
 
 ```bash
-export CODEGUIDE_EXECUTION_IMAGE='python:...@sha256:...'
+export CODEGUIDE_EXECUTION_IMAGE='python:3.11.9-slim-bookworm@sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317'
+python scripts/validate_docker_verifier.py \
+  --image "$CODEGUIDE_EXECUTION_IMAGE"
 ```
 
-镜像必须固定到 digest。容器后端未在目标环境通过验收前，只能称为“已实现
-的受限容器合同”；本地 `subprocess` 后端仅供受信任的单元测试，不能称为
-安全沙箱。
+镜像必须固定到 digest。该受限容器合同已在 Windows 10 + Docker Desktop
+环境完成本机实测，证据见 `artifacts/g0/docker_verifier_report.json`。
+这不等同于第三方安全审计，也不应简称为“安全沙箱”。本地 `subprocess`
+后端仅供受信任的单元测试。
 
 ## 训练口径
 

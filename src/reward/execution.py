@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -243,10 +244,22 @@ def _run_harness_docker(
             execution_backend="docker",
         )
 
+    container_id = uuid.uuid4().hex
+    container_name = f"codeguide-verifier-{container_id[:16]}"
+    cpu_soft_limit = max(1, math.ceil(timeout))
     command = [
         docker,
         "run",
         "--rm",
+        "--name",
+        container_name,
+        "--label",
+        "codeguide.verifier=true",
+        "--label",
+        f"codeguide.verifier.id={container_id}",
+        "--pull",
+        "never",
+        "--init",
         "--network",
         "none",
         "--read-only",
@@ -258,16 +271,24 @@ def _run_harness_docker(
         "64",
         "--memory",
         "256m",
+        "--memory-swap",
+        "256m",
         "--cpus",
         "1.0",
+        "--ulimit",
+        f"cpu={cpu_soft_limit}:{cpu_soft_limit + 1}",
         "--user",
         "65534:65534",
+        "--workdir",
+        "/tmp",
         "--tmpfs",
         "/tmp:rw,noexec,nosuid,size=64m",
         "--env",
         "PYTHONDONTWRITEBYTECODE=1",
         "--env",
         "PYTHONIOENCODING=utf-8",
+        "--env",
+        "TMPDIR=/tmp",
         "--volume",
         f"{harness_path}:/runner.py:ro",
         image,
@@ -275,6 +296,19 @@ def _run_harness_docker(
         "-I",
         "/runner.py",
     ]
+
+    def cleanup_container() -> None:
+        try:
+            subprocess.run(
+                [docker, "rm", "--force", container_name],
+                capture_output=True,
+                text=True,
+                timeout=10.0,
+                env={"PATH": os.environ.get("PATH", "")},
+            )
+        except Exception:
+            pass
+
     try:
         result = subprocess.run(
             command,
@@ -283,6 +317,26 @@ def _run_harness_docker(
             timeout=timeout + 2.0,
             env={"PATH": os.environ.get("PATH", "")},
         )
+        if not result.stdout.strip() and result.returncode in {137, 152}:
+            return VerificationResult(
+                0,
+                0,
+                0.0,
+                error=(
+                    f"container timeout/resource limit after {timeout}s "
+                    f"(exit code {result.returncode})"
+                ),
+                execution_backend="docker",
+            )
+        if not result.stdout.strip() and result.returncode != 0:
+            detail = result.stderr.strip()
+            return VerificationResult(
+                0,
+                0,
+                0.0,
+                error=detail or f"container exited with code {result.returncode}",
+                execution_backend="docker",
+            )
         return _parse_harness_result(
             result.stdout,
             result.stderr,
@@ -304,6 +358,10 @@ def _run_harness_docker(
             error=str(exc),
             execution_backend="docker",
         )
+    finally:
+        # Killing the local ``docker run`` client does not stop the container.
+        # Always remove by unique name so timed-out solutions cannot leak.
+        cleanup_container()
 
 
 def _run_harness(

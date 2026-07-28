@@ -315,3 +315,44 @@
 - 推送：普通 fast-forward push 成功，本地 `main` 与 `origin/main` 均为
   `af2a0fb368fd0e9e4722eded9b1c055900ff307e`。
 - 状态：首个可信私有 Git 基线已交付；未打 G0 tag。
+
+### EXP-007：Docker verifier 真实隔离与超时清理验收
+
+- 日期：2026-07-28
+- 阶段：G0
+- 环境：Windows 10、Docker Engine 28.1.1、Linux/amd64 容器。
+- 冻结镜像：
+  `python:3.11.9-slim-bookworm@sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317`。
+- 首轮发现：
+  - standard-input 与 call-based 均通过；
+  - 无限循环能触发超时，但本地 `docker run` 客户端被杀后，后台容器仍存活；
+  - 根因是 `subprocess.run(..., timeout=...)` 只终止客户端进程，
+    `--rm` 不会主动终止仍在运行的容器。
+- 修复：
+  - 每次运行使用唯一容器名和 `codeguide.verifier=true` 标签；
+  - `finally` 中按唯一名称执行 `docker rm --force`；
+  - 增加 `--pull never`、`--init`、`--memory-swap 256m`、CPU ulimit、
+    `/tmp` 工作目录和 `TMPDIR=/tmp`；
+  - CPU 限制导致的 137/152 退出统一记录为
+    `container timeout/resource limit`。
+- 真实验收覆盖：
+  - digest 固定与浮动 tag fail closed；
+  - standard-input；
+  - call-based 顶层函数与 `Solution` 方法；
+  - wrong answer；
+  - `network=none`；
+  - 非 root、只读根目录和受限 tmpfs；
+  - CPU/内存/swap/PID 限制；
+  - timeout 后无容器泄漏；
+  - 4 路并发后无容器泄漏。
+- 结果：
+  - `scripts/validate_docker_verifier.py` 全部检查 PASS；
+  - 单元测试 44 passed；
+  - 现有 call-based SFT 标签通过 Docker 后端 5/5；
+  - 连续 3 次无限循环均被终止，残留 verifier 容器 0。
+- 证据：`artifacts/g0/docker_verifier_report.json`。
+- 边界：可称“受限 Docker 执行合同已在本机实测通过”，不得称为经过
+  第三方安全审计的“安全沙箱”。
+- 云端/API/训练消耗：无。
+- 状态：Docker verifier 子项通过；G0 仍被 CUDA lock 与代理模型
+  SFT/GRPO dry-run 阻塞。

@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-28T08:03:35.700640+00:00",
+  "image": "python:3.11.9-slim-bookworm@sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317",
+  "image_id": "sha256:65a6ce634d975b67ee77c8d0f59248cbcb9d8b8f229d584c3cf5d624038bf963",
+  "platform": "linux",
+  "architecture": "amd64",
+  "timeout_seconds": 2.0,
+  "concurrency": 4,
+  "checks": {
+    "digest_pinned": true,
+    "standard_input": true,
+    "call_based_function": true,
+    "call_based_solution_class": true,
+    "wrong_answer_detected": true,
+    "floating_tag_rejected": true,
+    "network_blocked": true,
+    "non_root_read_only_and_tmp_writable": true,
+    "timeout_detected": true,
+    "timeout_container_cleaned": true,
+    "runtime_contract": true,
+    "concurrency": true,
+    "no_leaks_after_concurrency": true
+  },
+  "runtime_contract": {
+    "network_none": true,
+    "read_only_root": true,
+    "cap_drop_all": true,
+    "no_new_privileges": true,
+    "pids_limit_64": true,
+    "memory_256m": true,
+    "memory_swap_disabled": true,
+    "one_cpu": true,
+    "cpu_ulimit": true,
+    "init_enabled": true,
+    "non_root_user": true,
+    "workdir_tmp": true,
+    "tmpfs_restricted": true,
+    "runner_only_read_only_mount": true
+  },
+  "results": {
+    "standard_input": {
+      "passed_cases": 2,
+      "total_cases": 2,
+      "pass_rate": 1.0,
+      "error": null,
+      "unsupported": false,
+      "io_mode": "standard_input",
+      "execution_backend": "docker"
+    },
+    "call_based_function": {
+      "passed_cases": 2,
+      "total_cases": 2,
+      "pass_rate": 1.0,
+      "error": null,
+      "unsupported": false,
+      "io_mode": "call_based",
+      "execution_backend": "docker"
+    },
+    "call_based_solution_class": {
+      "passed_cases": 2,
+      "total_cases": 2,
+      "pass_rate": 1.0,
+      "error": null,
+      "unsupported": false,
+      "io_mode": "call_based",
+      "execution_backend": "docker"
+    },
+    "wrong_answer": {
+      "passed_cases": 0,
+      "total_cases": 1,
+      "pass_rate": 0.0,
+      "error": null,
+      "unsupported": false,
+      "io_mode": "standard_input",
+      "execution_backend": "docker"
+    },
+    "network": {
+      "passed_cases": 1,
+      "total_cases": 1,
+      "pass_rate": 1.0,
+      "error": null,
+      "unsupported": false,
+      "io_mode": "standard_input",
+      "execution_backend": "docker"
+    },
+    "filesystem": {
+      "passed_cases": 1,
+      "total_cases": 1,
+      "pass_rate": 1.0,
+      "error": null,
+      "unsupported": false,
+      "io_mode": "standard_input",
+      "execution_backend": "docker"
+    },
+    "timeout": {
+      "passed_cases": 0,
+      "total_cases": 1,
+      "pass_rate": 0.0,
+      "error": "container timeout/resource limit after 1.0s (exit code 152)",
+      "unsupported": false,
+      "io_mode": "standard_input",
+      "execution_backend": "docker"
+    },
+    "floating_tag": {
+      "passed_cases": 0,
+      "total_cases": 1,
+      "pass_rate": 0.0,
+      "error": "container image must be pinned by digest; set CODEGUIDE_EXECUTION_IMAGE=name@sha256:...",
+      "unsupported": true,
+      "io_mode": "standard_input",
+      "execution_backend": "docker"
+    }
+  },
+  "all_passed": true
+}

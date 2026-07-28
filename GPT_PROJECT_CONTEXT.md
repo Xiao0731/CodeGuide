@@ -414,3 +414,43 @@ small smoke outputs, and small reference-cache examples. It excludes:
   to `af2a0fb368fd0e9e4722eded9b1c055900ff307e`.
 - No milestone tag was created because Docker, CUDA lock, and proxy-model
   dry-runs remain incomplete.
+
+### 2026-07-28: Docker verifier real-runtime acceptance
+
+- Docker Desktop Linux daemon was started and Docker Engine 28.1.1 was used.
+- The formal verifier image was frozen as
+  `python:3.11.9-slim-bookworm@sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317`.
+- `src/reward/execution.py` now assigns every run a unique name and verifier
+  label, disables image pulls, runs under `tini`, and always force-removes the
+  named container in a `finally` block.
+- The runtime contract now explicitly includes:
+  - no network;
+  - read-only root filesystem;
+  - all capabilities dropped and no-new-privileges;
+  - UID/GID 65534;
+  - `/tmp` as the only writable working area with `noexec,nosuid`;
+  - 256 MiB memory and swap ceiling, one CPU, 64 PIDs, CPU ulimit, and host
+    wall timeout;
+  - exactly one read-only mount containing the generated runner.
+- A real infinite-loop probe exposed an earlier bug: timing out the local
+  `docker run` client did not stop its container. The first probe left one live
+  verifier container. The new unique-name cleanup fixed the leak; three
+  consecutive timeout probes left zero containers.
+- CPU-limit exits 137/152 are now reported as
+  `container timeout/resource limit` instead of the ambiguous
+  `no harness output`.
+- `scripts/validate_docker_verifier.py` verifies the live Docker configuration,
+  standard-input, top-level call-based functions, `Solution` methods, wrong
+  answers, blocked networking, filesystem restrictions, timeout cleanup,
+  four-way concurrency, no residual containers, and fail-closed rejection of
+  floating image tags.
+- Real acceptance result: every check passed. The existing five-record
+  call-based SFT smoke also passed 5/5 through the Docker backend.
+- Machine-readable evidence:
+  `artifacts/g0/docker_verifier_report.json`.
+- Unit tests after the repair: 44/44.
+- Evidence boundary: this validates the declared restricted-container contract
+  on the local Docker Desktop environment. It is not a third-party security
+  audit and must not be described as a universally secure sandbox.
+- G0 remains blocked by the CUDA dependency lock and proxy-model SFT/GRPO
+  dry-runs. No training, API distillation, or milestone tag was performed.

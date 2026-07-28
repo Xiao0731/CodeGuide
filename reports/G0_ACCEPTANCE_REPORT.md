@@ -3,7 +3,8 @@
 > 日期：2026-07-27（America/Los_Angeles）  
 > 审计对象：`review/codeguide` 源码快照  
 > 规划依据：`CodeGuide_后训练项目实施与验收规划书_v1.2.md`  
-> 总结论：**G0 尚未通过；静态/P0 子阶段已通过，GPU 与容器子阶段待目标环境完成。**
+> 总结论：**G0 尚未通过；静态/P0 与 Docker verifier 子阶段已通过，CUDA
+> 依赖锁和代理模型 dry-run 待完成。**
 
 ## 1. 修复前基线
 
@@ -60,7 +61,8 @@
   - CPU、内存、PID、wall-clock 限制；
   - 独立 tmpfs；
   - 只挂载只读 runner，不挂项目、密钥或数据目录；
-- 当前运行环境无 Docker，因此容器合同属于**已实现、未跑通**。
+- 初始审计环境无 Docker；2026-07-28 已在 Windows 10 + Docker Desktop
+  环境完成真实运行验收，详见第 8 节。
 
 ### 2.4 Reward 与 GRPO 数据
 
@@ -221,7 +223,7 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 | G0 条目 | 状态 | 证据/阻塞 |
 |---|---:|---|
 | `compileall` | PASS | 全仓静态编译 exit 0 |
-| 全部单元测试 | PASS | 42 passed |
+| 全部单元测试 | PASS | 44 passed |
 | 数据 smoke | PASS（开发后端） | call-based 5/5；旧 standard-input 负例 4/5 被准确检出 |
 | 代理模型 SFT 单 batch | BLOCKED | 当前环境无 torch、transformers、trl、peft、unsloth、GPU |
 | adapter 保存/读取 | BLOCKED | 同上 |
@@ -229,7 +231,7 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 | 中断后断点恢复 | BLOCKED | 同上 |
 | checkpoint callback 实际运行 | BLOCKED | 无模型/GPU；合同与单测已修复 |
 | 正式评测 CLI 读取 manifest | PASS | SHA-256 + count 验证通过 |
-| Docker reward smoke | BLOCKED | 当前环境无 Docker，镜像 digest 未冻结 |
+| Docker reward smoke | PASS | digest 固定；隔离、资源、超时、并发及两种 I/O 实测通过 |
 | 训练环境 lock | BLOCKED | 仅完成 `requirements.g0.lock.txt`；CUDA 训练栈未验证 |
 | 无密钥入库 | PASS | 静态扫描无命中 |
 | Git 私有基线 | PASS | `main`/`origin/main` 已同步至 `af2a0fb`，未强推 |
@@ -237,7 +239,7 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 
 ## 5. 当前环境证据
 
-`artifacts/g0/environment.json` 记录：
+初始审计环境的 `artifacts/g0/environment.json` 记录：
 
 - Python 3.12.13；
 - pytest 8.4.1；
@@ -251,7 +253,7 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 
 - QLoRA SFT 已跑通；
 - GRPO 已跑通；
-- Docker 安全执行已跑通；
+- Docker 是经过第三方安全审计的通用安全沙箱；
 - checkpoint 恢复已跑通；
 - 训练依赖已锁定；
 - G0 已全部通过。
@@ -262,17 +264,15 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 2. 固定 Python 3.11、CUDA、PyTorch、Transformers、TRL、PEFT、
    bitsandbytes、Unsloth、vLLM 的精确兼容版本，生成
    `requirements.lock.txt`；
-3. 冻结 `CODEGUIDE_EXECUTION_IMAGE=name@sha256:...`，运行 Docker
-   standard-input/call-based/超时/越权/并发测试；
-4. 使用 0.5B～1.5B 代理模型运行：
+3. 使用 0.5B～1.5B 代理模型运行：
    - SFT 单 batch；
    - adapter 保存与恢复；
    - GRPO 2 prompts × 4 generations × 1 step；
    - 独立 dev checkpoint；
    - 中断恢复；
-5. 运行 tokenizer 长度审计并冻结 4096/6144/8192；
-6. 严格模式 `validate_config.py` 通过后，才可将 G0 标记为 PASS；
-7. G0 通过后进入 300 条 DeepSeek-V4-Flash 数据 pilot。
+4. 运行 tokenizer 长度审计并冻结 4096/6144/8192；
+5. 严格模式 `validate_config.py` 通过后，才可将 G0 标记为 PASS；
+6. G0 通过后进入 300 条 DeepSeek-V4-Flash 数据 pilot。
 
 ## 7. 2026-07-28 Windows / RTX 4060 本机复验
 
@@ -292,7 +292,7 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 | 检查 | 结果 |
 |---|---|
 | `python -m compileall` | PASS，exit 0 |
-| `python -m pytest -q` | PASS，42 passed in 4.86s |
+| `python -m pytest -q` | PASS，修复后 44 passed |
 | shell `bash -n` | PASS，exit 0；WSL 输出网络提示但不影响语法检查 |
 | `validate_config.py --allow-unfrozen` | PASS，保留长度和镜像三项 warning |
 | 严格 `validate_config.py` | 预期失败：SFT/GRPO 长度未冻结 |
@@ -301,13 +301,58 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 | 冻结 smoke manifest | PASS，SHA-256 与记录数一致 |
 | 密钥扫描 | PASS，无硬编码 key/token 命中 |
 | 个人绝对路径扫描 | PASS，无工作区/用户名路径命中 |
-| Docker verifier 实测 | BLOCKED，daemon 未运行且镜像 digest 未冻结 |
+| Docker verifier 实测 | PASS，受限合同全部通过；证据见第 8 节 |
 | 代理 SFT/GRPO dry-run | BLOCKED，训练依赖尚未安装 |
 
-本机复验结论：**G0 静态/P0 子阶段再次通过；完整 G0 仍未通过。**
-下一任务必须先建立可推送的可信 Git 基线，再冻结 RTX 4060/CUDA 依赖，
-启动 Docker daemon 并完成 verifier 实测，最后运行代理模型 dry-run。
+本机复验结论：**G0 静态/P0 与 Docker verifier 子阶段通过；完整 G0
+仍未通过。** 下一任务是冻结 RTX 4060/CUDA 依赖并运行代理模型 dry-run。
 
 Git 基线随后已完成：私有远端 `Xiao0731/CodeGuide` 的旧提交通过非强制
-merge 保留，本地与远端 `main` 同步至 `af2a0fb`。下一阻塞现为 CUDA lock、
-Docker verifier 实测和代理模型 dry-run。
+merge 保留，本地与远端 `main` 同步至 `af2a0fb`。下一阻塞现为 CUDA lock
+和代理模型 dry-run。
+
+## 8. 2026-07-28 Docker verifier 真实运行验收
+
+冻结镜像：
+
+```text
+python:3.11.9-slim-bookworm@sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317
+```
+
+验收命令：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_docker_verifier.py `
+  --image $image --timeout 2 --concurrency 4 `
+  --output artifacts\g0\docker_verifier_report.json
+```
+
+首轮真实无限循环测试发现一个执行链路缺陷：宿主侧
+`subprocess.run(..., timeout=...)` 超时只终止 `docker run` 客户端，容器仍在
+后台运行。修复后每次执行都有唯一名称和标签，并在 `finally` 中执行
+`docker rm --force`。CPU 限制导致的退出码 137/152 也被明确归类为
+`timeout/resource limit`。
+
+最终结果：
+
+| 检查 | 结果 |
+|---|---|
+| digest 固定、浮动 tag fail closed | PASS |
+| standard-input | PASS，2/2 |
+| call-based 顶层函数 | PASS，2/2 |
+| call-based `Solution` 方法 | PASS，2/2 |
+| wrong answer 检出 | PASS |
+| `network=none` | PASS |
+| 非 root、只读根目录、受限 `/tmp` | PASS |
+| cap drop / no-new-privileges | PASS |
+| 256 MiB memory+swap、1 CPU、64 PIDs、CPU ulimit | PASS |
+| timeout 分类与强制清理 | PASS |
+| 4 路并发与运行后无泄漏 | PASS |
+| 现有 call-based SFT smoke 经 Docker 重验 | PASS，5/5 |
+| 连续 3 次无限循环后的残留容器 | 0 |
+| 全部单元测试 | PASS，44 passed |
+
+机器可读报告为 `artifacts/g0/docker_verifier_report.json`，其中
+`all_passed=true`。该结果支持“受限 Docker 执行合同已在本机实测通过”，
+不支持“经过第三方安全审计的安全沙箱”这一更强表述。未运行 API 蒸馏、
+SFT、GRPO 或模型训练。

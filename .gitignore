@@ -38,6 +38,7 @@ artifacts/*
 !artifacts/g0/
 artifacts/g0/*
 !artifacts/g0/environment.json
+!artifacts/g0/docker_verifier_report.json
 *.log
 
 # 环境变量

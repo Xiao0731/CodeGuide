@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-28T06:35:29.870846+00:00",
+  "captured_at": "2026-07-28T08:00:47.867649+00:00",
   "python": {
     "version": "3.11.9",
     "executable_name": "python.exe",
@@ -32,14 +32,14 @@
   },
   "docker": {
     "available": true,
-    "returncode": 1,
-    "stdout": "{\"Client\":{\"Version\":\"28.1.1\",\"ApiVersion\":\"1.49\",\"DefaultAPIVersion\":\"1.49\",\"GitCommit\":\"4eba377\",\"GoVersion\":\"go1.23.8\",\"Os\":\"windows\",\"Arch\":\"amd64\",\"BuildTime\":\"Fri Apr 18 09:53:24 2025\",\"Context\":\"desktop-linux\"},\"Server\":null}",
-    "stderr": "error during connect: Get \"http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.49/version\": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+    "returncode": 0,
+    "stdout": "{\"Client\":{\"Version\":\"28.1.1\",\"ApiVersion\":\"1.49\",\"DefaultAPIVersion\":\"1.49\",\"GitCommit\":\"4eba377\",\"GoVersion\":\"go1.23.8\",\"Os\":\"windows\",\"Arch\":\"amd64\",\"BuildTime\":\"Fri Apr 18 09:53:24 2025\",\"Context\":\"desktop-linux\"},\"Server\":{\"Platform\":{\"Name\":\"Docker Desktop 4.41.2 (191736)\"},\"Components\":[{\"Name\":\"Engine\",\"Version\":\"28.1.1\",\"Details\":{\"ApiVersion\":\"1.49\",\"Arch\":\"amd64\",\"BuildTime\":\"Fri Apr 18 09:52:57 2025\",\"Experimental\":\"false\",\"GitCommit\":\"01f442b\",\"GoVersion\":\"go1.23.8\",\"KernelVersion\":\"5.15.167.4-microsoft-standard-WSL2\",\"MinAPIVersion\":\"1.24\",\"Os\":\"linux\"}},{\"Name\":\"containerd\",\"Version\":\"1.7.27\",\"Details\":{\"GitCommit\":\"05044ec0a9a75232cad458027ca83437aae3f4da\"}},{\"Name\":\"runc\",\"Version\":\"1.2.5\",\"Details\":{\"GitCommit\":\"v1.2.5-0-g59923ef\"}},{\"Name\":\"docker-init\",\"Version\":\"0.19.0\",\"Details\":{\"GitCommit\":\"de40ad0\"}}],\"Version\":\"28.1.1\",\"ApiVersion\":\"1.49\",\"MinAPIVersion\":\"1.24\",\"GitCommit\":\"01f442b\",\"GoVersion\":\"go1.23.8\",\"Os\":\"linux\",\"Arch\":\"amd64\",\"KernelVersion\":\"5.15.167.4-microsoft-standard-WSL2\",\"BuildTime\":\"2025-04-18T09:52:57.000000000+00:00\"}}",
+    "stderr": ""
   },
   "git": {
     "available": true,
     "returncode": 0,
-    "stdout": "## No commits yet on main\n?? .gitignore\n?? CLAIMS_MATRIX.md\n?? \"CodeGuide_\\345\\220\\216\\350\\256\\255\\347\\273\\203\\351\\241\\271\\347\\233\\256\\345\\256\\236\\346\\226\\275\\344\\270\\216\\351\\252\\214\\346\\224\\266\\350\\247\\204\\345\\210\\222\\344\\271\\246_v1.2.md\"\n?? DECISION_LOG.md\n?? GPT_PROJECT_CONTEXT.md\n?? PROVENANCE.md\n?? README.md\n?? artifacts/\n?? colab_setup.ipynb\n?? configs/\n?? data/\n?? docs/\n?? evals/\n?? reports/\n?? requirements.g0.lock.txt\n?? requirements.txt\n?? scripts/\n?? src/\n?? tests/",
+    "stdout": "## main...origin/main\n M .gitignore\n M CLAIMS_MATRIX.md\n M \"CodeGuide_\\345\\220\\216\\350\\256\\255\\347\\273\\203\\351\\241\\271\\347\\233\\256\\345\\256\\236\\346\\226\\275\\344\\270\\216\\351\\252\\214\\346\\224\\266\\350\\247\\204\\345\\210\\222\\344\\271\\246_v1.2.md\"\n M DECISION_LOG.md\n M GPT_PROJECT_CONTEXT.md\n M README.md\n M reports/G0_ACCEPTANCE_REPORT.md\n M src/reward/execution.py\n M tests/test_g0_contracts.py\n?? artifacts/g0/docker_verifier_report.json\n?? scripts/validate_docker_verifier.py",
     "stderr": ""
   },
   "torch_runtime": {

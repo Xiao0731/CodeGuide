@@ -13,18 +13,18 @@
 | `reference_guided_label` 不向 student user 泄漏 reference | 已跑通（smoke） | 两份 reference-guided smoke | smoke 中未发现泄漏 | 全量数据泄漏率为 0 |
 | reference-guided 比 scratch 更值得扩大 | 已跑通（小样本） | scratch 0/4；guided 4/5 | 小样本显示明确正向信号 | 显著提升、稳定达到 80% |
 | call-based 接口约束有效 | 已跑通（5 条 smoke） | call-based smoke 5/5 | 5 条专项 smoke 全通过且无接口错 | 全量 call-based 已解决 |
-| 统一 `verify_code()` 支持 standard-input 与 call-based | 已实现并在 reference/smoke 中跑通 | verifier tests、cache、smoke | 两种 I/O 链路已用于离线验证 | verifier 是安全沙箱 |
-| 正式容器安全执行 | 已实现，未在目标环境验证 | `src/reward/execution.py`、G0 合同测试 | 已实现 fail-closed 的受限 Docker 合同 | Docker 安全执行已跑通或是安全沙箱 |
-| teacher 错误代码不会进入 accepted SFT | 已实现并通过本机单测 | `scripts/build_sft_dataset.py::_is_accepted_verification`、42 项测试 | 生成管线设置并测试了全测试通过硬门槛 | 已正式生成约 10K 高质量 SFT 标签 |
+| 统一 `verify_code()` 支持 standard-input 与 call-based | 已在 subprocess 与 Docker smoke 跑通 | verifier tests、cache、Docker smoke | 两种 I/O 链路已用于离线验证，且已在本机受限容器中复验 | verifier 是经过安全审计的通用沙箱 |
+| 正式受限容器执行合同 | 已在本机实测通过 | `src/reward/execution.py`、`scripts/validate_docker_verifier.py`、`artifacts/g0/docker_verifier_report.json` | digest 固定、隔离、资源限制、超时清理和并发合同已在本机 Docker Desktop 验证 | 经过第三方安全审计或在所有宿主环境均安全 |
+| teacher 错误代码不会进入 accepted SFT | 已实现并通过本机单测 | `scripts/build_sft_dataset.py::_is_accepted_verification`、44 项测试 | 生成管线设置并测试了全测试通过硬门槛 | 已正式生成约 10K 高质量 SFT 标签 |
 | 正式 SFT 数据生成与两轮修复闭环 | 未实现 | 无 300-500 pilot 报告 | 尚未开始正式 pilot | 已有约 10K 高质量 SFT 标签 |
 | QLoRA SFT 训练闭环 | 未验证 | 旧训练代码存在，无 v1.2 G6 证据 | 训练入口待 G0 dry-run | SFT 已提升教学质量 |
-| GRPO 唯一正式入口与 online/held-out 拆分 | 已实现并通过本机单测，待代理 dry-run | `scripts/train_grpo.py`、`src/training/grpo_train.py`、42 项测试 | 入口和确定性测试拆分已实现 | GRPO 已训练完成或有效 |
+| GRPO 唯一正式入口与 online/held-out 拆分 | 已实现并通过本机单测，待代理 dry-run | `scripts/train_grpo.py`、`src/training/grpo_train.py`、44 项测试 | 入口和确定性测试拆分已实现 | GRPO 已训练完成或有效 |
 | Teaching Reward 真正进入梯度 | 未实现/未验证 | 当前仅有旧 reward 代码 | TeachingCritic 尚待构建 | Teaching Reward 有效 |
 | anti-hacking contract reward 进入正式训练 | 未验证 | 代码与正式入口尚未完成接线验收 | 待 integration test | 已解决 reward hacking |
 | best checkpoint 基于独立冻结 dev 严格 Pass@1 | 已实现，待代理 dry-run | `src/training/grpo_train.py`、独立 `grpo.eval_data` 合同 | checkpoint 选择合同已修复 | callback 已在目标训练环境跑通 |
 | ExplainBench / TutorBench | 未实现 | 仅规划设计 | 评测集待冻结 | 已验证模型会交互式教学 |
 | Base / SFT / GRPO 最终对比 | 未开始 | 无冻结输出 | 尚无最终模型实验结论 | 显著优于基座或外部方案 |
-| 仓库 G0 | 阻塞 | 私有远端已同步至 `af2a0fb`；Docker/CUDA/代理 dry-run 未完成 | 已建立并推送静态可信基线 | 仓库开箱即复现或 G0 已通过 |
+| 仓库 G0 | 阻塞 | 私有 Git 基线和 Docker verifier 已完成；CUDA lock/代理 dry-run 未完成 | 已建立可信基线并完成受限容器实测 | 仓库开箱即复现或 G0 已通过 |
 | GPT 代码包包含项目治理文档且排除敏感大文件 | 已跑通 | ZIP 84 条目检查，必需入口全存在，排除项命中 0 | 当前代码包已通过内容清单检查 | 所有未来代码包天然正确，无需复验 |
 
 ## 更新记录
@@ -44,3 +44,5 @@
   私有化、远端历史审计和非强制合并尚未完成。
 - 远端现已 Private；旧提交 `e6c7bae` 经扫描后通过 `af2a0fb` 非强制 merge
   保留，本地/远端 `main` 已一致。该证据只覆盖基线后的 provenance。
+- Docker verifier 在本机 Docker Desktop 完成真实验收：全部合同检查通过，
+  call-based SFT 5/5，连续超时无容器泄漏；这不是第三方安全审计。
