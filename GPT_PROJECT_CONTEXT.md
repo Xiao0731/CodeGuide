@@ -387,3 +387,15 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - Local GPU is an RTX 4060 Laptop GPU with 8188 MiB. Docker CLI exists but its
   Linux daemon is stopped. The current environment lacks the training stack,
   so Docker verifier and proxy SFT/GRPO remain blocked.
+
+### 2026-07-28: GitHub delivery repository selected
+
+- Existing repository: `Xiao0731/CodeGuide`.
+- The repository was publicly visible when checked and contained one legacy
+  commit, while the repaired local baseline has an independent root history.
+- Decision: reuse the existing repository after changing it to private; do not
+  create a second repository unless the legacy history later proves unsuitable.
+- Before any push, authenticate GitHub CLI, fetch the remote commit, inspect the
+  history, and merge without force-pushing.
+- A private repository can be shared with the intended reviewer by explicitly
+  adding that GitHub account as a collaborator.

@@ -24,7 +24,7 @@
 | best checkpoint 基于独立冻结 dev 严格 Pass@1 | 已实现，待代理 dry-run | `src/training/grpo_train.py`、独立 `grpo.eval_data` 合同 | checkpoint 选择合同已修复 | callback 已在目标训练环境跑通 |
 | ExplainBench / TutorBench | 未实现 | 仅规划设计 | 评测集待冻结 | 已验证模型会交互式教学 |
 | Base / SFT / GRPO 最终对比 | 未开始 | 无冻结输出 | 尚无最终模型实验结论 | 显著优于基座或外部方案 |
-| 仓库 G0 | 阻塞 | P0 清单、无完整 dry-run | 当前处于 G0 修复阶段 | 仓库开箱即复现 |
+| 仓库 G0 | 阻塞 | 本地可信 commit `b3fb3a8`；Docker/CUDA/代理 dry-run 未完成 | 已建立本地静态可信基线 | 仓库开箱即复现或 G0 已通过 |
 | GPT 代码包包含项目治理文档且排除敏感大文件 | 已跑通 | ZIP 84 条目检查，必需入口全存在，排除项命中 0 | 当前代码包已通过内容清单检查 | 所有未来代码包天然正确，无需复验 |
 
 ## 更新记录
@@ -40,3 +40,5 @@
 - 首个可信 Git 基线尚未发布；GitHub CLI 缺失是当前外部阻塞。
 - Windows/Python 3.11.9 本机复验完成：compileall、42 项测试、call-based
   5/5 和 manifest 通过；Docker daemon 与训练栈未就绪，因此 G0 仍为阻塞。
+- 选定复用 `Xiao0731/CodeGuide`；发现其当前为 Public 且含一个旧 commit，
+  私有化、远端历史审计和非强制合并尚未完成。

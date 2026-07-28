@@ -276,3 +276,22 @@
 - 云端消耗：无。
 - 结论：G0 静态/P0 子阶段通过；Docker verifier、CUDA lock 和代理模型
   SFT/GRPO dry-run 未通过，完整 G0 仍为阻塞。
+
+### DEC-004：复用现有 GitHub 仓库并先完成私有化与历史审计
+
+- 日期：2026-07-28
+- 阶段：G0
+- 类型：版本控制 / 发布治理
+- 远端：`Xiao0731/CodeGuide`。
+- 发现：
+  - 远端当前为 Public；
+  - 远端 `main` 已有 1 个旧 commit；
+  - 本地可信基线 `b3fb3a8` 是独立 root commit；
+  - 本地尚未配置 `origin`，GitHub CLI 尚未安装。
+- 决策：
+  - 不另建仓库，优先复用现有仓库；
+  - 推送前先将仓库改为 Private；
+  - `gh auth login` 后先 fetch 和审查远端旧提交；
+  - 禁止直接 force-push，需保留可审计历史并显式解决无共同祖先问题；
+  - 评审者通过 private repository collaborator 方式访问。
+- 状态：仓库已选定；私有化、认证、远端历史合并和 push 待完成。
