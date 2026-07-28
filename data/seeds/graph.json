@@ -1,0 +1,270 @@
+[
+  {
+    "train_ID": "train_0046",
+    "problem_id": 2364,
+    "url": "https://codeforces.com/problemset/problem/1343/E",
+    "category": "graph",
+    "difficulty": "introductory",
+    "problem_statement": "You are given an undirected unweighted graph consisting of $n$ vertices and $m$ edges (which represents the map of Bertown) and the array of prices $p$ of length $m$. It is guaranteed that there is a path between each pair of vertices (districts).\n\nMike has planned a trip from the vertex (district) $a$ to the vertex (district) $b$ and then from the vertex (district) $b$ to the vertex (district) $c$. He can visit the same district twice or more. But there is one issue: authorities of the city want to set a price for using the road so if someone goes along the road then he should pay the price corresponding to this road (he pays each time he goes along the road). The list of prices that will be used $p$ is ready and they just want to distribute it between all roads in the town in such a way that each price from the array corresponds to exactly one road.\n\nYou are a good friend of Mike (and suddenly a mayor of Bertown) and want to help him to make his trip as cheap as possible. So, your task is to distribute prices between roads in such a way that if Mike chooses the optimal path then the price of the trip is the minimum possible. Note that you cannot rearrange prices after the start of the trip.\n\nYou have to answer $t$ independent test cases.\n\n\n-----Input-----\n\nThe first line of the input contains one integer $t$ ($1 \\le t \\le 10^4$) — the number of test cases. Then $t$ test cases follow.\n\nThe first line of the test case contains five integers $n, m, a, b$ and $c$ ($2 \\le n \\le 2 \\cdot 10^5$, $n-1 \\le m \\le min(\\frac{n(n-1)}{2}, 2 \\cdot 10^5)$, $1 \\le a, b, c \\le n$) — the number of vertices, the number of edges and districts in Mike's trip.\n\nThe second line of the test case contains $m$ integers $p_1, p_2, \\dots, p_m$ ($1 \\le p_i \\le 10^9$), where $p_i$ is the $i$-th price from the array.\n\nThe following $m$ lines of the test case denote edges: edge $i$ is represented by a pair of integers $v_i$, $u_i$ ($1 \\le v_i, u_i \\le n$, $u_i \\ne v_i$), which are the indices of vertices connected by the edge. There are no loops or multiple edges in the given graph, i. e. for each pair ($v_i, u_i$) there are no other pairs ($v_i, u_i$) or ($u_i, v_i$) in the array of edges, and for each pair $(v_i, u_i)$ the condition $v_i \\ne u_i$ is satisfied. It is guaranteed that the given graph is connected.\n\nIt is guaranteed that the sum of $n$ (as well as the sum of $m$) does not exceed $2 \\cdot 10^5$ ($\\sum n \\le 2 \\cdot 10^5$, $\\sum m \\le 2 \\cdot 10^5$).\n\n\n-----Output-----\n\nFor each test case, print the answer — the minimum possible price of Mike's trip if you distribute prices between edges optimally.\n\n\n-----Example-----\nInput\n2\n4 3 2 3 4\n1 2 3\n1 2\n1 3\n1 4\n7 9 1 5 7\n2 10 4 8 5 6 7 3 3\n1 2\n1 3\n1 4\n3 2\n3 5\n4 2\n5 6\n1 7\n6 7\n\nOutput\n7\n12\n\n\n\n-----Note-----\n\nOne of the possible solution to the first test case of the example:\n\n[Image]\n\nOne of the possible solution to the second test case of the example:\n\n[Image]",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "2\n4 3 2 3 4\n1 2 3\n1 2\n1 3\n1 4\n7 9 1 5 7\n2 10 4 8 5 6 7 3 3\n1 2\n1 3\n1 4\n3 2\n3 5\n4 2\n5 6\n1 7\n6 7\n"
+      ],
+      "outputs": [
+        "7\n12\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to assign the given road prices to the edges of an unweighted connected graph so that Mike's trip from a to b and then from b to c is as cheap as possible. Since the graph itself is unweighted, the real optimization is about how many times each edge is used in the chosen route, and how we match the smallest prices to the most frequently used edges.",
+      "key_observation": "Pick a vertex x as the meeting point of the optimal structure. Then the route can be viewed as a -> x -> b and b -> x -> c. The segment between b and x is paid twice, so the cheapest db[x] prices should be assigned to that shared segment. Therefore, after sorting prices and building prefix sums, the cost for vertex x becomes prefix[db[x]] + prefix[da[x] + db[x] + dc[x]].",
+      "step_by_step_plan": [
+        "Sort the price array in non-decreasing order and build its prefix-sum array, so we can quickly know the minimum possible cost of taking the cheapest k prices.",
+        "Run BFS three times on the unweighted graph: once from a, once from b, and once from c. This gives us the shortest number of edges from each of the three special vertices to every vertex x.",
+        "Enumerate every vertex x as a possible meeting point of the route structure.",
+        "For each x, compute total_edges = dist_a[x] + dist_b[x] + dist_c[x]. If total_edges > m, this candidate is impossible because there are not enough prices to assign.",
+        "Otherwise, compute the trip cost as prefix[dist_b[x]] + prefix[total_edges]. The first term pays for the shared segment one extra time, and the second term pays for all used edges once.",
+        "Take the minimum value over all vertices x and print it."
+      ],
+      "complexity": {
+        "time": "O((n + m) + m log m) per test set in total, because we do three BFS traversals on an unweighted graph and sort the m prices once.",
+        "space": "O(n + m), for the adjacency list, distance arrays, and prefix sums."
+      },
+      "common_mistakes": [
+        "Treating the graph as a weighted graph and running Dijkstra with the given prices. The prices are not fixed to edges in advance; we are allowed to distribute them optimally.",
+        "Forgetting that the b-to-x segment is traversed twice, and writing the cost as only prefix[dist_a[x] + dist_b[x] + dist_c[x]].",
+        "Not sorting the prices first. Without sorting, prefix sums do not represent the cheapest possible assignment.",
+        "Failing to skip candidates where dist_a[x] + dist_b[x] + dist_c[x] > m."
+      ],
+      "annotated_code": "import sys\nfrom collections import deque\n\n\ndef bfs(start, graph, n):\n    dist = [-1] * (n + 1)\n    q = deque([start])\n    dist[start] = 0\n    \n    while q:\n        u = q.popleft()\n        for v in graph[u]:\n            if dist[v] == -1:\n                dist[v] = dist[u] + 1\n                q.append(v)\n    \n    return dist\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    t = next(it)\n    out = []\n    \n    for _ in range(t):\n        n = next(it)\n        m = next(it)\n        a = next(it)\n        b = next(it)\n        c = next(it)\n        \n        prices = [next(it) for _ in range(m)]\n        graph = [[] for _ in range(n + 1)]\n        \n        for _ in range(m):\n            u = next(it)\n            v = next(it)\n            graph[u].append(v)\n            graph[v].append(u)\n        \n        # Sort prices so that prefix[k] means the minimum cost of using k edges once\n        prices.sort()\n        prefix = [0] * (m + 1)\n        for i, x in enumerate(prices, 1):\n            prefix[i] = prefix[i - 1] + x\n        \n        # Unweighted graph => BFS gives shortest edge counts\n        da = bfs(a, graph, n)\n        db = bfs(b, graph, n)\n        dc = bfs(c, graph, n)\n        \n        ans = 10 ** 30\n        \n        for x in range(1, n + 1):\n            total_edges = da[x] + db[x] + dc[x]\n            if total_edges > m:\n                continue\n            \n            # The b-x segment is paid twice\n            cost = prefix[db[x]] + prefix[total_edges]\n            if cost < ans:\n                ans = cost\n        \n        out.append(str(ans))\n    \n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0047",
+    "problem_id": 2399,
+    "url": "https://codeforces.com/problemset/problem/1385/E",
+    "category": "graph",
+    "difficulty": "introductory",
+    "problem_statement": "You are given a graph consisting of $n$ vertices and $m$ edges. It is not guaranteed that the given graph is connected. Some edges are already directed and you can't change their direction. Other edges are undirected and you have to choose some direction for all these edges.\n\nYou have to direct undirected edges in such a way that the resulting graph is directed and acyclic (i.e. the graph with all edges directed and having no directed cycles). Note that you have to direct all undirected edges.\n\nYou have to answer $t$ independent test cases.\n\n\n-----Input-----\n\nThe first line of the input contains one integer $t$ ($1 \\le t \\le 2 \\cdot 10^4$) — the number of test cases. Then $t$ test cases follow.\n\nThe first line of the test case contains two integers $n$ and $m$ ($2 \\le n \\le 2 \\cdot 10^5$, $1 \\le m \\le min(2 \\cdot 10^5, \\frac{n(n-1)}{2})$) — the number of vertices and the number of edges in the graph, respectively.\n\nThe next $m$ lines describe edges of the graph. The $i$-th edge is described with three integers $t_i$, $x_i$ and $y_i$ ($t_i \\in [0; 1]$, $1 \\le x_i, y_i \\le n$) — the type of the edge ($t_i = 0$ if the edge is undirected and $t_i = 1$ if the edge is directed) and vertices this edge connects (the undirected edge connects vertices $x_i$ and $y_i$ and directed edge is going from the vertex $x_i$ to the vertex $y_i$). It is guaranteed that the graph do not contain self-loops (i.e. edges from the vertex to itself) and multiple edges (i.e. for each pair ($x_i, y_i$) there are no other pairs ($x_i, y_i$) or ($y_i, x_i$)).\n\nIt is guaranteed that both sum $n$ and sum $m$ do not exceed $2 \\cdot 10^5$ ($\\sum n \\le 2 \\cdot 10^5$; $\\sum m \\le 2 \\cdot 10^5$).\n\n\n-----Output-----\n\nFor each test case print the answer — \"NO\" if it is impossible to direct undirected edges in such a way that the resulting graph is directed and acyclic, otherwise print \"YES\" on the first line and $m$ lines describing edges of the resulted directed acyclic graph (in any order). Note that you cannot change the direction of the already directed edges. If there are several answers, you can print any.\n\n\n-----Example-----\nInput\n4\n3 1\n0 1 3\n5 5\n0 2 1\n1 1 5\n1 5 4\n0 5 2\n1 3 5\n4 5\n1 1 2\n0 4 3\n1 3 1\n0 2 3\n1 2 4\n4 5\n1 4 1\n1 1 3\n0 1 2\n1 2 4\n1 3 2\n\nOutput\nYES\n3 1\nYES\n2 1\n1 5\n5 4\n2 5\n3 5\nYES\n1 2\n3 4\n3 1\n3 2\n2 4\nNO\n\n\n\n-----Note-----\n\nExplanation of the second test case of the example:\n\n[Image]\n\nExplanation of the third test case of the example:\n\n[Image]",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "4\n3 1\n0 1 3\n5 5\n0 2 1\n1 1 5\n1 5 4\n0 5 2\n1 3 5\n4 5\n1 1 2\n0 4 3\n1 3 1\n0 2 3\n1 2 4\n4 5\n1 4 1\n1 1 3\n0 1 2\n1 2 4\n1 3 2\n"
+      ],
+      "outputs": [
+        "YES\n3 1\nYES\n2 1\n1 5\n5 4\n2 5\n3 5\nYES\n1 2\n3 4\n3 1\n3 2\n2 4\nNO\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Some edges already have fixed directions, and the rest are undirected. We must assign directions to all undirected edges so that the final graph becomes a DAG. If this is impossible, print NO. Otherwise, print any valid orientation.",
+      "key_observation": "The only real obstruction is whether the already directed edges themselves contain a cycle. If they do, the answer is immediately NO. If they do not, then any topological order of that directed subgraph gives us a safe rule: direct every undirected edge from the earlier vertex in the topological order to the later one.",
+      "step_by_step_plan": [
+        "Build a graph using only the edges that are already directed, and compute indegrees for that directed subgraph.",
+        "Run Kahn's topological sort on this subgraph.",
+        "If the topological sort does not include all n vertices, then the fixed directed edges already contain a cycle, so print NO.",
+        "Otherwise, record the position of each vertex in the topological order.",
+        "Print YES, and then process every original edge in input order.",
+        "For edges that were already directed, keep their original direction unchanged.",
+        "For edges that were undirected, direct them from the vertex with smaller topological position to the one with larger topological position."
+      ],
+      "complexity": {
+        "time": "O(n + m) per test case, because we do one topological sort and then orient each edge once.",
+        "space": "O(n + m), for the adjacency list, indegree array, and stored edges."
+      },
+      "common_mistakes": [
+        "Trying to orient undirected edges before checking whether the fixed directed edges are already cyclic.",
+        "Including undirected edges in the cycle check. Only the already directed edges matter for the initial feasibility test.",
+        "Forgetting that the graph may be disconnected. Topological sort must allow multiple starting points.",
+        "Assuming the sample output is unique. The statement explicitly allows any valid orientation."
+      ],
+      "annotated_code": "import sys\nfrom collections import deque\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    t = next(it)\n    out = []\n    \n    for _ in range(t):\n        n = next(it)\n        m = next(it)\n        \n        # Store all edges so we can output them later\n        edges = []\n        \n        # Only fixed directed edges are used for topo sort / cycle check\n        graph = [[] for _ in range(n + 1)]\n        indeg = [0] * (n + 1)\n        \n        for _ in range(m):\n            typ = next(it)\n            x = next(it)\n            y = next(it)\n            edges.append((typ, x, y))\n            \n            if typ == 1:\n                graph[x].append(y)\n                indeg[y] += 1\n        \n        # Kahn's algorithm on the fixed directed subgraph\n        q = deque(i for i in range(1, n + 1) if indeg[i] == 0)\n        topo = []\n        \n        while q:\n            u = q.popleft()\n            topo.append(u)\n            for v in graph[u]:\n                indeg[v] -= 1\n                if indeg[v] == 0:\n                    q.append(v)\n        \n        # If not all vertices were processed, there is a directed cycle already\n        if len(topo) != n:\n            out.append('NO')\n            continue\n        \n        pos = [0] * (n + 1)\n        for i, v in enumerate(topo):\n            pos[v] = i\n        \n        out.append('YES')\n        \n        for typ, x, y in edges:\n            if typ == 1:\n                # Fixed direction must remain unchanged\n                out.append(f'{x} {y}')\n            else:\n                # Orient from earlier to later in topological order\n                if pos[x] < pos[y]:\n                    out.append(f'{x} {y}')\n                else:\n                    out.append(f'{y} {x}')\n    \n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": false
+    }
+  },
+  {
+    "train_ID": "train_0048",
+    "problem_id": 6,
+    "url": "https://codeforces.com/problemset/problem/1368/E",
+    "category": "graph",
+    "difficulty": "interview",
+    "problem_statement": "Arthur owns a ski resort on a mountain. There are $n$ landing spots on the mountain numbered from $1$ to $n$ from the top to the foot of the mountain. The spots are connected with one-directional ski tracks. All tracks go towards the foot of the mountain, so there are no directed cycles formed by the tracks. There are at most two tracks leaving each spot, but many tracks may enter the same spot.\n\nA skier can start skiing from one spot and stop in another spot if there is a sequence of tracks that lead from the starting spot and end in the ending spot. Unfortunately, recently there were many accidents, because the structure of the resort allows a skier to go through dangerous paths, by reaching high speed and endangering himself and the other customers. Here, a path is called dangerous, if it consists of at least two tracks.\n\nArthur wants to secure his customers by closing some of the spots in a way that there are no dangerous paths in the resort. When a spot is closed, all tracks entering and leaving that spot become unusable. \n\nFormally, after closing some of the spots, there should not be a path that consists of two or more tracks.\n\nArthur doesn't want to close too many spots. He will be happy to find any way to close at most $\\frac{4}{7}n$ spots so that the remaining part is safe. Help him find any suitable way to do so.\n\n\n-----Input-----\n\nThe first line contains a single positive integer $T$ — the number of test cases. $T$ test case description follows.\n\nThe first line of each description contains two integers $n$ and $m$ ($1 \\leq n \\leq 2 \\cdot 10^5$) — the number of landing spots and tracks respectively.\n\nThe following $m$ lines describe the tracks. Each of these lines contains two integers $x$ and $y$ ($1 \\leq x < y \\leq n$) — indices of the starting and finishing spots for the respective track. It is guaranteed that at most two tracks start at each spot. There may be tracks in which starting and finishing spots both coincide.\n\nIt is guaranteed that the sum of $n$ over all test cases does not exceed $2 \\cdot 10^5$.\n\n\n-----Output-----\n\nFor each test case, print a single integer $k$ ($0 \\leq k \\leq \\frac{4}{7}n$) — the number of spots to be closed. In the next line, print $k$ distinct integers — indices of all spots to be closed, in any order.\n\nIf there are several answers, you may output any of them. Note that you don't have to minimize $k$. It can be shown that a suitable answer always exists.\n\n\n-----Example-----\nInput\n2\n4 6\n1 2\n1 3\n2 3\n2 4\n3 4\n3 4\n7 6\n1 2\n1 3\n2 4\n2 5\n3 6\n3 7\n\nOutput\n2\n3 4 \n4\n4 5 6 7 \n\n\n\n-----Note-----\n\nIn the first sample case, closing any two spots is suitable.\n\nIn the second sample case, closing only the spot $1$ is also suitable.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "2\n4 6\n1 2\n1 3\n2 3\n2 4\n3 4\n3 4\n7 6\n1 2\n1 3\n2 4\n2 5\n3 6\n3 7\n"
+      ],
+      "outputs": [
+        "2\n3 4 \n4\n4 5 6 7 \n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We are given a DAG of ski tracks, and we may close some vertices. After closing them, the remaining graph must contain no path of length 2 or more edges. We do not need the minimum number of closed vertices; we only need to produce any valid set whose size is within the promised bound.",
+      "key_observation": "The vertex labels already form a topological order because every edge goes from a smaller index to a larger index. So we can process vertices from 1 to n and greedily decide whether to keep or remove each one. If keeping a vertex would create a path of length at least 2 edges in the remaining graph, then we simply remove that vertex.",
+      "step_by_step_plan": [
+        "Build the reverse adjacency list: for each vertex v, store all predecessors u such that there is an edge u -> v.",
+        "Process vertices from 1 to n in increasing order. This works because x < y for every edge, so the numbering is already a topological order.",
+        "Maintain dp[v] for kept vertices, where dp[v] is the maximum number of vertices on a remaining path that ends at v, capped by the fact that paths of 3 vertices are already illegal.",
+        "For the current vertex v, look at all predecessors u that are not removed, and compute the maximum dp[u].",
+        "If that maximum is already 2, then keeping v would create a path with at least 3 vertices (that is, at least 2 edges), which is forbidden. So remove v.",
+        "Otherwise, keep v and set dp[v] = best + 1.",
+        "At the end, output all removed vertices."
+      ],
+      "complexity": {
+        "time": "O(n + m) per test case, because each edge is inspected once while processing its destination vertex.",
+        "space": "O(n + m), for the reverse adjacency list, removal marks, and dp array."
+      },
+      "common_mistakes": [
+        "Trying to minimize the number of removed vertices. The problem only asks for any valid construction within the guaranteed bound.",
+        "Ignoring that the numbering itself is a topological order. A generic topological sort is unnecessary here.",
+        "Allowing already removed vertices to keep contributing to later transitions. Once a vertex is removed, all incident edges become unusable.",
+        "Confusing 'path of at least two tracks' with 'path of at least two vertices'. The forbidden case is two or more edges."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    t = next(it)\n    out = []\n    \n    for _ in range(t):\n        n = next(it)\n        m = next(it)\n        \n        # parents[v] stores all u such that u -> v\n        parents = [[] for _ in range(n + 1)]\n        for _ in range(m):\n            x = next(it)\n            y = next(it)\n            parents[y].append(x)\n        \n        removed = [False] * (n + 1)\n        dp = [0] * (n + 1)\n        ans = []\n        \n        # Because every edge satisfies x < y, 1..n is already a topological order\n        for v in range(1, n + 1):\n            best = 0\n            for u in parents[v]:\n                if not removed[u] and dp[u] > best:\n                    best = dp[u]\n            \n            # If best == 2, keeping v would create a path of length >= 2 edges\n            if best >= 2:\n                removed[v] = True\n                ans.append(v)\n            else:\n                dp[v] = best + 1\n        \n        out.append(str(len(ans)))\n        out.append(' '.join(map(str, ans)))\n    \n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0049",
+    "problem_id": 104,
+    "url": "https://codeforces.com/problemset/problem/1327/D",
+    "category": "graph",
+    "difficulty": "interview",
+    "problem_statement": "You are given a colored permutation $p_1, p_2, \\dots, p_n$. The $i$-th element of the permutation has color $c_i$.\n\nLet's define an infinite path as infinite sequence $i, p[i], p[p[i]], p[p[p[i]]] \\dots$ where all elements have same color ($c[i] = c[p[i]] = c[p[p[i]]] = \\dots$).\n\nWe can also define a multiplication of permutations $a$ and $b$ as permutation $c = a \\times b$ where $c[i] = b[a[i]]$. Moreover, we can define a power $k$ of permutation $p$ as $p^k=\\underbrace{p \\times p \\times \\dots \\times p}_{k \\text{ times}}$.\n\nFind the minimum $k > 0$ such that $p^k$ has at least one infinite path (i.e. there is a position $i$ in $p^k$ such that the sequence starting from $i$ is an infinite path).\n\nIt can be proved that the answer always exists.\n\n\n-----Input-----\n\nThe first line contains single integer $T$ ($1 \\le T \\le 10^4$) — the number of test cases.\n\nNext $3T$ lines contain test cases — one per three lines. The first line contains single integer $n$ ($1 \\le n \\le 2 \\cdot 10^5$) — the size of the permutation.\n\nThe second line contains $n$ integers $p_1, p_2, \\dots, p_n$ ($1 \\le p_i \\le n$, $p_i \\neq p_j$ for $i \\neq j$) — the permutation $p$.\n\nThe third line contains $n$ integers $c_1, c_2, \\dots, c_n$ ($1 \\le c_i \\le n$) — the colors of elements of the permutation.\n\nIt is guaranteed that the total sum of $n$ doesn't exceed $2 \\cdot 10^5$.\n\n\n-----Output-----\n\nPrint $T$ integers — one per test case. For each test case print minimum $k > 0$ such that $p^k$ has at least one infinite path.\n\n\n-----Example-----\nInput\n3\n4\n1 3 4 2\n1 2 2 3\n5\n2 3 4 5 1\n1 2 3 4 5\n8\n7 4 5 6 1 8 3 2\n5 3 6 4 7 5 8 4\n\nOutput\n1\n5\n2\n\n\n\n-----Note-----\n\nIn the first test case, $p^1 = p = [1, 3, 4, 2]$ and the sequence starting from $1$: $1, p[1] = 1, \\dots$ is an infinite path.\n\nIn the second test case, $p^5 = [1, 2, 3, 4, 5]$ and it obviously contains several infinite paths.\n\nIn the third test case, $p^2 = [3, 6, 1, 8, 7, 2, 5, 4]$ and the sequence starting from $4$: $4, p^2[4]=8, p^2[8]=4, \\dots$ is an infinite path since $c_4 = c_8 = 4$.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "3\n4\n1 3 4 2\n1 2 2 3\n5\n2 3 4 5 1\n1 2 3 4 5\n8\n7 4 5 6 1 8 3 2\n5 3 6 4 7 5 8 4\n"
+      ],
+      "outputs": [
+        "1\n5\n2\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "The permutation can be decomposed into disjoint cycles. We want the smallest positive k such that in p^k, there exists at least one infinite path whose vertices all have the same color. Since permutation powers act independently inside each cycle, we only need one cycle to work, and the global answer is the minimum valid k over all cycles.",
+      "key_observation": "Inside a cycle of length L, taking p^k means jumping by a fixed step on that cycle. Therefore, the answer for that cycle must be a divisor of L. For each divisor d of L, we check whether there exists some starting offset such that all positions separated by d in the cycle have the same color. The first divisor that works is the minimum k for that cycle.",
+      "step_by_step_plan": [
+        "Decompose the permutation into disjoint cycles using a visited array.",
+        "For each cycle, extract its colors into a list in traversal order.",
+        "Let the cycle length be L. Enumerate all divisors of L in increasing order.",
+        "For a divisor d, try every starting offset s from 0 to d - 1.",
+        "For each offset, check the subsequence colors[s], colors[s + d], colors[s + 2d], ... . If all values are equal for some offset, then d works for this cycle.",
+        "The answer for the whole test case is the minimum working divisor among all cycles."
+      ],
+      "complexity": {
+        "time": "O(sum over cycles of (number_of_divisors(length) * length)) in the worst case, which is acceptable because the total n over all test cases is at most 2 * 10^5 and each cycle has only a small number of divisors.",
+        "space": "O(n), for the visited array, permutation storage, color storage, and cycle extraction."
+      },
+      "common_mistakes": [
+        "Trying to reason directly about p^k on the full permutation instead of decomposing the permutation into cycles first.",
+        "Checking only one starting offset for a divisor d. A valid monochromatic pattern can start at any residue class modulo d.",
+        "Testing arbitrary k values instead of only divisors of the cycle length.",
+        "Taking the maximum answer over all cycles. We only need one cycle to produce an infinite same-color path, so we take the minimum."
+      ],
+      "annotated_code": "import sys\n\n\ndef valid_period(colors, d):\n    # Check whether there exists a starting offset such that\n    # all positions start, start+d, start+2d, ... have the same color\n    L = len(colors)\n    for start in range(d):\n        first = colors[start]\n        ok = True\n        for i in range(start, L, d):\n            if colors[i] != first:\n                ok = False\n                break\n        if ok:\n            return True\n    return False\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    t = next(it)\n    out = []\n    \n    for _ in range(t):\n        n = next(it)\n        p = [next(it) - 1 for _ in range(n)]\n        c = [next(it) for _ in range(n)]\n        \n        visited = [False] * n\n        ans = n\n        \n        for i in range(n):\n            if visited[i]:\n                continue\n            \n            # Extract one cycle\n            cycle = []\n            cur = i\n            while not visited[cur]:\n                visited[cur] = True\n                cycle.append(cur)\n                cur = p[cur]\n            \n            colors = [c[x] for x in cycle]\n            L = len(colors)\n            \n            divisors = []\n            d = 1\n            while d * d <= L:\n                if L % d == 0:\n                    divisors.append(d)\n                    if d * d != L:\n                        divisors.append(L // d)\n                d += 1\n            \n            for d in sorted(divisors):\n                if valid_period(colors, d):\n                    ans = min(ans, d)\n                    break\n        \n        out.append(str(ans))\n    \n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0050",
+    "problem_id": 2044,
+    "url": "https://codeforces.com/problemset/problem/827/B",
+    "category": "graph",
+    "difficulty": "competition",
+    "problem_statement": "Arkady needs your help again! This time he decided to build his own high-speed Internet exchange point. It should consist of n nodes connected with minimum possible number of wires into one network (a wire directly connects two nodes). Exactly k of the nodes should be exit-nodes, that means that each of them should be connected to exactly one other node of the network, while all other nodes should be connected to at least two nodes in order to increase the system stability.\n\nArkady wants to make the system as fast as possible, so he wants to minimize the maximum distance between two exit-nodes. The distance between two nodes is the number of wires a package needs to go through between those two nodes.\n\nHelp Arkady to find such a way to build the network that the distance between the two most distant exit-nodes is as small as possible.\n\n\n-----Input-----\n\nThe first line contains two integers n and k (3 ≤ n ≤ 2·10^5, 2 ≤ k ≤ n - 1) — the total number of nodes and the number of exit-nodes.\n\nNote that it is always possible to build at least one network with n nodes and k exit-nodes within the given constraints.\n\n\n-----Output-----\n\nIn the first line print the minimum possible distance between the two most distant exit-nodes. In each of the next n - 1 lines print two integers: the ids of the nodes connected by a wire. The description of each wire should be printed exactly once. You can print wires and wires' ends in arbitrary order. The nodes should be numbered from 1 to n. Exit-nodes can have any ids.\n\nIf there are multiple answers, print any of them.\n\n\n-----Examples-----\nInput\n3 2\n\nOutput\n2\n1 2\n2 3\n\nInput\n5 3\n\nOutput\n3\n1 2\n2 3\n3 4\n3 5\n\n\n\n-----Note-----\n\nIn the first example the only network is shown on the left picture.\n\nIn the second example one of optimal networks is shown on the right picture.\n\nExit-nodes are highlighted. [Image]",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "3 2\n",
+        "5 3\n",
+        "4 2\n",
+        "4 3\n",
+        "5 2\n",
+        "5 4\n",
+        "6 2\n",
+        "6 3\n",
+        "6 4\n",
+        "6 5\n",
+        "7 2\n",
+        "7 3\n",
+        "7 4\n",
+        "7 5\n",
+        "7 6\n",
+        "10 6\n"
+      ],
+      "outputs": [
+        "2\n1 2\n2 3\n",
+        "3\n1 2\n2 3\n3 4\n3 5\n",
+        "3\n1 2\n2 3\n3 4\n",
+        "2\n1 2\n2 3\n2 4\n",
+        "4\n1 2\n2 3\n3 4\n4 5\n",
+        "2\n1 2\n2 3\n2 4\n2 5\n",
+        "5\n1 2\n2 3\n3 4\n4 5\n5 6\n",
+        "4\n1 2\n2 3\n3 4\n4 5\n3 6\n",
+        "3\n1 2\n2 3\n3 4\n3 5\n3 6\n",
+        "2\n1 2\n2 3\n2 4\n2 5\n2 6\n",
+        "6\n1 2\n2 3\n3 4\n4 5\n5 6\n6 7\n",
+        "4\n1 2\n2 3\n3 4\n4 5\n3 6\n6 7\n",
+        "4\n1 2\n2 3\n3 4\n4 5\n3 6\n3 7\n",
+        "3\n1 2\n2 3\n3 4\n3 5\n3 6\n3 7\n",
+        "2\n1 2\n2 3\n2 4\n2 5\n2 6\n2 7\n",
+        "4\n1 2\n2 3\n3 4\n4 5\n3 6\n6 7\n3 8\n3 9\n3 10\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to build a tree with exactly k leaves and n total vertices, while minimizing the maximum distance between any two leaves. We may output any optimal construction.",
+      "key_observation": "The optimal shape is a center vertex with k chains attached to it, and the chain lengths should be as balanced as possible. Since the total number of edges is n - 1, we distribute these edges among the k branches as evenly as we can. Then the maximum leaf-to-leaf distance is simply the sum of the lengths of the two longest branches.",
+      "step_by_step_plan": [
+        "Use vertex 1 as the central hub of the construction.",
+        "Let total = n - 1, because a tree with n vertices has exactly n - 1 edges.",
+        "Distribute these total edges among k branches as evenly as possible: each branch gets base = total // k edges, and the first extra = total % k branches get one more edge.",
+        "Construct each branch as a simple chain starting from the center vertex 1.",
+        "Because every branch has length at least 1, each branch contributes exactly one leaf at its end, so the total number of leaves is exactly k.",
+        "The answer to print is the sum of the two largest branch lengths.",
+        "Then output all constructed edges."
+      ],
+      "complexity": {
+        "time": "O(n), because we construct exactly n - 1 edges once.",
+        "space": "O(n), for storing the list of constructed edges."
+      },
+      "common_mistakes": [
+        "Using a star blindly. A pure star works only when n = k + 1; otherwise, the extra vertices must go somewhere, and attaching them carelessly can increase the number of leaves.",
+        "Not balancing the branch lengths. If one branch is much longer than the others, the farthest pair of leaves becomes unnecessarily large.",
+        "Forgetting that the tree must have exactly k leaves, not at least k leaves.",
+        "Printing the wrong first-line answer. It should be the distance between the two most distant leaves in your construction."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    n, k = map(int, sys.stdin.buffer.read().split())\n    \n    total_edges = n - 1\n    base = total_edges // k\n    extra = total_edges % k\n    \n    # First 'extra' branches have length base + 1, the rest have length base\n    lengths = [base + (1 if i < extra else 0) for i in range(k)]\n    \n    edges = []\n    cur = 2\n    for length in lengths:\n        prev = 1\n        for _ in range(length):\n            edges.append((prev, cur))\n            prev = cur\n            cur += 1\n    \n    # Since lengths are arranged from longest to shortest (or equal),\n    # the answer is the sum of the two largest branch lengths.\n    answer = lengths[0] + lengths[1]\n    \n    out = [str(answer)]\n    for u, v in edges:\n        out.append(f'{u} {v}')\n    \n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": false
+    }
+  }
+]

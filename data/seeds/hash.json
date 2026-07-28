@@ -1,0 +1,286 @@
+[
+  {
+    "train_ID": "train_0011",
+    "problem_id": 2418,
+    "url": "https://leetcode.com/problems/contains-duplicate/",
+    "category": "hash",
+    "difficulty": "introductory",
+    "problem_statement": "Given an array of integers, find if the array contains any duplicates.\n\nYour function should return true if any value appears at least twice in the array, and it should return false if every element is distinct.\n\nExample 1:\n\n\nInput: [1,2,3,1]\nOutput: true\n\nExample 2:\n\n\nInput: [1,2,3,4]\nOutput: false\n\nExample 3:\n\n\nInput: [1,1,1,3,3,4,3,2,4,2]\nOutput: true",
+    "starter_code": "class Solution:\n    def containsDuplicate(self, nums: List[int]) -> bool:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            2,
+            3,
+            1
+          ]
+        ]
+      ],
+      "outputs": [
+        true
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Determine whether any integer appears at least twice in a given array. Return true if a duplicate exists, and false if every element is unique.",
+      "key_observation": "A Hash Set allows for average O(1) time complexity for both inserting and searching. By storing each element in a set as we traverse the array, we can immediately identify a duplicate the moment we encounter a number that is already in the set.",
+      "step_by_step_plan": [
+        "Initialize an empty hash set to keep track of the numbers we have encountered.",
+        "Iterate through each number in the input array 'nums'.",
+        "For each number, check if it already exists in the hash set.",
+        "If it exists, a duplicate has been detected; return true immediately.",
+        "If it does not exist, add the current number to the hash set and move to the next.",
+        "If the loop finishes without finding any matches, return false."
+      ],
+      "complexity": {
+        "time": "O(N), where N is the number of elements in the array. In the worst case, we traverse the entire array once, with each set operation taking O(1) on average.",
+        "space": "O(N) to store the elements in the hash set in the worst case (when all elements are unique)."
+      },
+      "common_mistakes": [
+        "Using a brute-force O(N^2) approach with nested loops, which will fail on large input sizes due to time constraints.",
+        "Choosing a sorting-based approach (O(N log N)) when time is the primary concern, although it is more memory-efficient (O(1) extra space).",
+        "Forgetting to return false if the entire array is scanned without finding a duplicate."
+      ],
+      "annotated_code": "class Solution:\n    def containsDuplicate(self, nums: List[int]) -> bool:\n        # Approach 1: Early exit using a set for O(N) time\n        seen = set()\n        for num in nums:\n            if num in seen:\n                return True\n            seen.add(num)\n        return False\n\n        "
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0012",
+    "problem_id": 2530,
+    "url": "https://leetcode.com/problems/pairs-of-songs-with-total-durations-divisible-by-60/",
+    "category": "hash",
+    "difficulty": "introductory",
+    "problem_statement": "In a list of songs, the i-th song has a duration of time[i] seconds. \nReturn the number of pairs of songs for which their total duration in seconds is divisible by 60.  Formally, we want the number of indices i, j such that i < j with (time[i] + time[j]) % 60 == 0.\n \nExample 1:\nInput: [30,20,150,100,40]\nOutput: 3\nExplanation: Three pairs have a total duration divisible by 60:\n(time[0] = 30, time[2] = 150): total duration 180\n(time[1] = 20, time[3] = 100): total duration 120\n(time[1] = 20, time[4] = 40): total duration 60\n\n\nExample 2:\nInput: [60,60,60]\nOutput: 3\nExplanation: All three pairs have a total duration of 120, which is divisible by 60.\n\n\n \nNote:\n\n1 <= time.length <= 60000\n1 <= time[i] <= 500",
+    "starter_code": "class Solution:\n    def numPairsDivisibleBy60(self, time: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            30,
+            20,
+            150,
+            100,
+            40
+          ]
+        ]
+      ],
+      "outputs": [
+        3
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given an array of song durations, count how many pairs of indices (i, j) with i < j have a total duration divisible by 60.",
+      "key_observation": "Only the remainder modulo 60 matters. If the current song has remainder r, then it can form a valid pair only with a previous song whose remainder is (60 - r) % 60. This lets us count pairs in one pass using a frequency table of remainders.",
+      "step_by_step_plan": [
+        "Create an array or hash map to store how many previous songs have each remainder modulo 60.",
+        "Initialize the answer counter to 0.",
+        "Iterate through the song durations one by one.",
+        "For the current duration, compute r = duration % 60 and its needed complement c = (60 - r) % 60.",
+        "Add the number of previously seen songs with remainder c to the answer.",
+        "Then record the current song by increasing the count of remainder r.",
+        "Return the final answer after the loop."
+      ],
+      "complexity": {
+        "time": "O(N), because we process each song exactly once.",
+        "space": "O(1), because there are only 60 possible remainders."
+      },
+      "common_mistakes": [
+        "Checking all pairs with nested loops, which leads to O(N^2) time and will be too slow.",
+        "Handling the complement as 60 - r without taking modulo again, which breaks the r = 0 case.",
+        "Forgetting that remainder 0 pairs with 0, and remainder 30 pairs with 30."
+      ],
+      "annotated_code": "class Solution:\n    def numPairsDivisibleBy60(self, time: List[int]) -> int:\n        count = [0] * 60\n        ans = 0\n        \n        for t in time:\n            r = t % 60\n            need = (60 - r) % 60\n            \n            # All previous songs with the complementary remainder form valid pairs\n            ans += count[need]\n            \n            # Record the current song for future pairings\n            count[r] += 1\n        \n        return ans"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0013",
+    "problem_id": 94,
+    "url": "https://codeforces.com/problemset/problem/1417/B",
+    "category": "hash",
+    "difficulty": "interview",
+    "problem_statement": "RedDreamer has an array $a$ consisting of $n$ non-negative integers, and an unlucky integer $T$.\n\nLet's denote the misfortune of array $b$ having length $m$ as $f(b)$ — the number of pairs of integers $(i, j)$ such that $1 \\le i < j \\le m$ and $b_i + b_j = T$. RedDreamer has to paint each element of $a$ into one of two colors, white and black (for each element, the color is chosen independently), and then create two arrays $c$ and $d$ so that all white elements belong to $c$, and all black elements belong to $d$ (it is possible that one of these two arrays becomes empty). RedDreamer wants to paint the elements in such a way that $f(c) + f(d)$ is minimum possible.\n\nFor example:\n\n  if $n = 6$, $T = 7$ and $a = [1, 2, 3, 4, 5, 6]$, it is possible to paint the $1$-st, the $4$-th and the $5$-th elements white, and all other elements black. So $c = [1, 4, 5]$, $d = [2, 3, 6]$, and $f(c) + f(d) = 0 + 0 = 0$;  if $n = 3$, $T = 6$ and $a = [3, 3, 3]$, it is possible to paint the $1$-st element white, and all other elements black. So $c = [3]$, $d = [3, 3]$, and $f(c) + f(d) = 0 + 1 = 1$. \n\nHelp RedDreamer to paint the array optimally!\n\n\n-----Input-----\n\nThe first line contains one integer $t$ ($1 \\le t \\le 1000$) — the number of test cases. Then $t$ test cases follow.\n\nThe first line of each test case contains two integers $n$ and $T$ ($1 \\le n \\le 10^5$, $0 \\le T \\le 10^9$) — the number of elements in the array and the unlucky integer, respectively. \n\nThe second line contains $n$ integers $a_1$, $a_2$, ..., $a_n$ ($0 \\le a_i \\le 10^9$) — the elements of the array. \n\nThe sum of $n$ over all test cases does not exceed $10^5$.\n\n\n-----Output-----\n\nFor each test case print $n$ integers: $p_1$, $p_2$, ..., $p_n$ (each $p_i$ is either $0$ or $1$) denoting the colors. If $p_i$ is $0$, then $a_i$ is white and belongs to the array $c$, otherwise it is black and belongs to the array $d$.\n\nIf there are multiple answers that minimize the value of $f(c) + f(d)$, print any of them.\n\n\n-----Example-----\nInput\n2\n6 7\n1 2 3 4 5 6\n3 6\n3 3 3\n\nOutput\n1 0 0 1 1 0 \n1 0 0",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "2\n6 7\n1 2 3 4 5 6\n3 6\n3 3 3\n"
+      ],
+      "outputs": [
+        "0 0 0 1 1 1 \n1 0 1 \n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to color each array element with 0 or 1 so that the total number of same-color pairs whose sum is exactly T becomes as small as possible. Any optimal coloring is acceptable.",
+      "key_observation": "For any value x, its only dangerous partner is T - x. If x and T - x are different, the best strategy is to force them into opposite colors. The only tricky case is x = T - x (that is, 2 * x = T): those values can only pair among themselves, so we should split them as evenly as possible between the two colors.",
+      "step_by_step_plan": [
+        "Initialize the answer array of colors.",
+        "Scan the numbers from left to right.",
+        "If 2 * a[i] < T, assign color 0.",
+        "If 2 * a[i] > T, assign color 1.",
+        "If 2 * a[i] == T, alternate colors among such occurrences so they are split as evenly as possible.",
+        "Print the resulting colors."
+      ],
+      "complexity": {
+        "time": "O(N) per test case, because each element is processed once.",
+        "space": "O(N), for the output color array."
+      },
+      "common_mistakes": [
+        "Trying to explicitly count all dangerous pairs after every coloring decision, which overcomplicates the problem.",
+        "Using floating-point comparisons like a[i] < T / 2 instead of integer-safe comparisons with 2 * a[i].",
+        "Putting all values equal to T / 2 into the same color, which creates unnecessary same-color pairs.",
+        "Treating this as a unique-output problem. Many optimal colorings are valid."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    t = next(it)\n    out = []\n    \n    for _ in range(t):\n        n = next(it)\n        T = next(it)\n        arr = [next(it) for _ in range(n)]\n        ans = [0] * n\n        toggle = 0\n        \n        for i, x in enumerate(arr):\n            if 2 * x < T:\n                ans[i] = 0\n            elif 2 * x > T:\n                ans[i] = 1\n            else:\n                # Split the T/2 values evenly between the two colors\n                ans[i] = toggle\n                toggle ^= 1\n        \n        out.append(' '.join(map(str, ans)))\n    \n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": false
+    }
+  },
+  {
+    "train_ID": "train_0014",
+    "problem_id": 199,
+    "url": "https://leetcode.com/problems/longest-consecutive-sequence/",
+    "category": "hash",
+    "difficulty": "interview",
+    "problem_statement": "Given an unsorted array of integers, find the length of the longest consecutive elements sequence.\n\nYour algorithm should run in O(n) complexity.\n\nExample:\n\n\nInput: [100, 4, 200, 1, 3, 2]\nOutput: 4\nExplanation: The longest consecutive elements sequence is [1, 2, 3, 4]. Therefore its length is 4.",
+    "starter_code": "class Solution:\n    def longestConsecutive(self, nums: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            100,
+            4,
+            200,
+            1,
+            3,
+            2
+          ]
+        ]
+      ],
+      "outputs": [
+        4
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given an unsorted array of integers, return the length of the longest sequence of consecutive integers.",
+      "key_observation": "A hash set allows O(1) average membership checks. We should only start counting from numbers that are the beginning of a sequence, meaning x - 1 is not in the set. This avoids repeatedly recounting the same consecutive run.",
+      "step_by_step_plan": [
+        "Put all numbers into a hash set for O(1) average lookup.",
+        "Initialize the best answer to 0.",
+        "Iterate through each number in the set.",
+        "If num - 1 is also in the set, skip this number because it is not the start of a sequence.",
+        "Otherwise, expand forward from num while num + 1, num + 2, ... remain in the set.",
+        "Measure the length of this sequence and update the global maximum.",
+        "Return the best length found."
+      ],
+      "complexity": {
+        "time": "O(N) on average, because each number is part of at most one forward expansion from a sequence start.",
+        "space": "O(N), because we store all numbers in a hash set."
+      },
+      "common_mistakes": [
+        "Sorting the array first and claiming the algorithm is O(N), even though sorting is O(N log N).",
+        "Starting a forward scan from every number, which can lead to repeated work.",
+        "Forgetting that duplicates disappear naturally in a set, which is actually helpful for this problem."
+      ],
+      "annotated_code": "class Solution:\n    def longestConsecutive(self, nums: List[int]) -> int:\n        num_set = set(nums)\n        ans = 0\n        \n        for num in num_set:\n            # Only start counting from the beginning of a sequence\n            if num - 1 not in num_set:\n                length = 1\n                current = num\n                \n                while current + 1 in num_set:\n                    current += 1\n                    length += 1\n                \n                ans = max(ans, length)\n        \n        return ans"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0015",
+    "problem_id": 2071,
+    "url": "https://codeforces.com/problemset/problem/650/A",
+    "category": "hash",
+    "difficulty": "competition",
+    "problem_statement": "Watchmen are in a danger and Doctor Manhattan together with his friend Daniel Dreiberg should warn them as soon as possible. There are n watchmen on a plane, the i-th watchman is located at point (x_{i}, y_{i}).\n\nThey need to arrange a plan, but there are some difficulties on their way. As you know, Doctor Manhattan considers the distance between watchmen i and j to be |x_{i} - x_{j}| + |y_{i} - y_{j}|. Daniel, as an ordinary person, calculates the distance using the formula $\\sqrt{(x_{i} - x_{j})^{2} +(y_{i} - y_{j})^{2}}$.\n\nThe success of the operation relies on the number of pairs (i, j) (1 ≤ i < j ≤ n), such that the distance between watchman i and watchmen j calculated by Doctor Manhattan is equal to the distance between them calculated by Daniel. You were asked to compute the number of such pairs.\n\n\n-----Input-----\n\nThe first line of the input contains the single integer n (1 ≤ n ≤ 200 000) — the number of watchmen.\n\nEach of the following n lines contains two integers x_{i} and y_{i} (|x_{i}|, |y_{i}| ≤ 10^9).\n\nSome positions may coincide.\n\n\n-----Output-----\n\nPrint the number of pairs of watchmen such that the distance between them calculated by Doctor Manhattan is equal to the distance calculated by Daniel.\n\n\n-----Examples-----\nInput\n3\n1 1\n7 5\n1 5\n\nOutput\n2\n\nInput\n6\n0 0\n0 1\n0 2\n-1 1\n0 1\n1 1\n\nOutput\n11\n\n\n\n-----Note-----\n\nIn the first sample, the distance between watchman 1 and watchman 2 is equal to |1 - 7| + |1 - 5| = 10 for Doctor Manhattan and $\\sqrt{(1 - 7)^{2} +(1 - 5)^{2}} = 2 \\cdot \\sqrt{13}$ for Daniel. For pairs (1, 1), (1, 5) and (7, 5), (1, 5) Doctor Manhattan and Daniel will calculate the same distances.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "3\n1 1\n7 5\n1 5\n",
+        "6\n0 0\n0 1\n0 2\n-1 1\n0 1\n1 1\n",
+        "10\n46 -55\n46 45\n46 45\n83 -55\n46 45\n83 -55\n46 45\n83 45\n83 45\n46 -55\n",
+        "1\n-5 -90\n",
+        "2\n315 845\n-669 -762\n",
+        "3\n8911 7861\n-6888 7861\n8911 7861\n",
+        "2\n-1 1000000000\n0 -1\n",
+        "2\n1000000000 0\n-7 1\n",
+        "2\n1 4\n2 1\n",
+        "2\n1 0\n0 2333333\n",
+        "2\n2 1\n1 2\n",
+        "2\n1 1000000000\n2 -1000000000\n",
+        "2\n0 1000000000\n1 -7\n",
+        "2\n1 0\n0 19990213\n"
+      ],
+      "outputs": [
+        "2\n",
+        "11\n",
+        "33\n",
+        "0\n",
+        "0\n",
+        "3\n",
+        "0\n",
+        "0\n",
+        "0\n",
+        "0\n",
+        "0\n",
+        "0\n",
+        "0\n",
+        "0\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We are given points on a plane and need to count how many pairs have equal Manhattan distance and Euclidean distance.",
+      "key_observation": "For two points, Manhattan distance equals Euclidean distance if and only if the points share the same x-coordinate or the same y-coordinate. Therefore, the answer is: pairs with the same x + pairs with the same y - pairs of identical points, because coincident points are counted in both groups.",
+      "step_by_step_plan": [
+        "Maintain a frequency map for x-coordinates.",
+        "Maintain a frequency map for y-coordinates.",
+        "Maintain a frequency map for exact points (x, y).",
+        "For each point, add its count in the x-map to the answer, then increment that x count.",
+        "Do the same for the y-map.",
+        "Because identical points were counted once in the x-map and once in the y-map, subtract the previous count of the exact same point before incrementing its point count.",
+        "Print the final answer."
+      ],
+      "complexity": {
+        "time": "O(N), because each point is processed once with O(1) average hash-map operations.",
+        "space": "O(N), because the hash maps may store all distinct x-values, y-values, and points."
+      },
+      "common_mistakes": [
+        "Trying to compare Manhattan and Euclidean distances numerically for every pair, which leads to O(N^2) time.",
+        "Missing the mathematical condition that equality happens only for horizontal or vertical alignment.",
+        "Forgetting to subtract duplicate points, which causes overcounting because identical points contribute to both the same-x and same-y counts."
+      ],
+      "annotated_code": "import sys\nfrom collections import defaultdict\n\n\ndef solve():\n    input = sys.stdin.readline\n    n = int(input())\n    \n    count_x = defaultdict(int)\n    count_y = defaultdict(int)\n    count_point = defaultdict(int)\n    ans = 0\n    \n    for _ in range(n):\n        x, y = map(int, input().split())\n        \n        # All previous points with the same x-coordinate form valid pairs\n        ans += count_x[x]\n        count_x[x] += 1\n        \n        # All previous points with the same y-coordinate form valid pairs\n        ans += count_y[y]\n        count_y[y] += 1\n        \n        # Identical points were counted twice above, so subtract once\n        ans -= count_point[(x, y)]\n        count_point[(x, y)] += 1\n    \n    print(ans)\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  }
+]

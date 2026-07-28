@@ -1,0 +1,309 @@
+[
+  {
+    "train_ID": "train_0036",
+    "problem_id": 2480,
+    "url": "https://leetcode.com/problems/minimum-cost-to-move-chips-to-the-same-position/",
+    "category": "greedy",
+    "difficulty": "introductory",
+    "problem_statement": "We have n chips, where the position of the ith chip is position[i].\nWe need to move all the chips to the same position. In one step, we can change the position of the ith chip from position[i] to:\n\nposition[i] + 2 or position[i] - 2 with cost = 0.\nposition[i] + 1 or position[i] - 1 with cost = 1.\n\nReturn the minimum cost needed to move all the chips to the same position.\n \nExample 1:\n\nInput: position = [1,2,3]\nOutput: 1\nExplanation: First step: Move the chip at position 3 to position 1 with cost = 0.\nSecond step: Move the chip at position 2 to position 1 with cost = 1.\nTotal cost is 1.\n\nExample 2:\n\nInput: position = [2,2,2,3,3]\nOutput: 2\nExplanation: We can move the two chips at poistion 3 to position 2. Each move has cost = 1. The total cost = 2.\n\nExample 3:\nInput: position = [1,1000000000]\nOutput: 1\n\n \nConstraints:\n\n1 <= position.length <= 100\n1 <= position[i] <= 10^9",
+    "starter_code": "\nclass Solution:\n    def minCostToMoveChips(self, position: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            2,
+            3
+          ]
+        ]
+      ],
+      "outputs": [
+        1
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to move all chips to one final position. Moving a chip by 2 positions costs 0, while moving it by 1 position costs 1. Return the minimum total cost needed to gather all chips together.",
+      "key_observation": "Only the parity of a position matters. Any chip can move freely among positions with the same parity, because repeated ±2 moves cost 0. Therefore, the only real choice is whether to gather everything on an odd position or on an even position.",
+      "step_by_step_plan": [
+        "Count how many chips are currently on odd positions.",
+        "Count how many chips are currently on even positions.",
+        "If we gather all chips on an odd position, every chip currently on an even position must pay cost 1 exactly once.",
+        "If we gather all chips on an even position, every chip currently on an odd position must pay cost 1 exactly once.",
+        "Return the smaller of the two counts."
+      ],
+      "complexity": {
+        "time": "O(N), because we scan the list of chip positions once.",
+        "space": "O(1), because we only maintain two counters."
+      },
+      "common_mistakes": [
+        "Trying to simulate actual moves between all positions, even though the exact destination within the same parity class does not matter.",
+        "Ignoring the parity insight and overcomplicating the problem with sorting or shortest-path style reasoning.",
+        "Thinking a chip might need to pay more than 1 total cost to switch parity. In fact, moving from odd to even (or even to odd) only needs one ±1 move."
+      ],
+      "annotated_code": "class Solution:\n    def minCostToMoveChips(self, position: List[int]) -> int:\n        odd = 0\n        even = 0\n        \n        for x in position:\n            if x % 2 == 0:\n                even += 1\n            else:\n                odd += 1\n        \n        # Gather on odd => pay for all even chips\n        # Gather on even => pay for all odd chips\n        return min(odd, even)"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0037",
+    "problem_id": 2550,
+    "url": "https://leetcode.com/problems/lemonade-change/",
+    "category": "greedy",
+    "difficulty": "introductory",
+    "problem_statement": "At a lemonade stand, each lemonade costs $5. \nCustomers are standing in a queue to buy from you, and order one at a time (in the order specified by bills).\nEach customer will only buy one lemonade and pay with either a $5, $10, or $20 bill.  You must provide the correct change to each customer, so that the net transaction is that the customer pays $5.\nNote that you don't have any change in hand at first.\nReturn true if and only if you can provide every customer with correct change.\n \n\nExample 1:\nInput: [5,5,5,10,20]\nOutput: true\nExplanation: \nFrom the first 3 customers, we collect three $5 bills in order.\nFrom the fourth customer, we collect a $10 bill and give back a $5.\nFrom the fifth customer, we give a $10 bill and a $5 bill.\nSince all customers got correct change, we output true.\n\n\nExample 2:\nInput: [5,5,10]\nOutput: true\n\n\nExample 3:\nInput: [10,10]\nOutput: false\n\n\nExample 4:\nInput: [5,5,10,10,20]\nOutput: false\nExplanation: \nFrom the first two customers in order, we collect two $5 bills.\nFor the next two customers in order, we collect a $10 bill and give back a $5 bill.\nFor the last customer, we can't give change of $15 back because we only have two $10 bills.\nSince not every customer received correct change, the answer is false.\n\n \nNote:\n\n0 <= bills.length <= 10000\nbills[i] will be either 5, 10, or 20.",
+    "starter_code": "\nclass Solution:\n    def lemonadeChange(self, bills: List[int]) -> bool:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            5,
+            5,
+            5,
+            10,
+            20
+          ]
+        ]
+      ],
+      "outputs": [
+        true
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Customers pay for a $5 lemonade using only $5, $10, or $20 bills, and they arrive in a fixed order. Starting with no cash, determine whether it is possible to give correct change to every customer.",
+      "key_observation": "This is a greedy simulation problem. The only bills we ever need to track are $5 and $10. When giving $15 change for a $20 bill, using one $10 bill and one $5 bill is always better than using three $5 bills, because $5 bills are more flexible and are needed in both future change scenarios.",
+      "step_by_step_plan": [
+        "Maintain two counters: how many $5 bills and how many $10 bills you currently have.",
+        "Process each customer's bill from left to right.",
+        "If the bill is $5, just increase the count of $5 bills.",
+        "If the bill is $10, you must give one $5 bill as change; if you have none, return false.",
+        "If the bill is $20, first try to give one $10 bill and one $5 bill. If that is not possible, try to give three $5 bills. If neither is possible, return false.",
+        "If all customers are processed successfully, return true."
+      ],
+      "complexity": {
+        "time": "O(N), because each customer is processed once.",
+        "space": "O(1), because we only store counts of two bill types."
+      },
+      "common_mistakes": [
+        "Using three $5 bills before trying $10 + $5 when serving a $20 bill, which can make a future transaction impossible.",
+        "Tracking the total amount of money only, instead of the specific counts of $5 and $10 bills.",
+        "Forgetting that the order of customers matters; you cannot rearrange transactions."
+      ],
+      "annotated_code": "class Solution:\n    def lemonadeChange(self, bills: List[int]) -> bool:\n        five = 0\n        ten = 0\n        \n        for bill in bills:\n            if bill == 5:\n                five += 1\n            elif bill == 10:\n                if five == 0:\n                    return False\n                five -= 1\n                ten += 1\n            else:  # bill == 20\n                # Greedy: prefer 10 + 5 over 5 + 5 + 5\n                if ten > 0 and five > 0:\n                    ten -= 1\n                    five -= 1\n                elif five >= 3:\n                    five -= 3\n                else:\n                    return False\n        \n        return True"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0038",
+    "problem_id": 141,
+    "url": "https://leetcode.com/problems/boats-to-save-people/",
+    "category": "greedy",
+    "difficulty": "interview",
+    "problem_statement": "The i-th person has weight people[i], and each boat can carry a maximum weight of limit.\nEach boat carries at most 2 people at the same time, provided the sum of the weight of those people is at most limit.\nReturn the minimum number of boats to carry every given person.  (It is guaranteed each person can be carried by a boat.)\n \n\nExample 1:\nInput: people = [1,2], limit = 3\nOutput: 1\nExplanation: 1 boat (1, 2)\n\n\nExample 2:\nInput: people = [3,2,2,1], limit = 3\nOutput: 3\nExplanation: 3 boats (1, 2), (2) and (3)\n\n\nExample 3:\nInput: people = [3,5,3,4], limit = 5\nOutput: 4\nExplanation: 4 boats (3), (3), (4), (5)\nNote:\n\n1 <= people.length <= 50000\n1 <= people[i] <= limit <= 30000",
+    "starter_code": "\nclass Solution:\n    def numRescueBoats(self, people: List[int], limit: int) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            2
+          ],
+          3
+        ]
+      ],
+      "outputs": [
+        1
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Each boat can carry at most two people, and their total weight cannot exceed the limit. We need to transport everyone using the minimum number of boats.",
+      "key_observation": "After sorting, always place the heaviest remaining person on a boat. The only useful question is whether the lightest remaining person can join them. If even the lightest person cannot pair with the heaviest, then the heaviest must go alone.",
+      "step_by_step_plan": [
+        "Sort the array of people by weight in non-decreasing order.",
+        "Use two pointers: one at the lightest remaining person, and one at the heaviest remaining person.",
+        "Count one boat for the heaviest person in every iteration, because they must be assigned now.",
+        "If the lightest and heaviest together do not exceed the limit, move both pointers inward because they can share one boat.",
+        "Otherwise, move only the heaviest pointer inward, because the heaviest person must go alone.",
+        "Continue until all people are assigned."
+      ],
+      "complexity": {
+        "time": "O(N log N), due to sorting the weights.",
+        "space": "O(1) extra space if sorting in place is allowed; otherwise it depends on the sorting implementation."
+      },
+      "common_mistakes": [
+        "Trying to greedily pair arbitrary people without sorting first, which loses the structure needed for a proof of optimality.",
+        "Assuming that if the heaviest person cannot pair with the current lightest, they might still pair with someone else. That is impossible after sorting.",
+        "Forgetting that each boat can carry at most two people, not any number of people under the weight limit."
+      ],
+      "annotated_code": "class Solution:\n    def numRescueBoats(self, people: List[int], limit: int) -> int:\n        people.sort()\n        left = 0\n        right = len(people) - 1\n        boats = 0\n        \n        while left <= right:\n            boats += 1\n            \n            # Try to pair the lightest with the heaviest\n            if people[left] + people[right] <= limit:\n                left += 1\n            \n            # The heaviest person is always used in this boat\n            right -= 1\n        \n        return boats"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0039",
+    "problem_id": 148,
+    "url": "https://leetcode.com/problems/most-profit-assigning-work/",
+    "category": "greedy",
+    "difficulty": "interview",
+    "problem_statement": "We have jobs: difficulty[i] is the difficulty of the ith job, and profit[i] is the profit of the ith job. \nNow we have some workers. worker[i] is the ability of the ith worker, which means that this worker can only complete a job with difficulty at most worker[i]. \nEvery worker can be assigned at most one job, but one job can be completed multiple times.\nFor example, if 3 people attempt the same job that pays $1, then the total profit will be $3.  If a worker cannot complete any job, his profit is $0.\nWhat is the most profit we can make?\nExample 1:\nInput: difficulty = [2,4,6,8,10], profit = [10,20,30,40,50], worker = [4,5,6,7]\nOutput: 100 \nExplanation: Workers are assigned jobs of difficulty [4,4,6,6] and they get profit of [20,20,30,30] seperately.\nNotes:\n\n1 <= difficulty.length = profit.length <= 10000\n1 <= worker.length <= 10000\ndifficulty[i], profit[i], worker[i]  are in range [1, 10^5]",
+    "starter_code": "\nclass Solution:\n    def maxProfitAssignment(self, difficulty: List[int], profit: List[int], worker: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            2,
+            4,
+            6,
+            8,
+            10
+          ],
+          [
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          [
+            4,
+            5,
+            6,
+            7
+          ]
+        ]
+      ],
+      "outputs": [
+        100
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Each worker can do any job whose difficulty is at most their ability. A job may be assigned to multiple workers, so the task is to maximize the total profit earned by all workers combined.",
+      "key_observation": "Because jobs can be reused infinitely many times, this is not a matching problem. For each worker, we only need the maximum profit among all jobs they are capable of doing. After sorting jobs by difficulty and workers by ability, we can sweep from left to right and maintain the best profit seen so far.",
+      "step_by_step_plan": [
+        "Pair each job's difficulty with its profit, and sort the jobs by difficulty.",
+        "Sort the worker abilities in non-decreasing order.",
+        "Use a pointer to scan the jobs while iterating through workers from weakest to strongest.",
+        "For the current worker, advance the job pointer through all jobs whose difficulty is within the worker's ability.",
+        "Maintain a running variable 'best_profit_so_far' representing the maximum profit among all reachable jobs.",
+        "Add that best profit to the answer for the current worker.",
+        "Return the final total."
+      ],
+      "complexity": {
+        "time": "O((N + M) log N + M log M), where N is the number of jobs and M is the number of workers, due to sorting.",
+        "space": "O(N), to store the job pairs."
+      },
+      "common_mistakes": [
+        "Treating the problem like bipartite matching and assuming each job can be used only once.",
+        "Choosing the job with the largest difficulty a worker can handle, instead of the largest profit.",
+        "Scanning all jobs again for every worker, which leads to an unnecessary O(N * M) solution."
+      ],
+      "annotated_code": "class Solution:\n    def maxProfitAssignment(self, difficulty: List[int], profit: List[int], worker: List[int]) -> int:\n        jobs = sorted(zip(difficulty, profit))\n        worker.sort()\n        \n        ans = 0\n        best_profit = 0\n        j = 0\n        \n        for ability in worker:\n            # Add all jobs this worker can do\n            while j < len(jobs) and jobs[j][0] <= ability:\n                best_profit = max(best_profit, jobs[j][1])\n                j += 1\n            \n            # Reuse of jobs is allowed, so every worker takes the best reachable one\n            ans += best_profit\n        \n        return ans"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0040",
+    "problem_id": 2015,
+    "url": "https://codeforces.com/problemset/problem/585/A",
+    "category": "greedy",
+    "difficulty": "competition",
+    "problem_statement": "Gennady is one of the best child dentists in Berland. Today n children got an appointment with him, they lined up in front of his office.\n\nAll children love to cry loudly at the reception at the dentist. We enumerate the children with integers from 1 to n in the order they go in the line. Every child is associated with the value of his cofidence p_{i}. The children take turns one after another to come into the office; each time the child that is the first in the line goes to the doctor.\n\nWhile Gennady treats the teeth of the i-th child, the child is crying with the volume of v_{i}. At that the confidence of the first child in the line is reduced by the amount of v_{i}, the second one — by value v_{i} - 1, and so on. The children in the queue after the v_{i}-th child almost do not hear the crying, so their confidence remains unchanged.\n\nIf at any point in time the confidence of the j-th child is less than zero, he begins to cry with the volume of d_{j} and leaves the line, running towards the exit, without going to the doctor's office. At this the confidence of all the children after the j-th one in the line is reduced by the amount of d_{j}.\n\nAll these events occur immediately one after the other in some order. Some cries may lead to other cries, causing a chain reaction. Once in the hallway it is quiet, the child, who is first in the line, goes into the doctor's office.\n\nHelp Gennady the Dentist to determine the numbers of kids, whose teeth he will cure. Print their numbers in the chronological order.\n\n\n-----Input-----\n\nThe first line of the input contains a positive integer n (1 ≤ n ≤ 4000) — the number of kids in the line. \n\nNext n lines contain three integers each v_{i}, d_{i}, p_{i} (1 ≤ v_{i}, d_{i}, p_{i} ≤ 10^6) — the volume of the cry in the doctor's office, the volume of the cry in the hall and the confidence of the i-th child.\n\n\n-----Output-----\n\nIn the first line print number k — the number of children whose teeth Gennady will cure.\n\nIn the second line print k integers — the numbers of the children who will make it to the end of the line in the increasing order.\n\n\n-----Examples-----\nInput\n5\n4 2 2\n4 1 2\n5 2 4\n3 3 5\n5 1 2\n\nOutput\n2\n1 3 \nInput\n5\n4 5 1\n5 3 9\n4 1 2\n2 1 8\n4 1 9\n\nOutput\n4\n1 2 4 5 \n\n\n-----Note-----\n\nIn the first example, Gennady first treats the teeth of the first child who will cry with volume 4. The confidences of the remaining children will get equal to  - 2, 1, 3, 1, respectively. Thus, the second child also cries at the volume of 1 and run to the exit. The confidence of the remaining children will be equal to 0, 2, 0. Then the third child will go to the office, and cry with volume 5. The other children won't bear this, and with a loud cry they will run to the exit.\n\nIn the second sample, first the first child goes into the office, he will cry with volume 4. The confidence of the remaining children will be equal to 5,  - 1, 6, 8. Thus, the third child will cry with the volume of 1 and run to the exit. The confidence of the remaining children will be equal to 5, 5, 7. After that, the second child goes to the office and cry with the volume of 5. The confidences of the remaining children will be equal to 0, 3. Then the fourth child will go into the office and cry with the volume of 2. Because of this the confidence of the fifth child will be 1, and he will go into the office last.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "5\n4 2 2\n4 1 2\n5 2 4\n3 3 5\n5 1 2\n",
+        "5\n4 5 1\n5 3 9\n4 1 2\n2 1 8\n4 1 9\n",
+        "10\n10 7 10\n3 6 11\n8 4 10\n10 1 11\n7 3 13\n7 2 13\n7 6 14\n3 4 17\n9 4 20\n5 2 24\n",
+        "10\n5 6 3\n7 4 10\n9 1 17\n2 8 23\n9 10 24\n6 8 18\n3 2 35\n7 6 6\n1 3 12\n9 9 5\n",
+        "10\n4 9 1\n8 2 14\n7 10 20\n6 9 18\n5 3 19\n2 9 7\n6 8 30\n8 7 38\n6 5 5\n6 9 37\n",
+        "10\n10 3 3\n8 6 17\n9 5 26\n10 7 17\n3 10 29\n3 1 27\n3 3 7\n8 10 28\n1 3 23\n3 4 6\n",
+        "10\n5 6 1\n9 2 6\n4 1 5\n4 10 5\n1 8 23\n9 4 21\n3 9 6\n7 8 34\n7 4 24\n8 9 21\n",
+        "4\n2 10 1\n1 2 2\n2 1 1\n5 5 1\n",
+        "1\n1 1 1\n",
+        "2\n5 1 1\n1 1 5\n",
+        "2\n5 1 1\n1 1 4\n",
+        "2\n5 1 1\n1 1 6\n",
+        "3\n5 1 1\n1 1 4\n1 1 4\n",
+        "3\n5 1 1\n1 1 4\n1 1 5\n",
+        "3\n5 1 1\n1 1 5\n1 1 3\n",
+        "3\n5 1 1\n10 1 5\n1000 1000 14\n",
+        "10\n9 8 8\n2 9 33\n10 7 42\n7 2 18\n3 5 82\n9 9 25\n3 2 86\n3 5 49\n5 3 72\n4 4 71\n",
+        "10\n9 8 8\n2 9 8\n10 7 16\n7 2 9\n3 5 23\n9 9 25\n3 2 35\n3 5 36\n5 3 40\n4 4 42\n"
+      ],
+      "outputs": [
+        "2\n1 3 ",
+        "4\n1 2 4 5 ",
+        "3\n1 2 5 ",
+        "6\n1 2 3 4 5 7 ",
+        "8\n1 2 3 4 5 7 8 10 ",
+        "5\n1 2 3 5 8 ",
+        "5\n1 2 5 6 8 ",
+        "3\n1 2 4 ",
+        "1\n1 ",
+        "2\n1 2 ",
+        "1\n1 ",
+        "2\n1 2 ",
+        "1\n1 ",
+        "2\n1 3 ",
+        "2\n1 2 ",
+        "3\n1 2 3 ",
+        "10\n1 2 3 4 5 6 7 8 9 10 ",
+        "1\n1 "
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Children stand in a queue for the dentist. When the child currently being treated cries, the confidence of children still waiting in line decreases with a decaying effect. If any waiting child's confidence becomes negative, that child cries in the hallway, leaves the queue immediately, and further decreases the confidence of all children behind them. We need to output which children actually make it into the dentist's office.",
+      "key_observation": "This is a direct simulation problem with chain reactions. The tricky part is that the office cry decays by queue order among children who are still present, while hallway cries trigger immediate cascading decreases on all later surviving children. The correct solution is to simulate the queue from left to right and carefully process these chain reactions in order.",
+      "step_by_step_plan": [
+        "Maintain an array indicating whether each child is still in the queue.",
+        "Process children from left to right. If a child has already left due to a previous chain reaction, skip them.",
+        "If a child is still present, they successfully enter the office, so record their index in the answer.",
+        "Collect the current surviving children behind them in queue order, and apply the office cry damage with decreasing volume v, v-1, v-2, ... down to 0.",
+        "After that, scan those surviving children from front to back. Whenever a child's confidence is negative, mark them as removed and apply their hallway cry damage d to all later surviving children.",
+        "Because this hallway damage may cause more children to become negative, continue the same front-to-back scan until the hallway becomes quiet.",
+        "After all chain reactions settle, move on to the next child who is still in line."
+      ],
+      "complexity": {
+        "time": "O(N^2), because in the worst case each treated child may affect many later children and each hallway cry may scan a suffix of the queue.",
+        "space": "O(N), for the alive-status array and temporary queue snapshot."
+      },
+      "common_mistakes": [
+        "Applying the office cry decay by raw array index instead of by the current surviving queue order.",
+        "Processing chain reactions out of order. Children must effectively collapse from front to back in the remaining queue.",
+        "Trying to greedily predict which children survive, instead of simulating the process exactly.",
+        "Assuming sample output formatting with trailing spaces must be reproduced exactly. For evaluation, whitespace normalization is safer than exact raw string matching."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    data = list(map(int, sys.stdin.read().split()))\n    n = data[0]\n    vals = data[1:]\n    \n    v = [0] * n\n    d = [0] * n\n    p = [0] * n\n    for i in range(n):\n        v[i], d[i], p[i] = vals[3 * i], vals[3 * i + 1], vals[3 * i + 2]\n    \n    alive = [True] * n\n    ans = []\n    \n    for i in range(n):\n        if not alive[i]:\n            continue\n        \n        # This child gets treated successfully\n        ans.append(i + 1)\n        \n        # Snapshot the current surviving queue behind child i\n        queue = [j for j in range(i + 1, n) if alive[j]]\n        \n        # Step 1: apply the decaying cry from the office\n        cry = v[i]\n        for j in queue:\n            p[j] -= cry\n            if cry > 0:\n                cry -= 1\n        \n        # Step 2: process hallway chain reactions from front to back\n        for idx, j in enumerate(queue):\n            if not alive[j]:\n                continue\n            if p[j] < 0:\n                alive[j] = False\n                shock = d[j]\n                for k in range(idx + 1, len(queue)):\n                    nxt = queue[k]\n                    if alive[nxt]:\n                        p[nxt] -= shock\n    \n    print(len(ans))\n    print(' '.join(map(str, ans)))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  }
+]

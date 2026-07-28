@@ -1,0 +1,253 @@
+[
+  {
+    "train_ID": "train_0001",
+    "problem_id": 2457,
+    "url": "https://leetcode.com/problems/find-pivot-index/",
+    "category": "array",
+    "difficulty": "introductory",
+    "problem_statement": "Given an array of integers nums, write a method that returns the \"pivot\" index of this array...",
+    "starter_code": "class Solution:\n    def pivotIndex(self, nums: List[int]) -> int:",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [[[1, 7, 3, 6, 5, 6]]],
+      "outputs": [3]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Find an index in the array where the sum of all numbers to the left is equal to the sum of all numbers to the right. Return the leftmost such index, or -1 if none exists.",
+      "key_observation": "The sum of the right side can be derived as (Total Sum - Left Sum - Current Element). This allows us to find the pivot in a single pass after computing the total sum.",
+      "step_by_step_plan": [
+        "Calculate the total sum of the entire array.",
+        "Initialize 'left_sum' to 0.",
+        "Iterate through the array using index 'i' and value 'num'.",
+        "Check if 'left_sum' equals 'total_sum - left_sum - num'. If yes, return 'i'.",
+        "Update 'left_sum' by adding 'num' and continue."
+      ],
+      "complexity": {
+        "time": "O(N) where N is the length of the array, as we traverse the array twice.",
+        "space": "O(1) since we only use a few variables for sums."
+      },
+      "common_mistakes": [
+        "Using O(N^2) nested loops which will be too slow for large inputs.",
+        "Forgetting that the sum of elements to the left of index 0 is 0.",
+        "Not handling cases with negative numbers where the prefix sum isn't monotonic."
+      ],
+      "annotated_code": "class Solution:\n    def pivotIndex(self, nums: List[int]) -> int:\n        # Step 1: Pre-calculate the total sum of the array\n        total_sum = sum(nums)\n        left_sum = 0\n        \n        # Step 2: Iterate and check the balance condition\n        for i, num in enumerate(nums):\n            # Balance: LeftSum == TotalSum - LeftSum - CurrentNum\n            if left_sum == total_sum - left_sum - num:\n                return i\n            # Update left_sum for the next index\n            left_sum += num\n            \n        return -1"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0002",
+    "problem_id": 2504,
+    "url": "https://leetcode.com/problems/sum-of-all-odd-length-subarrays/",
+    "category": "array",
+    "difficulty": "introductory",
+    "problem_statement": "Given an array of positive integers arr, calculate the sum of all possible odd-length subarrays.",
+    "starter_code": "\nclass Solution:\n    def sumOddLengthSubarrays(self, arr: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            4,
+            2,
+            5,
+            3
+          ]
+        ]
+      ],
+      "outputs": [
+        58
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Return the sum of all elements in every possible contiguous subarray that has an odd number of elements.",
+      "key_observation": "Instead of iterating over subarrays, calculate the contribution of each element. An element at index 'i' appears in '((i + 1) * (n - i) + 1) // 2' odd-length subarrays.",
+      "step_by_step_plan": [
+        "Initialize 'total_sum' to 0 and get the length 'n' of the array.",
+        "Iterate through each element 'arr[i]' by its index 'i'.",
+        "Calculate the total number of subarrays containing this element: (i + 1) * (n - i).",
+        "The number of odd-length subarrays containing this element is 'total // 2' (if even) or 'total // 2 + 1' (if odd). Simply: (total + 1) // 2.",
+        "Add 'arr[i] * count' to the 'total_sum'.",
+        "Return the result after the loop."
+      ],
+      "complexity": {
+        "time": "O(N) as we traverse the array once to calculate each element's contribution.",
+        "space": "O(1) as we only use a few integer variables."
+      },
+      "common_mistakes": [
+        "Using O(N^3) brute force triple loops, which is inefficient.",
+        "Incorrectly calculating the number of odd-length subarrays for even-indexed elements.",
+        "Confusion between contiguous subarrays and non-contiguous subsequences."
+      ],
+      "annotated_code": "class Solution:\n    def sumOddLengthSubarrays(self, arr: List[int]) -> int:\n        ans, n = 0, len(arr)\n        for i in range(n):\n            # Ways to choose start index: [0...i]\n            left = i + 1\n            # Ways to choose end index: [i...n-1]\n            right = n - i\n            # Total subarrays containing arr[i]\n            total = left * right\n            # Number of odd-length subarrays is ceil(total / 2)\n            ans += ((total + 1) // 2) * arr[i]\n        return ans"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": false,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0003",
+    "problem_id": 150,
+    "url": "https://leetcode.com/problems/partition-array-into-disjoint-intervals/",
+    "category": "array",
+    "difficulty": "interview",
+    "problem_statement": "Given an array A, partition it into two (contiguous) subarrays left and right so that:\n\nEvery element in left is less than or equal to every element in right.\nleft and right are non-empty.\nleft has the smallest possible size.\n\nReturn the length of left after such a partitioning.  It is guaranteed that such a partitioning exists.\n\nExample 1:\nInput: [5,0,3,8,6]\nOutput: 3\nExplanation: left = [5,0,3], right = [8,6]\n\nExample 2:\nInput: [1,1,1,0,6,12]\nOutput: 4\nExplanation: left = [1,1,1,0], right = [6,12]\n\nNote:\n\n2 <= A.length <= 30000\n0 <= A[i] <= 10^6\nIt is guaranteed there is at least one way to partition A as described.",
+    "starter_code": "\nclass Solution:\n    def partitionDisjoint(self, A: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            5,
+            0,
+            3,
+            8,
+            6
+          ]
+        ]
+      ],
+      "outputs": [
+        3
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to cut the array into a 'left' part and a 'right' part. The rule is that the biggest number in the left part must be smaller than or equal to the smallest number in the right part. We want the left part to be as short as possible and return its length.",
+      "key_observation": "If we find a number that is strictly smaller than the maximum value of our current left partition, this number MUST belong to the left partition. When we expand the left partition to include it, the left partition's new maximum becomes the highest value we've seen so far in the entire array.",
+      "step_by_step_plan": [
+        "Initialize 'left_max' and 'curr_max' with the first element of the array. Set 'partition_idx' to 0.",
+        "Loop through the array starting from index 1.",
+        "At each step, update 'curr_max' to keep track of the largest element seen so far.",
+        "If the current element is smaller than 'left_max', the current partition is invalid. We must extend the left partition to include this element. Update 'partition_idx' to the current index, and update 'left_max' to equal 'curr_max'.",
+        "After the loop, return 'partition_idx + 1' because the question asks for the length, not the index."
+      ],
+      "complexity": {
+        "time": "O(N), as we iterate through the array exactly once.",
+        "space": "O(1), because we only use three integer variables to track the state, completely avoiding the O(N) space auxiliary arrays."
+      },
+      "common_mistakes": [
+        "Using an O(N^2) brute-force approach by checking the left max and right min for every possible split, which leads to Time Limit Exceeded.",
+        "Using two arrays to precompute the prefix-max and suffix-min. While this works in O(N) time, it uses O(N) space, which falls into the interviewer's trap of not writing the optimal O(1) space solution.",
+        "Forgetting to update 'left_max' to 'curr_max' when expanding the left partition, or updating it incorrectly to just the current element."
+      ],
+      "annotated_code": "class Solution:\n    def partitionDisjoint(self, A: List[int]) -> int:\n        left_max = A[0]\n        curr_max = A[0]\n        partition_idx = 0\n        \n        for i in range(1, len(A)):\n            curr_max = max(curr_max, A[i])\n            \n            # If A[i] < left_max, it violates the rule, so we expand the left partition\n            if A[i] < left_max:\n                partition_idx = i\n                left_max = curr_max\n                \n        return partition_idx + 1"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0004",
+    "problem_id": 170,
+    "url": "https://leetcode.com/problems/shortest-subarray-to-be-removed-to-make-array-sorted/",
+    "category": "array",
+    "difficulty": "interview",
+    "problem_statement": "Given an integer array arr, remove a subarray (can be empty) from arr such that the remaining elements in arr are non-decreasing.\nA subarray is a contiguous subsequence of the array.\nReturn the length of the shortest subarray to remove.\n\nExample 1:\nInput: arr = [1,2,3,10,4,2,3,5]\nOutput: 3\nExplanation: The shortest subarray we can remove is [10,4,2] of length 3. The remaining elements after that will be [1,2,3,3,5] which are sorted.\nAnother correct solution is to remove the subarray [3,10,4].\nExample 2:\nInput: arr = [5,4,3,2,1]\nOutput: 4\nExplanation: Since the array is strictly decreasing, we can only keep a single element. Therefore we need to remove a subarray of length 4, either [5,4,3,2] or [4,3,2,1].\n\nExample 3:\nInput: arr = [1,2,3]\nOutput: 0\nExplanation: The array is already non-decreasing. We do not need to remove any elements.\n\nExample 4:\nInput: arr = [1]\nOutput: 0\n\nConstraints:\n\n1 <= arr.length <= 10^5\n0 <= arr[i] <= 10^9",
+    "starter_code": "\nclass Solution:\n    def findLengthOfShortestSubarray(self, arr: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            2,
+            3,
+            10,
+            4,
+            2,
+            3,
+            5
+          ]
+        ]
+      ],
+      "outputs": [
+        3
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to delete exactly one contiguous chunk of numbers so that the remaining numbers form a perfectly sorted (non-decreasing) array. Our goal is to delete as few numbers as possible. Note: There might be multiple ways to choose which subarray to delete, but the minimum length to remove is unique.",
+      "key_observation": "Instead of focusing on what to remove, focus on what to keep. If we remove a single subarray in the middle, the remaining elements will consist of a sorted prefix and a sorted suffix. The task reduces to finding the longest valid combination where the tail of the prefix is less than or equal to the head of the suffix.",
+      "step_by_step_plan": [
+        "Find the longest valid sorted prefix from the start (ending at index 'left'). If it reaches the end, the array is already sorted, return 0.",
+        "Find the longest valid sorted suffix from the end (starting at index 'right').",
+        "Initialize the 'ans' with the simplest edge cases: keeping ONLY the prefix (removing everything after 'left') or keeping ONLY the suffix (removing everything before 'right').",
+        "Use two pointers 'i' (scanning the prefix from 0 to 'left') and 'j' (scanning the suffix from 'right' to the end).",
+        "If arr[i] <= arr[j], it means we can connect the prefix up to 'i' with the suffix starting at 'j'. The removed length is (j - i - 1). Update 'ans' to the minimum, then move 'i' forward.",
+        "If arr[i] > arr[j], the connection is invalid, so we must move 'j' forward to find a larger element in the suffix."
+      ],
+      "complexity": {
+        "time": "O(N), because the 'left' and 'right' pointers traverse the array once to find the prefix and suffix. During the merge step, pointers 'i' and 'j' strictly move forward, ensuring O(N) time.",
+        "space": "O(1), since we are only using a few pointer variables (left, right, i, j) without allocating any additional arrays."
+      },
+      "common_mistakes": [
+        "Focusing on the deleted portion instead of the kept portions, which leads to an inefficient O(N^2) brute-force search.",
+        "Forgetting the edge cases where the optimal solution involves entirely deleting the prefix or entirely deleting the suffix.",
+        "Using binary search to merge the prefix and suffix (O(N log N)). While acceptable, the two-pointer approach is the optimal O(N) solution the interviewer wants to see."
+      ],
+      "annotated_code": "class Solution:\n    def findLengthOfShortestSubarray(self, arr: List[int]) -> int:\n        n = len(arr)\n        left = 0\n        \n        # Step 1: Find the longest sorted prefix\n        while left + 1 < n and arr[left] <= arr[left + 1]:\n            left += 1\n            \n        if left == n - 1:\n            return 0  # Array is already fully sorted\n            \n        # Step 2: Find the longest sorted suffix\n        right = n - 1\n        while right > 0 and arr[right - 1] <= arr[right]:\n            right -= 1\n            \n        # Step 3: Base cases (keep only prefix OR only suffix)\n        ans = min(n - left - 1, right)\n        \n        # Step 4: Two pointers to merge prefix and suffix\n        i, j = 0, right\n        while i <= left and j < n:\n            if arr[i] <= arr[j]:\n                ans = min(ans, j - i - 1)\n                i += 1\n            else:\n                j += 1\n                \n        return ans"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0005",
+    "problem_id": 2010,
+    "url": "https://codeforces.com/problemset/problem/573/B",
+    "category": "array",
+    "difficulty": "competition",
+    "problem_statement": "Limak is a little bear who loves to play. Today he is playing by destroying block towers. He built n towers in a row. The i-th tower is made of h_{i} identical blocks. For clarification see picture for the first sample.\n\nLimak will repeat the following operation till everything is destroyed.\n\nBlock is called internal if it has all four neighbors, i.e. it has each side (top, left, down and right) adjacent to other block or to the floor. Otherwise, block is boundary. In one operation Limak destroys all boundary blocks. His paws are very fast and he destroys all those blocks at the same time.\n\nLimak is ready to start. You task is to count how many operations will it take him to destroy all towers.\n\n-----Input-----\n\nThe first line contains single integer n (1 ≤ n ≤ 10^5).\n\nThe second line contains n space-separated integers h_1, h_2, ..., h_{n} (1 ≤ h_{i} ≤ 10^9) — sizes of towers.\n\n-----Output-----\n\nPrint the number of operations needed to destroy all towers.\n\n-----Examples-----\nInput\n6\n2 1 4 6 2 2\n\nOutput\n3\n\nInput\n7\n3 3 3 1 3 3 3\n\nOutput\n2\n\n-----Note-----\n\nThe picture below shows all three operations for the first sample test. Each time boundary blocks are marked with red color.  [Image]  After first operation there are four blocks left and only one remains after second operation. This last block is destroyed in third operation.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "6\n2 1 4 6 2 2\n",
+        "7\n3 3 3 1 3 3 3\n"
+      ],
+      "outputs": [
+        "3\n",
+        "2\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We are given the heights of 'n' adjacent towers. In one step, any block that touches the outside air (top, left, or right) is destroyed. We need to determine the maximum number of steps required until all blocks are destroyed.",
+      "key_observation": "Instead of simulating the global destruction layer by layer, calculate the 'lifespan' of each individual tower. The lifespan of tower 'i' is bounded by three constraints: its own height (destroyed from the top), the lifespan of its left neighbor + 1 (destroyed from the left), and the lifespan of its right neighbor + 1 (destroyed from the right).",
+      "step_by_step_plan": [
+        "Initialize an array 'dp' of length 'n' to store the lifespan of each tower.",
+        "Sweep from left to right: The first tower's lifespan is 1. For any tower 'i' after it, its lifespan is capped by 'min(h[i], dp[i-1] + 1)'.",
+        "Sweep from right to left: The last tower's lifespan is capped at 1. For any preceding tower 'i', further restrict its lifespan by comparing its current 'dp[i]' with 'dp[i+1] + 1'.",
+        "While doing the right-to-left sweep, keep track of the maximum lifespan encountered. This maximum value is the total number of operations required."
+      ],
+      "complexity": {
+        "time": "O(N), as we only need two passes (one forward, one backward) through the array of towers. We completely avoid simulating the height.",
+        "space": "O(N), to store the intermediate lifespan of each tower in the 'dp' array."
+      },
+      "common_mistakes": [
+        "Attempting to simulate the process step-by-step. Since tower heights can reach 10^9, a layer-by-layer simulation will result in a severe Time Limit Exceeded (TLE).",
+        "Forgetting that the leftmost and rightmost towers are permanently exposed on one side, meaning their absolute maximum lifespan is always 1.",
+        "Updating the array in a single pass, which fails to account for destruction propagating from the right side."
+      ],
+      "annotated_code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n        \n    n = int(input_data[0])\n    h = [int(x) for x in input_data[1:n+1]]\n    \n    # dp[i] represents the maximum operations tower i can survive\n    dp = [0] * n\n    \n    # Left-to-right pass: bounding by height and left neighbor\n    dp[0] = 1\n    for i in range(1, n):\n        dp[i] = min(h[i], dp[i-1] + 1)\n        \n    # Right-to-left pass: bounding by right neighbor and tracking the max\n    dp[-1] = min(dp[-1], 1)\n    max_ops = dp[-1]\n    \n    for i in range(n-2, -1, -1):\n        dp[i] = min(dp[i], dp[i+1] + 1)\n        if dp[i] > max_ops:\n            max_ops = dp[i]\n            \n    print(max_ops)\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  }
+]

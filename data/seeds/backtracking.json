@@ -1,0 +1,290 @@
+[
+  {
+    "train_ID": "train_0026",
+    "problem_id": 2522,
+    "url": "https://leetcode.com/problems/count-and-say/",
+    "category": "backtracking",
+    "difficulty": "introductory",
+    "problem_statement": "The count-and-say sequence is the sequence of integers with the first five terms as following:\n\n1.     1\n2.     11\n3.     21\n4.     1211\n5.     111221\n\n\n\n1 is read off as \"one 1\" or 11.\n11 is read off as \"two 1s\" or 21.\n21 is read off as \"one 2, then one 1\" or 1211.\n\n\n\nGiven an integer n, generate the nth term of the count-and-say sequence.\n\n\n\nNote: Each term of the sequence of integers will be represented as a string.\n\n\nExample 1:\n\nInput: 1\nOutput: \"1\"\n\n\n\nExample 2:\n\nInput: 4\nOutput: \"1211\"",
+    "starter_code": "\nclass Solution:\n    def countAndSay(self, n: int) -> str:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          1
+        ]
+      ],
+      "outputs": [
+        "1"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We start from the string \"1\" and repeatedly describe the previous term by counting consecutive equal digits. The task is to return the nth string in this count-and-say sequence.",
+      "key_observation": "Each new term depends only on the previous term. To build the next string, we scan the current string from left to right, group identical consecutive digits together, and write down \"count + digit\" for each group.",
+      "step_by_step_plan": [
+        "Initialize the current term as the string \"1\".",
+        "Repeat n - 1 times to generate the next terms.",
+        "For each round, scan the current string using a pointer and count how many times the same digit repeats consecutively.",
+        "Append the count and the digit to a temporary list for every group.",
+        "Join the temporary list into the next term, and continue.",
+        "After all rounds, return the final string."
+      ],
+      "complexity": {
+        "time": "O(S), where S is the total number of characters processed across all generated terms up to n.",
+        "space": "O(L), where L is the length of the current generated term."
+      },
+      "common_mistakes": [
+        "Processing digits one by one without grouping consecutive equal characters, which breaks the definition of the sequence.",
+        "Forgetting to append the last group after the scan ends.",
+        "Trying to treat the sequence as numeric arithmetic instead of string transformation."
+      ],
+      "annotated_code": "class Solution:\\n    def countAndSay(self, n: int) -> str:\\n        s = \\\"1\\\"\\n        \\n        # Generate the next term from the previous term, n-1 times\\n        for _ in range(n - 1):\\n            parts = []\\n            i = 0\\n            \\n            while i < len(s):\\n                j = i\\n                # Find the maximal group of the same digit\\n                while j < len(s) and s[j] == s[i]:\\n                    j += 1\\n                \\n                # Append \\\"count\\\" and \\\"digit\\\"\\n                parts.append(str(j - i))\\n                parts.append(s[i])\\n                i = j\\n            \\n            s = \\\"\\\".join(parts)\\n        \\n        return s"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": false,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0027",
+    "problem_id": 2558,
+    "url": "https://www.hackerrank.com/challenges/alphabet-rangoli/problem",
+    "category": "backtracking",
+    "difficulty": "introductory",
+    "problem_statement": "=====Problem Statement=====\nYou are given an integer, N. Your task is to print an alphabet rangoli of size N. (Rangoli is a form of Indian folk art based on creation of patterns.)\n\nDifferent sizes of alphabet rangoli are shown below:\n\n#size 3\n\n----c----\n--c-b-c--\nc-b-a-b-c\n--c-b-c--\n----c----\n\n#size 5\n\n--------e--------\n------e-d-e------\n----e-d-c-d-e----\n--e-d-c-b-c-d-e--\ne-d-c-b-a-b-c-d-e\n--e-d-c-b-c-d-e--\n----e-d-c-d-e----\n------e-d-e------\n--------e--------\n\n#size 10\n\n------------------j------------------\n----------------j-i-j----------------\n--------------j-i-h-i-j--------------\n------------j-i-h-g-h-i-j------------\n----------j-i-h-g-f-g-h-i-j----------\n--------j-i-h-g-f-e-f-g-h-i-j--------\n------j-i-h-g-f-e-d-e-f-g-h-i-j------\n----j-i-h-g-f-e-d-c-d-e-f-g-h-i-j----\n--j-i-h-g-f-e-d-c-b-c-d-e-f-g-h-i-j--\nj-i-h-g-f-e-d-c-b-a-b-c-d-e-f-g-h-i-j\n--j-i-h-g-f-e-d-c-b-c-d-e-f-g-h-i-j--\n----j-i-h-g-f-e-d-c-d-e-f-g-h-i-j----\n------j-i-h-g-f-e-d-e-f-g-h-i-j------\n--------j-i-h-g-f-e-f-g-h-i-j--------\n----------j-i-h-g-f-g-h-i-j----------\n------------j-i-h-g-h-i-j------------\n--------------j-i-h-i-j--------------\n----------------j-i-j----------------\n------------------j------------------\n\nThe center of the rangoli has the first alphabet letter a, and the boundary has the Nth alphabet letter (in alphabetical order).\n\n=====Input Format=====\nOnly one line of input containing N, the size of the rangoli.\n\n=====Constraints=====\n0 < N < 27\n\n=====Output Format=====\nPrint the alphabet rangoli in the format explained above.",
+    "starter_code": "\ndef print_rangoli(size):\n    # your code goes here\n\nif __name__ == '__main__':\n    n = int(input())\n    print_rangoli(n)",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "5"
+      ],
+      "outputs": [
+        "--------e--------\n------e-d-e------\n----e-d-c-d-e----\n--e-d-c-b-c-d-e--\ne-d-c-b-a-b-c-d-e\n--e-d-c-b-c-d-e--\n----e-d-c-d-e----\n------e-d-e------\n--------e--------"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given an integer size N, print a symmetric alphabet rangoli pattern whose center is 'a' and whose outer boundary is the Nth lowercase letter.",
+      "key_observation": "Each row is completely determined by one pivot letter. A row consists of letters descending toward 'a' and then ascending back symmetrically, joined by hyphens, and finally centered to a fixed width of 4 * N - 3.",
+      "step_by_step_plan": [
+        "Prepare the lowercase alphabet list.",
+        "For each row index i from 0 to N - 1, build the sequence of letters for that row.",
+        "Construct the row by taking descending letters from the outer letter down to the current one, then ascending back.",
+        "Join the letters with '-' characters.",
+        "Center the row with '-' padding to width 4 * N - 3.",
+        "Build the top half and center first, then mirror it to form the bottom half.",
+        "Print the final rows in order without adding extra spaces."
+      ],
+      "complexity": {
+        "time": "O(N^2), because the pattern has O(N) rows and each row has O(N) characters/letters to build.",
+        "space": "O(N^2), for storing all rows before printing."
+      },
+      "common_mistakes": [
+        "Using spaces instead of '-' for padding or separation.",
+        "Computing the wrong target width; the correct width is 4 * N - 3.",
+        "Building only one half of the figure and forgetting to mirror it.",
+        "Printing extra trailing spaces or blank lines, which can break exact-output checking."
+      ],
+      "annotated_code": "import string\\n\\n\\ndef print_rangoli(size):\\n    letters = list(string.ascii_lowercase)\\n    rows = []\\n    width = 4 * size - 3\\n    \\n    # Build rows from center outward order: i = 0 is the center row\\n    for i in range(size):\\n        left = letters[size - 1:i:-1]\\n        right = letters[i:size]\\n        row = \\\"-\\\".join(left + right)\\n        rows.append(row.center(width, \\\"-\\\"))\\n    \\n    # Mirror: top half + center + bottom half\\n    result = rows[::-1] + rows[1:]\\n    print(\\\"\\\\n\\\".join(result))\\n\\n\\nif __name__ == '__main__':\\n    n = int(input())\\n    print_rangoli(n)"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0028",
+    "problem_id": 145,
+    "url": "https://leetcode.com/problems/24-game/",
+    "category": "backtracking",
+    "difficulty": "interview",
+    "problem_statement": "You have 4 cards each containing a number from 1 to 9.  You need to judge whether they could operated through *, /, +, -, (, ) to get the value of 24.\n\n\nExample 1:\n\nInput: [4, 1, 8, 7]\nOutput: True\nExplanation: (8-4) * (7-1) = 24\n\n\n\nExample 2:\n\nInput: [1, 2, 1, 2]\nOutput: False\n\n\n\nNote:\n\nThe division operator / represents real division, not integer division.  For example, 4 / (1 - 2/3) = 12.\nEvery operation done is between two numbers.  In particular, we cannot use - as a unary operator.  For example, with [1, 1, 1, 1] as input, the expression -1 - 1 - 1 - 1 is not allowed.\nYou cannot concatenate numbers together.  For example, if the input is [1, 2, 1, 2], we cannot write this as 12 + 12.",
+    "starter_code": "\nclass Solution:\n    def judgePoint24(self, nums: List[int]) -> bool:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            4,
+            1,
+            8,
+            7
+          ]
+        ]
+      ],
+      "outputs": [
+        true
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We are given exactly four numbers, and we may repeatedly pick any two numbers, apply one arithmetic operation among +, -, *, /, and replace them with the result. The goal is to determine whether it is possible to obtain exactly 24.",
+      "key_observation": "This is a complete search over all binary operation orders. At every step, we only need to choose two current numbers, try all valid results from combining them, and recurse on the smaller list. Because division is real-valued, we must compare against 24 using a small floating-point tolerance instead of exact equality.",
+      "step_by_step_plan": [
+        "Convert the input numbers to floating-point values.",
+        "Define a recursive function that works on the current list of numbers.",
+        "If the list has length 1, check whether the remaining value is close enough to 24.",
+        "Otherwise, choose every unordered pair of indices (i, j).",
+        "Generate all possible results of combining those two values using +, -, *, and valid divisions.",
+        "Recurse on the list formed by the untouched numbers plus the new result.",
+        "If any recursive branch succeeds, return true; otherwise return false."
+      ],
+      "complexity": {
+        "time": "O(1) in practice, because the input size is fixed at exactly 4 numbers. Conceptually it is an exponential backtracking search over a very small state space.",
+        "space": "O(1) in practice, because the recursion depth is bounded by 4."
+      },
+      "common_mistakes": [
+        "Using exact equality with floating-point division results instead of checking with an epsilon tolerance.",
+        "Forgetting to skip division by zero cases.",
+        "Trying to preserve only integer results, even though the problem explicitly allows real division.",
+        "Missing valid expressions because subtraction and division are not commutative, so both orders must be considered."
+      ],
+      "annotated_code": "from typing import List\\n\\n\\nclass Solution:\\n    def judgePoint24(self, nums: List[int]) -> bool:\\n        EPS = 1e-6\\n        \\n        def dfs(arr: List[float]) -> bool:\\n            # If only one number remains, check whether it is 24\\n            if len(arr) == 1:\\n                return abs(arr[0] - 24) < EPS\\n            \\n            n = len(arr)\\n            for i in range(n):\\n                for j in range(i + 1, n):\\n                    a, b = arr[i], arr[j]\\n                    rest = [arr[k] for k in range(n) if k != i and k != j]\\n                    \\n                    # All possible results from combining a and b\\n                    candidates = [a + b, a - b, b - a, a * b]\\n                    if abs(b) > EPS:\\n                        candidates.append(a / b)\\n                    if abs(a) > EPS:\\n                        candidates.append(b / a)\\n                    \\n                    for value in candidates:\\n                        if dfs(rest + [value]):\\n                            return True\\n            \\n            return False\\n        \\n        return dfs([float(x) for x in nums])"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0029",
+    "problem_id": 153,
+    "url": "https://leetcode.com/problems/matchsticks-to-square/",
+    "category": "backtracking",
+    "difficulty": "interview",
+    "problem_statement": "Remember the story of Little Match Girl? By now, you know exactly what matchsticks the little match girl has, please find out a way you can make one square by using up all those matchsticks. You should not break any stick, but you can link them up, and each matchstick must be used exactly one time.\n\n Your input will be several matchsticks the girl has, represented with their stick length. Your output will either be true or false, to represent whether you could make one square using all the matchsticks the little match girl has.\n\nExample 1:\n\nInput: [1,1,2,2,2]\nOutput: true\n\nExplanation: You can form a square with length 2, one side of the square came two sticks with length 1.\n\n\n\nExample 2:\n\nInput: [3,3,3,3,4]\nOutput: false\n\nExplanation: You cannot find a way to form a square with all the matchsticks.\n\n\n\nNote:\n\nThe length sum of the given matchsticks is in the range of 0 to 10^9.\nThe length of the given matchstick array will not exceed 15.",
+    "starter_code": "\nclass Solution:\n    def makesquare(self, nums: List[int]) -> bool:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            1,
+            2,
+            2,
+            2
+          ]
+        ]
+      ],
+      "outputs": [
+        true
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to use every matchstick exactly once and decide whether they can be arranged into one square. Since a square has four equal sides, the problem becomes whether we can partition all sticks into four groups with the same total length.",
+      "key_observation": "This is a backtracking partition problem. The target side length is total_sum / 4, so if the total sum is not divisible by 4, the answer is immediately false. During DFS, we try to place each matchstick onto one of the four sides, and strong pruning comes from sorting in descending order and skipping symmetric side states.",
+      "step_by_step_plan": [
+        "Compute the total length of all matchsticks. If it is not divisible by 4, return false immediately.",
+        "Let target = total_sum / 4, and sort the matchsticks in descending order so that large sticks are placed first.",
+        "Maintain an array of four side sums.",
+        "Use DFS to place the current matchstick onto one of the four sides.",
+        "Skip any placement that would make a side exceed the target length.",
+        "Use symmetry pruning: if two sides currently have the same length, trying the stick on both leads to equivalent states, so only try one of them.",
+        "If all sticks are placed successfully, return true."
+      ],
+      "complexity": {
+        "time": "O(4^N) in the worst case, where N is the number of matchsticks, although sorting and pruning reduce the actual search a lot.",
+        "space": "O(N), for the recursion stack."
+      },
+      "common_mistakes": [
+        "Forgetting the necessary divisibility check sum(nums) % 4 == 0.",
+        "Trying to greedily build one side at a time without backtracking, which can fail on valid cases.",
+        "Not sorting in descending order, which makes pruning much weaker.",
+        "Exploring symmetric states repeatedly, such as placing a stick on two sides that currently have the same length."
+      ],
+      "annotated_code": "from typing import List\\n\\n\\nclass Solution:\\n    def makesquare(self, nums: List[int]) -> bool:\\n        if not nums or len(nums) < 4:\\n            return False\\n        \\n        total = sum(nums)\\n        if total % 4 != 0:\\n            return False\\n        \\n        target = total // 4\\n        nums.sort(reverse=True)\\n        \\n        # If the largest stick is longer than one side, impossible\\n        if nums[0] > target:\\n            return False\\n        \\n        sides = [0, 0, 0, 0]\\n        \\n        def dfs(index: int) -> bool:\\n            if index == len(nums):\\n                return sides[0] == sides[1] == sides[2] == sides[3] == target\\n            \\n            used_lengths = set()\\n            for i in range(4):\\n                # Symmetry pruning: same current side length => same state\\n                if sides[i] in used_lengths:\\n                    continue\\n                if sides[i] + nums[index] > target:\\n                    continue\\n                \\n                used_lengths.add(sides[i])\\n                sides[i] += nums[index]\\n                if dfs(index + 1):\\n                    return True\\n                sides[i] -= nums[index]\\n                \\n                # If we tried putting it on an empty side and failed,\\n                # there is no need to try other empty sides.\\n                if sides[i] == 0:\\n                    break\\n            \\n            return False\\n        \\n        return dfs(0)"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0030",
+    "problem_id": 2036,
+    "url": "https://codeforces.com/problemset/problem/1314/B",
+    "category": "backtracking",
+    "difficulty": "competition",
+    "problem_statement": "The biggest event of the year – Cota 2 world championship \"The Innernational\" is right around the corner. $2^n$ teams will compete in a double-elimination format (please, carefully read problem statement even if you know what is it) to identify the champion. \n\nTeams are numbered from $1$ to $2^n$ and will play games one-on-one. All teams start in the upper bracket.\n\nAll upper bracket matches will be held played between teams that haven't lost any games yet. Teams are split into games by team numbers. Game winner advances in the next round of upper bracket, losers drop into the lower bracket.\n\nLower bracket starts with $2^{n-1}$ teams that lost the first upper bracket game. Each lower bracket round consists of two games. In the first game of a round $2^k$ teams play a game with each other (teams are split into games by team numbers). $2^{k-1}$ loosing teams are eliminated from the championship, $2^{k-1}$ winning teams are playing $2^{k-1}$ teams that got eliminated in this round of upper bracket (again, teams are split into games by team numbers). As a result of each round both upper and lower bracket have $2^{k-1}$ teams remaining. See example notes for better understanding.\n\nSingle remaining team of upper bracket plays with single remaining team of lower bracket in grand-finals to identify championship winner.\n\nYou are a fan of teams with numbers $a_1, a_2, ..., a_k$. You want the championship to have as many games with your favourite teams as possible. Luckily, you can affect results of every championship game the way you want. What's maximal possible number of championship games that include teams you're fan of?\n\n\n-----Input-----\n\nFirst input line has two integers $n, k$ — $2^n$ teams are competing in the championship. You are a fan of $k$ teams ($2 \\le n \\le 17; 0 \\le k \\le 2^n$).\n\nSecond input line has $k$ distinct integers $a_1, \\ldots, a_k$ — numbers of teams you're a fan of ($1 \\le a_i \\le 2^n$).\n\n\n-----Output-----\n\nOutput single integer — maximal possible number of championship games that include teams you're fan of.\n\n\n-----Examples-----\nInput\n3 1\n6\n\nOutput\n6\n\nInput\n3 3\n1 7 8\n\nOutput\n11\n\nInput\n3 4\n1 3 5 7\n\nOutput\n14\n\n\n\n-----Note-----\n\nOn the image, each game of the championship is denoted with an English letter ($a$ to $n$). Winner of game $i$ is denoted as $Wi$, loser is denoted as $Li$. Teams you're a fan of are highlighted with red background.\n\nIn the first example, team $6$ will play in 6 games if it looses the first upper bracket game (game $c$) and wins all lower bracket games (games $h, j, l, m$). [Image]\n\nIn the second example, teams $7$ and $8$ have to play with each other in the first game of upper bracket (game $d$). Team $8$ can win all remaining games in upper bracket, when teams $1$ and $7$ will compete in the lower bracket. [Image]\n\nIn the third example, your favourite teams can play in all games of the championship. [Image]",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "3 1\n6\n",
+        "3 3\n1 7 8\n",
+        "3 4\n1 3 5 7\n",
+        "10 10\n334 588 666 787 698 768 934 182 39 834\n",
+        "2 4\n3 2 4 1\n",
+        "3 4\n3 4 1 6\n",
+        "2 0\n",
+        "2 1\n1\n",
+        "17 0\n",
+        "17 1\n95887\n",
+        "2 2\n4 2\n",
+        "2 3\n2 1 3\n",
+        "3 5\n7 2 1 4 8\n",
+        "3 6\n5 4 1 3 6 7\n",
+        "3 7\n5 4 8 1 7 3 6\n",
+        "3 8\n2 5 6 1 8 3 4 7\n",
+        "16 50\n57794 44224 38309 41637 11732 44974 655 27143 11324 49584 3371 17159 26557 38800 33033 18231 26264 14765 33584 30879 46988 60703 52973 47349 22720 51251 54716 29642 7041 54896 12197 38530 51481 43063 55463 2057 48064 41953 16250 21272 34003 51464 50389 30417 45901 38895 25949 798 29404 55166\n"
+      ],
+      "outputs": [
+        "6\n",
+        "11\n",
+        "14\n",
+        "138\n",
+        "6\n",
+        "12\n",
+        "0\n",
+        "4\n",
+        "0\n",
+        "34\n",
+        "6\n",
+        "6\n",
+        "13\n",
+        "14\n",
+        "14\n",
+        "14\n",
+        "1005\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "There are 2^n teams in a double-elimination tournament. We control every match result and want to maximize the total number of tournament games that involve at least one favorite team. The favorite teams are given by their initial numbers.",
+      "key_observation": "Think recursively on contiguous blocks of size 2^m. After all internal matches of such a block are completed, only two teams leave the block: one upper-bracket survivor and one lower-bracket survivor. Therefore, for each block we only need DP over 4 states: whether the upper exit is favorite and whether the lower exit is favorite. When two equal-size child blocks are merged, exactly three new matches appear between their exits, so we can combine child DP states in constant time.",
+      "step_by_step_plan": [
+        "Start from blocks of size 2, because the first upper-bracket round is played by consecutive team numbers.",
+        "For each size-2 block, initialize a DP over 4 states: (upper_exit_favorite, lower_exit_favorite).",
+        "To merge two child blocks, iterate over all reachable child states from the left block and the right block.",
+        "Simulate the three new matches created by the merge: upper-vs-upper, lower-vs-lower, and then lower-winner vs upper-loser.",
+        "For every game, determine whether it is counted (at least one favorite participates) and what favorite-status exits remain after choosing the winners optimally.",
+        "Store the best score for each parent state in the merged block.",
+        "Repeat until only one whole-tournament block remains.",
+        "Finally, add the grand final between the tournament's upper finalist and lower finalist, and take the maximum."
+      ],
+      "complexity": {
+        "time": "O(2^n), because each initial pair creates one base block and each merge of two blocks performs only constant-sized DP transitions over 4 states.",
+        "space": "O(2^n), for storing the current layer of block DP values."
+      },
+      "common_mistakes": [
+        "Trying to simulate the whole tournament game by game with explicit brackets, which makes the implementation much more complicated than necessary.",
+        "Assuming only the number of favorite teams matters. Their initial positions matter because first-round pairings are fixed by team numbers.",
+        "Forgetting that a favorite can either stay in the upper bracket or intentionally drop to the lower bracket if that yields more counted games later.",
+        "Missing the final grand-final game after the recursive block DP is finished."
+      ],
+      "annotated_code": "import sys\\n\\n\\ndef game_outcomes(f1, f2):\\n    \\\"\\\"\\\"\\n    Return all possible (winner_favorite, loser_favorite, covered) outcomes\\n    of one match, where f1/f2 are 0 or 1 depending on whether the two\\n    participants are favorite teams.\\n    \\\"\\\"\\\"\\n    if f1 == 0 and f2 == 0:\\n        return [(0, 0, 0)]\\n    if f1 == 1 and f2 == 1:\\n        return [(1, 1, 1)]\\n    # Exactly one favorite participates: we may choose whether it wins or loses\\n    return [(1, 0, 1), (0, 1, 1)]\\n\\n\\ndef state_id(upper_fav, lower_fav):\\n    return (upper_fav << 1) | lower_fav\\n\\n\\ndef solve():\\n    data = list(map(int, sys.stdin.buffer.read().split()))\\n    it = iter(data)\\n    n = next(it)\\n    k = next(it)\\n    total_teams = 1 << n\\n    \\n    favorite = [0] * (total_teams + 1)\\n    for _ in range(k):\\n        favorite[next(it)] = 1\\n    \\n    # Base blocks: size 2, because the first upper-bracket round is played\\n    # by consecutive team numbers (1 vs 2, 3 vs 4, ...).\\n    blocks = []\\n    NEG = -10**18\\n    for i in range(1, total_teams + 1, 2):\\n        dp = [NEG] * 4\\n        for up, low, covered in game_outcomes(favorite[i], favorite[i + 1]):\\n            sid = state_id(up, low)\\n            dp[sid] = max(dp[sid], covered)\\n        blocks.append(dp)\\n    \\n    # Merge blocks bottom-up\\n    while len(blocks) > 1:\\n        new_blocks = []\\n        for i in range(0, len(blocks), 2):\\n            left = blocks[i]\\n            right = blocks[i + 1]\\n            ndp = [NEG] * 4\\n            \\n            for s1 in range(4):\\n                if left[s1] < 0:\\n                    continue\\n                upper_left = s1 >> 1\\n                lower_left = s1 & 1\\n                \\n                for s2 in range(4):\\n                    if right[s2] < 0:\\n                        continue\\n                    upper_right = s2 >> 1\\n                    lower_right = s2 & 1\\n                    base_score = left[s1] + right[s2]\\n                    \\n                    # 1) Upper exits play each other\\n                    for upper_winner, upper_loser, c1 in game_outcomes(upper_left, upper_right):\\n                        # 2) Lower exits play each other\\n                        for lower_mid, _, c2 in game_outcomes(lower_left, lower_right):\\n                            # 3) Winner of lower match plays loser of upper match\\n                            for lower_winner, _, c3 in game_outcomes(lower_mid, upper_loser):\\n                                sid = state_id(upper_winner, lower_winner)\\n                                ndp[sid] = max(ndp[sid], base_score + c1 + c2 + c3)\\n            \\n            new_blocks.append(ndp)\\n        blocks = new_blocks\\n    \\n    # After the whole tournament block is processed, there is still the grand final\\n    final_dp = blocks[0]\\n    ans = 0\\n    for sid, score in enumerate(final_dp):\\n        if score < 0:\\n            continue\\n        upper_fav = sid >> 1\\n        lower_fav = sid & 1\\n        grand_final = 1 if (upper_fav or lower_fav) else 0\\n        ans = max(ans, score + grand_final)\\n    \\n    print(ans)\\n\\n\\nif __name__ == '__main__':\\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  }
+]

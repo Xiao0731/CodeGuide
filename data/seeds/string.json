@@ -1,0 +1,270 @@
+[
+  {
+    "train_ID": "train_0006",
+    "problem_id": 2408,
+    "url": "https://leetcode.com/problems/first-unique-character-in-a-string/",
+    "category": "string",
+    "difficulty": "introductory",
+    "problem_statement": "Given a string, find the first non-repeating character in it and return it's index. If it doesn't exist, return -1.\n\nExamples:\n\ns = \"leetcode\"\nreturn 0.\n\ns = \"loveleetcode\",\nreturn 2.\n\n\n\n\nNote: You may assume the string contain only lowercase letters.",
+    "starter_code": "\nclass Solution:\n    def firstUniqChar(self, s: str) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          "\"leetcode\""
+        ]
+      ],
+      "outputs": [
+        0
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Find the first letter in a given lowercase string that appears exactly once, and return its index. If every letter repeats, return -1.",
+      "key_observation": "To determine if a character is unique, we must see the entire string first. Therefore, a two-pass approach is optimal: count the frequencies in the first pass, then check those frequencies in the original order during the second pass.",
+      "step_by_step_plan": [
+        "Create a hash map (or frequency array) to store the count of each character.",
+        "Iterate through the string once to populate the frequency map.",
+        "Iterate through the string a second time, accessing both the index and the character.",
+        "For each character, check its count in the hash map. If the count is exactly 1, return the current index immediately.",
+        "If the loop completes without finding any unique character, return -1."
+      ],
+      "complexity": {
+        "time": "O(N), where N is the length of the string. We iterate through the string exactly twice, doing O(1) hash map operations each time.",
+        "space": "O(1) (or O(Σ) where Σ=26). The hash map stores at most 26 lowercase English letters, which is a constant space bound regardless of the string length."
+      },
+      "common_mistakes": [
+        "Using 's.count(char)' inside the loop. This scans the entire string repeatedly for every character, silently degrading the time complexity to O(N^2) and causing a Time Limit Exceeded (TLE) on large inputs.",
+        "Iterating over 'set(s)' to find unique characters. Sets do not preserve the original string order, so you might find a unique character, but it won't necessarily be the *first* one."
+      ],
+      "annotated_code": "import collections\n\nclass Solution:\n    def firstUniqChar(self, s: str) -> int:\n        # First pass: Build the frequency map in O(N) time\n        # collections.Counter perfectly handles the counting phase\n        counts = collections.Counter(s)\n        \n        # Second pass: Find the first character with a count of 1\n        for i, char in enumerate(s):\n            if counts[char] == 1:\n                return i\n                \n        # Return -1 if no unique character exists\n        return -1"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0007",
+    "problem_id": 2484,
+    "url": "https://leetcode.com/problems/greatest-common-divisor-of-strings/",
+    "category": "string",
+    "difficulty": "introductory",
+    "problem_statement": "For two strings s and t, we say \"t divides s\" if and only if s = t + ... + t  (t concatenated with itself 1 or more times)\nGiven two strings str1 and str2, return the largest string x such that x divides both str1 and str2.\n \nExample 1:\nInput: str1 = \"ABCABC\", str2 = \"ABC\"\nOutput: \"ABC\"\nExample 2:\nInput: str1 = \"ABABAB\", str2 = \"ABAB\"\nOutput: \"AB\"\nExample 3:\nInput: str1 = \"LEET\", str2 = \"CODE\"\nOutput: \"\"\nExample 4:\nInput: str1 = \"ABCDEF\", str2 = \"ABC\"\nOutput: \"\"\n\n \nConstraints:\n\n1 <= str1.length <= 1000\n1 <= str2.length <= 1000\nstr1 and str2 consist of English uppercase letters.",
+    "starter_code": "\nclass Solution:\n    def gcdOfStrings(self, str1: str, str2: str) -> str:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          "\"ABCABC\"",
+          "\"ABC\""
+        ]
+      ],
+      "outputs": [
+        "\"ABC\""
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Find the longest common divisor string that can be repeatedly concatenated to form both str1 and str2. If no such substring exists, return an empty string.",
+      "key_observation": "If a common repeating string exists, concatenating str1 and str2 in either order will yield the exact same string (str1 + str2 == str2 + str1). Furthermore, the length of the greatest common string divisor is mathematically equal to the greatest common divisor (GCD) of the lengths of str1 and str2.",
+      "step_by_step_plan": [
+        "Check if 'str1 + str2' is equal to 'str2 + str1'. If they are not equal, it's impossible for them to have a common string divisor, so return an empty string.",
+        "Calculate the greatest common divisor (GCD) of the lengths of str1 and str2 using built-in math functions.",
+        "Return the prefix of str1 from index 0 up to the calculated GCD length."
+      ],
+      "complexity": {
+        "time": "O(N + M), where N and M are the lengths of str1 and str2. String concatenation and comparison take O(N + M) time. The math.gcd operation takes O(log(min(N, M))) time, which is dominated by the string operation.",
+        "space": "O(N + M) to store the concatenated strings in memory during the comparison."
+      },
+      "common_mistakes": [
+        "Attempting a brute-force approach by checking every possible prefix of the shorter string, which drastically increases code complexity and is prone to index out-of-bounds errors.",
+        "Failing to realize that sharing a common prefix is not enough; the prefix must perfectly divide (tile) the entire string without any remainders."
+      ],
+      "annotated_code": "import math\n\nclass Solution:\n    def gcdOfStrings(self, str1: str, str2: str) -> str:\n        # Step 1: Verify if they share a common building block\n        if str1 + str2 != str2 + str1:\n            return \"\"\n        \n        # Step 2: Find the GCD of their lengths\n        gcd_length = math.gcd(len(str1), len(str2))\n        \n        # Step 3: Return the common building block prefix\n        return str1[:gcd_length]"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0008",
+    "problem_id": 126,
+    "url": "https://leetcode.com/problems/maximum-number-of-occurrences-of-a-substring/",
+    "category": "string",
+    "difficulty": "interview",
+    "problem_statement": "Given a string s, return the maximum number of ocurrences of any substring under the following rules:\n\nThe number of unique characters in the substring must be less than or equal to maxLetters.\nThe substring size must be between minSize and maxSize inclusive.\n\n \nExample 1:\nInput: s = \"aababcaab\", maxLetters = 2, minSize = 3, maxSize = 4\nOutput: 2\nExplanation: Substring \"aab\" has 2 ocurrences in the original string.\nIt satisfies the conditions, 2 unique letters and size 3 (between minSize and maxSize).\n\nExample 2:\nInput: s = \"aaaa\", maxLetters = 1, minSize = 3, maxSize = 3\nOutput: 2\nExplanation: Substring \"aaa\" occur 2 times in the string. It can overlap.\n\nExample 3:\nInput: s = \"aabcabcab\", maxLetters = 2, minSize = 2, maxSize = 3\nOutput: 3\n\nExample 4:\nInput: s = \"abcde\", maxLetters = 2, minSize = 3, maxSize = 3\nOutput: 0\n\n \nConstraints:\n\n1 <= s.length <= 10^5\n1 <= maxLetters <= 26\n1 <= minSize <= maxSize <= min(26, s.length)\ns only contains lowercase English letters.",
+    "starter_code": "\nclass Solution:\n    def maxFreq(self, s: str, maxLetters: int, minSize: int, maxSize: int) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          "\"aababcaab\"",
+          2,
+          3,
+          4
+        ]
+      ],
+      "outputs": [
+        2
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Find the maximum frequency of any valid substring in a given string. A valid substring must have a length between 'minSize' and 'maxSize', and contain at most 'maxLetters' unique characters.",
+      "key_observation": "The 'maxSize' parameter is a deliberate distraction! If a longer valid substring appears 'K' times, its prefix of length 'minSize' must also appear at least 'K' times. Furthermore, a smaller prefix will never have more unique characters than the longer substring. Therefore, we ONLY need to check substrings of exactly length 'minSize'.",
+      "step_by_step_plan": [
+        "Initialize a hash map (or dictionary) to keep track of the frequencies of valid substrings.",
+        "Initialize a 'max_freq' counter to 0 to record the best result.",
+        "Iterate through the string using a fixed-size sliding window of length 'minSize'.",
+        "For each substring slice, check if the number of unique characters (using a set) is less than or equal to 'maxLetters'.",
+        "If valid, increment its count in the hash map and update 'max_freq' if the new count is higher.",
+        "Return 'max_freq' after traversing the entire string."
+      ],
+      "complexity": {
+        "time": "O(N * M), where N is the length of the string and M is 'minSize'. Slicing the string and creating a set takes O(M) time per window. Since M <= 26, this is effectively O(N).",
+        "space": "O(N), as we store the frequencies of substrings in a hash map. In the worst case, there could be N - minSize + 1 distinct substrings."
+      },
+      "common_mistakes": [
+        "Falling into the trap of iterating over all lengths from minSize to maxSize, which heavily increases the time complexity and leads to Time Limit Exceeded (TLE) or inefficient O(N * (maxSize - minSize)) solutions.",
+        "Failing to account for overlapping substrings. The sliding window naturally handles overlaps by shifting one character at a time."
+      ],
+      "annotated_code": "import collections\n\nclass Solution:\n    def maxFreq(self, s: str, maxLetters: int, minSize: int, maxSize: int) -> int:\n        freq_map = collections.defaultdict(int)\n        max_freq = 0\n        \n        # We ONLY need to check windows of length exactly 'minSize'\n        for i in range(len(s) - minSize + 1):\n            sub = s[i:i + minSize]\n            \n            # If the number of unique characters is within the limit\n            if len(set(sub)) <= maxLetters:\n                freq_map[sub] += 1\n                \n                # Keep track of the maximum frequency seen so far\n                if freq_map[sub] > max_freq:\n                    max_freq = freq_map[sub]\n                    \n        return max_freq"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0009",
+    "problem_id": 149,
+    "url": "https://leetcode.com/problems/remove-all-adjacent-duplicates-in-string-ii/",
+    "category": "string",
+    "difficulty": "interview",
+    "problem_statement": "Given a string s, a k duplicate removal consists of choosing k adjacent and equal letters from s and removing them causing the left and the right side of the deleted substring to concatenate together.\nWe repeatedly make k duplicate removals on s until we no longer can.\nReturn the final string after all such duplicate removals have been made.\nIt is guaranteed that the answer is unique.\n \nExample 1:\nInput: s = \"abcd\", k = 2\nOutput: \"abcd\"\nExplanation: There's nothing to delete.\nExample 2:\nInput: s = \"deeedbbcccbdaa\", k = 3\nOutput: \"aa\"\nExplanation: \nFirst delete \"eee\" and \"ccc\", get \"ddbbbdaa\"\nThen delete \"bbb\", get \"dddaa\"\nFinally delete \"ddd\", get \"aa\"\nExample 3:\nInput: s = \"pbbcggttciiippooaais\", k = 2\nOutput: \"ps\"\n\n \nConstraints:\n\n1 <= s.length <= 10^5\n2 <= k <= 10^4\ns only contains lower case English letters.",
+    "starter_code": "\nclass Solution:\n    def removeDuplicates(self, s: str, k: int) -> str:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          "\"abcd\"",
+          2
+        ]
+      ],
+      "outputs": [
+        "\"abcd\""
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to repeatedly remove any group of exactly 'k' adjacent, identical characters from a string. When a group is removed, the remaining left and right parts merge, potentially creating a new group of 'k' identical characters. We return the final string when no more removals are possible.",
+      "key_observation": "Because removing characters causes the left and right sides to merge, we need a way to efficiently 'look back' at previous characters. Instead of repeatedly rescanning the string, we can use a Stack. To optimize further, instead of storing individual characters, we should store pairs of `[character, count]`. This allows us to track frequencies in O(1) time and simply pop the pair when its count reaches 'k'.",
+      "step_by_step_plan": [
+        "Initialize an empty 'stack' that will hold lists in the format [character, count].",
+        "Iterate through each character in the string 's'.",
+        "If the stack is not empty and the current character matches the character at the top of the stack, increment its count by 1.",
+        "If it does not match (or the stack is empty), push a new pair [character, 1] onto the stack.",
+        "After updating or pushing, immediately check if the count at the top of the stack equals 'k'. If it does, pop that element from the stack.",
+        "Finally, reconstruct the remaining string by multiplying each character in the stack by its count and joining them together."
+      ],
+      "complexity": {
+        "time": "O(N), where N is the length of the string. We process each character exactly once, and all stack operations (push, peek, pop) take O(1) time.",
+        "space": "O(N) in the worst case, where all characters are distinct and no removals occur, meaning the stack stores N pairs."
+      },
+      "common_mistakes": [
+        "Using string replacement functions like 's.replace()' inside a while loop. This forces a rescan of the entire string multiple times, leading to an O(N^2 / K) Time Limit Exceeded (TLE) error.",
+        "Storing only individual characters in the stack and checking the last 'k' elements using slicing (e.g., 'stack[-k:] == char * k'). Slicing takes O(K) time, degrading the overall performance to O(N * K)."
+      ],
+      "annotated_code": "class Solution:\n    def removeDuplicates(self, s: str, k: int) -> str:\n        # Stack stores pairs of [character, frequency]\n        stack = []\n        \n        for char in s:\n            if stack and stack[-1][0] == char:\n                stack[-1][1] += 1\n            else:\n                stack.append([char, 1])\n                \n            # If the top group reaches exactly size k, remove it\n            if stack[-1][1] == k:\n                stack.pop()\n                \n        # Reconstruct the final string from the stack\n        return \"\".join(char * count for char, count in stack)"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0010",
+    "problem_id": 2013,
+    "url": "https://codeforces.com/problemset/problem/708/A",
+    "category": "string",
+    "difficulty": "competition",
+    "problem_statement": "You are given a non-empty string s consisting of lowercase English letters. You have to pick exactly one non-empty substring of s and shift all its letters 'z' $\\rightarrow$ 'y' $\\rightarrow$ 'x' $\\rightarrow \\ldots \\rightarrow$ 'b' $\\rightarrow$ 'a' $\\rightarrow$ 'z'. In other words, each character is replaced with the previous character of English alphabet and 'a' is replaced with 'z'.\n\nWhat is the lexicographically minimum string that can be obtained from s by performing this shift exactly once?\n\n\n-----Input-----\n\nThe only line of the input contains the string s (1 ≤ |s| ≤ 100 000) consisting of lowercase English letters.\n\n\n-----Output-----\n\nPrint the lexicographically minimum string that can be obtained from s by shifting letters of exactly one non-empty substring.\n\n\n-----Examples-----\nInput\ncodeforces\n\nOutput\nbncdenqbdr\n\nInput\nabacaba\n\nOutput\naaacaba\n\n\n\n-----Note-----\n\nString s is lexicographically smaller than some other string t of the same length if there exists some 1 ≤ i ≤ |s|, such that s_1 = t_1, s_2 = t_2, ..., s_{i} - 1 = t_{i} - 1, and s_{i} < t_{i}.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "codeforces\n",
+        "abacaba\n",
+        "babbbabaababbaa\n",
+        "bcbacaabcababaccccaaaabacbbcbbaa\n",
+        "cabaccaacccabaacdbdcbcdbccbccbabbdadbdcdcdbdbcdcdbdadcbcda\n",
+        "a\n",
+        "eeeedddccbceaabdaecaebaeaecccbdeeeaadcecdbeacecdcdcceabaadbcbbadcdaeddbcccaaeebccecaeeeaebcaaccbdaccbdcadadaaeacbbdcbaeeaecedeeeedadec\n",
+        "fddfbabadaadaddfbfecadfaefaefefabcccdbbeeabcbbddefbafdcafdfcbdffeeaffcaebbbedabddeaecdddffcbeaafffcddccccfffdbcddcfccefafdbeaacbdeeebdeaaacdfdecadfeafaeaefbfdfffeeaefebdceebcebbfeaccfafdccdcecedeedadcadbfefccfdedfaaefabbaeebdebeecaadbebcfeafbfeeefcfaecadfe\n",
+        "aaaaaaaaaa\n",
+        "abbabaaaaa\n",
+        "bbbbbbbbbbbb\n",
+        "aabaaaaaaaaaaaa\n",
+        "aaaaaaaaaaaaaaaaaaaa\n",
+        "abaabaaaaaabbaaaaaaabaaaaaaaaabaaaabaaaaaaabaaaaaaaaaabaaaaaaaaaaaaaaabaaaabbaaaaabaaaaaaaabaaaaaaaa\n",
+        "abbbbbbbabbbbbbbbbbbbbbbbbbbbbbbabbabbbbbabbbbbbbbbbbabbbbbbbbabbabbbbbbbbbbbbbbabbabbbaababbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabbabbbbbbbbbbbbbbbbabbbbabbbbbbbbbbbbbbbabbbbbbbbbaababbbbbbbbabbbbbbbbbbbbbbbbbbbbbbbbbbbbabbbbbbbbbbbbbbbbbbbbabbabbbbbbbbbbbbbbbbabbbabbbbbaabbabbbbbbbbbbbbbbbbbbbbbbbbbbbbbabbbbbbbbbbbbbbbbaabbbbbbbbbbbbababbabbbbbbbbbbbbbbbbbbbbbbbbabbbbbbbbbbbbbbbabbbbbbbbbbbabbbbbbbbbbbbbbbbbbbbbbabbbbbbbabbbbbbb\n",
+        "aaaaa\n",
+        "aaa\n",
+        "aa\n"
+      ],
+      "outputs": [
+        "bncdenqbdr\n",
+        "aaacaba\n",
+        "aabbbabaababbaa\n",
+        "abaacaabcababaccccaaaabacbbcbbaa\n",
+        "babaccaacccabaacdbdcbcdbccbccbabbdadbdcdcdbdbcdcdbdadcbcda\n",
+        "z\n",
+        "ddddcccbbabdaabdaecaebaeaecccbdeeeaadcecdbeacecdcdcceabaadbcbbadcdaeddbcccaaeebccecaeeeaebcaaccbdaccbdcadadaaeacbbdcbaeeaecedeeeedadec\n",
+        "ecceaabadaadaddfbfecadfaefaefefabcccdbbeeabcbbddefbafdcafdfcbdffeeaffcaebbbedabddeaecdddffcbeaafffcddccccfffdbcddcfccefafdbeaacbdeeebdeaaacdfdecadfeafaeaefbfdfffeeaefebdceebcebbfeaccfafdccdcecedeedadcadbfefccfdedfaaefabbaeebdebeecaadbebcfeafbfeeefcfaecadfe\n",
+        "aaaaaaaaaz\n",
+        "aaaabaaaaa\n",
+        "aaaaaaaaaaaa\n",
+        "aaaaaaaaaaaaaaa\n",
+        "aaaaaaaaaaaaaaaaaaaz\n",
+        "aaaabaaaaaabbaaaaaaabaaaaaaaaabaaaabaaaaaaabaaaaaaaaaabaaaaaaaaaaaaaaabaaaabbaaaaabaaaaaaaabaaaaaaaa\n",
+        "aaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbabbabbbbbabbbbbbbbbbbabbbbbbbbabbabbbbbbbbbbbbbbabbabbbaababbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbabbabbbbbbbbbbbbbbbbabbbbabbbbbbbbbbbbbbbabbbbbbbbbaababbbbbbbbabbbbbbbbbbbbbbbbbbbbbbbbbbbbabbbbbbbbbbbbbbbbbbbbabbabbbbbbbbbbbbbbbbabbbabbbbbaabbabbbbbbbbbbbbbbbbbbbbbbbbbbbbbabbbbbbbbbbbbbbbbaabbbbbbbbbbbbababbabbbbbbbbbbbbbbbbbbbbbbbbabbbbbbbbbbbbbbbabbbbbbbbbbbabbbbbbbbbbbbbbbbbbbbbbabbbbbbbabbbbbbb\n",
+        "aaaaz\n",
+        "aaz\n",
+        "az\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We must choose exactly one contiguous substring and shift every character to its previous letter in the alphabet ('a' wraps around to 'z'). Our objective is to produce the alphabetically (lexicographically) smallest string possible.",
+      "key_observation": "To make a string alphabetically smaller, we must reduce the characters as early as possible. We should scan from left to right, find the first character that is NOT 'a', and begin shifting. We must stop shifting immediately when we encounter the next 'a', because shifting 'a' to 'z' would make the string alphabetically larger.",
+      "step_by_step_plan": [
+        "Convert the string into a list of characters, as strings are immutable in Python.",
+        "Iterate through the string to find the first character that is not 'a'.",
+        "Once found, start shifting that character and all subsequent characters down by one letter (using 'chr(ord(c) - 1)').",
+        "Stop the shifting process the moment you hit an 'a' or the end of the string.",
+        "Handle the absolute edge case: If the loop finishes and no characters were shifted (meaning the string was entirely 'a's), we are forced to shift exactly one substring. To minimize the lexicographical penalty, change the very last 'a' to 'z'.",
+        "Join the list back into a string and print the result."
+      ],
+      "complexity": {
+        "time": "O(N), where N is the length of the string. We iterate through the characters at most twice (once for modification, once for joining).",
+        "space": "O(N) to store the mutable list of characters."
+      },
+      "common_mistakes": [
+        "Forgetting the all-'a' edge case (e.g., 'aaaa'). Since the operation MUST be performed exactly once, doing nothing is invalid. Failing to change the last 'a' to 'z' will result in a Wrong Answer.",
+        "Continuing to shift characters after encountering an 'a' mid-shift. For example, turning 'abaca' into 'aaazb' is worse than turning it into 'aaaca'."
+      ],
+      "annotated_code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n        \n    s = list(input_data[0])\n    n = len(s)\n    \n    started = False\n    for i in range(n):\n        # Find the first non-'a' character to start the greedy shift\n        if s[i] != 'a':\n            started = True\n            s[i] = chr(ord(s[i]) - 1)\n        # If we have already started shifting and hit an 'a', we must stop\n        elif started:\n            break\n            \n    # Trap: If the string was entirely 'a's, we MUST do exactly one shift\n    if not started:\n        s[-1] = 'z'\n        \n    print(\"\".join(s))\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  }
+]

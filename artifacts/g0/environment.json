@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-07-28T06:35:29.870846+00:00",
+  "python": {
+    "version": "3.11.9",
+    "executable_name": "python.exe",
+    "implementation": "CPython"
+  },
+  "platform": {
+    "system": "Windows",
+    "release": "10",
+    "machine": "AMD64"
+  },
+  "packages": {
+    "torch": null,
+    "transformers": null,
+    "trl": null,
+    "peft": null,
+    "accelerate": null,
+    "datasets": "3.6.0",
+    "bitsandbytes": null,
+    "unsloth": null,
+    "vllm": null,
+    "omegaconf": null,
+    "PyYAML": "6.0.3",
+    "pytest": "9.0.3"
+  },
+  "nvidia_smi": {
+    "available": true,
+    "returncode": 0,
+    "stdout": "NVIDIA GeForce RTX 4060 Laptop GPU, 576.40, 8188 MiB",
+    "stderr": ""
+  },
+  "docker": {
+    "available": true,
+    "returncode": 1,
+    "stdout": "{\"Client\":{\"Version\":\"28.1.1\",\"ApiVersion\":\"1.49\",\"DefaultAPIVersion\":\"1.49\",\"GitCommit\":\"4eba377\",\"GoVersion\":\"go1.23.8\",\"Os\":\"windows\",\"Arch\":\"amd64\",\"BuildTime\":\"Fri Apr 18 09:53:24 2025\",\"Context\":\"desktop-linux\"},\"Server\":null}",
+    "stderr": "error during connect: Get \"http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.49/version\": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+  },
+  "git": {
+    "available": true,
+    "returncode": 0,
+    "stdout": "## No commits yet on main\n?? .gitignore\n?? CLAIMS_MATRIX.md\n?? \"CodeGuide_\\345\\220\\216\\350\\256\\255\\347\\273\\203\\351\\241\\271\\347\\233\\256\\345\\256\\236\\346\\226\\275\\344\\270\\216\\351\\252\\214\\346\\224\\266\\350\\247\\204\\345\\210\\222\\344\\271\\246_v1.2.md\"\n?? DECISION_LOG.md\n?? GPT_PROJECT_CONTEXT.md\n?? PROVENANCE.md\n?? README.md\n?? artifacts/\n?? colab_setup.ipynb\n?? configs/\n?? data/\n?? docs/\n?? evals/\n?? reports/\n?? requirements.g0.lock.txt\n?? requirements.txt\n?? scripts/\n?? src/\n?? tests/",
+    "stderr": ""
+  },
+  "torch_runtime": {
+    "available": false,
+    "error": "No module named 'torch'"
+  }
+}

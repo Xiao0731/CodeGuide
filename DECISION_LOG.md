@@ -1,0 +1,278 @@
+# CodeGuide 实验、决策与故障记录
+
+> 作用：持续记录后续开发中的实验对比、失败现象、根因、应对措施和可复算证据，供项目复盘、论文写作与面试讲解使用。  
+> 最高优先级依据：`CodeGuide_后训练项目实施与验收规划书_v1.2.md`。  
+> 当前阶段：G0 仓库可信 / P0 修复。  
+> 状态口径：`已实现`、`已跑通`、`已验证`必须严格区分。
+
+## 1. 记录规则
+
+每个有效步骤至少记录：
+
+```text
+记录 ID：
+日期：
+阶段 / Gate：
+类型：实现 / 实验 / 决策 / 故障 / 文档
+目标与验收阻塞：
+是否改变数据、模型、reward、split 或评测口径：
+是否消耗云端时间：
+配置与输入：
+实际命令：
+实际结果：
+错误现象：
+根因：
+应对措施：
+证据文件：
+结论边界：
+状态：已实现 / 已跑通 / 已验证 / 阻塞
+下一步：
+```
+
+失败记录不得删除。修复后追加结果，并保留原始错误、根因和修复前后差异。
+
+## 2. 已有实验与故障基线
+
+### EXP-001：TACO train 多候选参考解离线验证
+
+- 日期：2026-05 至 2026-07，按现有缓存与此前运行记录整理
+- 阶段：数据准备基线，G0 前已有成果
+- 类型：实验
+- 目标：避免第一份 Python reference 失败时错误放弃整道题
+- 输入：TACO train 去重后 24,237 题
+- 实现：
+  - loader 保留并排序多个 Python-like 候选；
+  - 每题最多依次验证多个候选；
+  - 首个全通过候选立即选中；
+  - 使用统一 `verify_code()`；
+  - 支持并行、断点续传、逐行 flush 和失败分类
+- 实际结果：
+  - 有 Python 候选：18,733
+  - 第一候选直接通过：9,455
+  - 多候选回退救回：960
+  - 最终全通过 reference：10,415
+  - 无 Python reference：5,504
+  - 平均尝试候选数：1.348
+- 主要失败：
+  - `wrong_answer`：4,444
+  - `runtime_error`：2,818
+  - `unsupported`：607
+  - `timeout`：282
+  - `interface_mismatch`：153
+  - `syntax_error`：14
+- 结论：
+  - 多候选回退确实增加了 960 道可用题；
+  - 10,415 是“通过当前 verifier 全部可用测试”的候选数，不等于最终 accepted SFT 数；
+  - 当前执行器仍是受限子进程，不能称为安全沙箱。
+- 证据：
+  - `data/cache/taco_reference_verification_train_full.jsonl`
+  - `scripts/verify_taco_references.py`
+  - `src/reward/execution.py`
+- 状态：已跑通；统计结果可复算
+
+### EXP-002：scratch 分层 smoke4
+
+- 类型：实验
+- 目标：观察 teacher 不看 reference 时的标签代码正确性
+- 输入：easy / medium / hard / very_hard 各 1 条
+- 实际结果：0/4 生成代码全测试通过
+- 主要错误：
+  - call-based 样本把 `special_number` 改成 `specialNumber`；
+  - standard-input 高难题存在真实算法错误；
+  -部分样本虽语法正确、讲解完整，但代码测试为 0。
+- 根因：
+  - teacher 需要从零解题；
+  - call-based 接口约束在旧 prompt 中不充分；
+  - 语法与表面质量过滤无法保证算法正确。
+- 应对：
+  - 引入 teacher 私有 verified reference；
+  - 将 `io_mode`、`fn_name`、`starter_code` 显式加入接口约束；
+  - 生成代码统一用 `verify_code()` 计算通过率。
+- 证据：`data/sft_train_smoke4.jsonl`
+- 结论边界：样本只有 4 条，只能用于发现问题，不能估计总体通过率。
+- 状态：已跑通
+
+### EXP-003：reference-guided 分层 smoke
+
+- 类型：实验
+- 目标：验证 teacher 私有 reference 是否值得扩大
+- 输入：easy / medium / medium_hard / hard / very_hard 各 1 条，reference 全部预先验证通过
+- 实际结果：
+  - 5 条成功生成并写入；
+  - 4/5 生成代码全测试通过；
+  - reference 未泄漏到 `messages.user`；
+  - 无语法错误和明显截断。
+- 失败样本：
+  - `taco_b74ba2ec45`
+  - expected：`4\n0\n2`
+  - actual：`3\n0\n2`
+  - 类型：`wrong_answer`
+- 根因：teacher 在可读性改写时改变了 reference 的算法语义，不是执行器或接口问题。
+- 应对：
+  - 强化 teacher prompt：必须忠实遵循 reference 核心算法；
+  - 允许改注释和可读性，不允许改算法语义；
+  - 失败标签不得进入正式 accepted SFT。
+- 证据：`data/sft_train_smoke_ref_label.jsonl`
+- 结论边界：4/5 仅说明方向有效，不能声称总体 80%。
+- 状态：已跑通
+
+### EXP-004：reference-guided call-based 专项 smoke
+
+- 类型：实验
+- 目标：检查函数名、starter contract 与 reference 泄漏
+- 输入：5 条 `reference_verified=true` 且 pass rate 为 1.0 的 call-based 题
+- 实际结果：
+  - 5/5 生成代码全测试通过；
+  - 5/5 严格声明所需 `fn_name`；
+  - 5/5 遵守 starter contract；
+  - 0 reference 泄漏；
+  - 0 `interface_mismatch`；
+  - 0 语法错误、截断和执行错误。
+- 证据：`data/sft_train_smoke_ref_label_call_based.jsonl`
+- 结论边界：专项样本量为 5，不能直接外推全量 call-based 通过率。
+- 状态：已跑通
+
+### INC-001：PowerShell 将 Python stderr 日志包装为 NativeCommandError
+
+- 类型：故障
+- 现象：DeepSeek 请求主流程仍在运行，但 PowerShell 报
+  `python.exe ... NativeCommandError`。
+- 根因：PowerShell 5.1 对 native stderr 经管道传给 `Tee-Object` 的包装行为，不等价于 Python 进程失败。
+- 应对：以 `$LASTEXITCODE` 判断真实退出状态，并允许日志继续输出。
+- 结论：这是脚本输出通道问题，不是蒸馏 API 或 Python 主流程失败。
+- 状态：已修复并在后续 smoke 中跑通
+
+### INC-002：本地 TACO 加载时出现 Hugging Face HEAD 404
+
+- 类型：故障
+- 现象：日志出现对
+  `datasets/parquet/parquet.py` 的 HTTP HEAD 404。
+- 根因：`datasets` 内部模块探测产生的网络日志；随后仍从本地 Parquet 加载了 24,237 条去重题目。
+- 应对：以最终本地加载结果和退出码判断；后续环境冻结应进一步避免无必要网络探测。
+- 结论：该次运行中不是数据加载失败，但离线复现仍需治理。
+- 状态：主流程已跑通，离线依赖治理待 G0 完成
+
+### INC-003：smoke report 临时 Python 文件编码损坏
+
+- 类型：故障
+- 现象：临时脚本中的中文字符串变成乱码并触发
+  `SyntaxError: unterminated string literal`。
+- 根因：PowerShell 写临时 Python 文件时编码不一致。
+- 应对：按 UTF-8 无 BOM 写入临时脚本。
+- 结果：后续 call-based smoke report 正常输出 5 条完整报告。
+- 状态：已修复并跑通
+
+### INC-004：GPT 代码包遗漏中文文件名的 v1.2 规划书
+
+- 日期：2026-07-28
+- 阶段：G0
+- 类型：故障
+- 现象：
+  - `scripts/package_gpt_context.ps1` 的源代码已列出规划书；
+  - ZIP 检查却显示
+    `CodeGuide_后训练项目实施与验收规划书_v1.2.md` 不存在；
+  - 其他 ASCII 文件名的治理文档均正常进入 ZIP。
+- 根因：Windows PowerShell 5.1 对 `.ps1` 中非 ASCII 字符串字面量的解码不稳定，
+  导致 `Test-Path -LiteralPath` 实际检查了错误路径。
+- 最小修复：不再硬编码中文文件名，改为自动收集项目根目录下全部 `*.md`。
+- 验收：
+  - 命令：
+    `powershell -ExecutionPolicy Bypass -File scripts\package_gpt_context.ps1 -OutputPath codeguide_gpt_context.zip`
+  - 重新生成根目录 `codeguide_gpt_context.zip`；
+  - 检查规划书、上下文、实验日志、claims matrix 和打包脚本五个入口；
+  - 再检查敏感目录和全量缓存未进入压缩包。
+- 实际结果：
+  - ZIP 条目数：84；
+  - 五个必需入口全部存在；
+  - 敏感/排除路径命中数：0；
+  - 解压后总大小：1,368,745 bytes。
+- 结论：这是打包清单的编码问题，不是规划书文件损坏。
+- 状态：已修复并跑通验收
+
+## 3. 当前决策
+
+### DEC-001：v1.2 规划书成为最高优先级项目约束
+
+- 日期：2026-07-28
+- 阶段：G0
+- 类型：决策 / 文档
+- 目标与阻塞：避免后续按陈旧 README、旧配置或未验证功能声明推进
+- 决策：
+  - `CodeGuide_后训练项目实施与验收规划书_v1.2.md` 高于旧 README、配置与 Notebook；
+  - 当前阶段固定为 G0/P0 修复；
+  - 未通过上一 Gate 不进入下一阶段；
+  - 后续计划调整必须先更新规划书；
+  - 每个有效步骤同步更新 `GPT_PROJECT_CONTEXT.md` 与本文件；
+  - claim 证据变化时同步更新 `CLAIMS_MATRIX.md`。
+- 是否改变核心口径：不改变数据、模型、reward、split 或评测口径
+- 云端消耗：无
+- 实际检查：
+  - 完整阅读规划书全部 19 节；
+  - 更新项目上下文；
+  - 建立本日志和 claims matrix；
+  - 更新 GPT 打包清单。
+- 状态：已实现
+- 下一步：按规划书第 18 节执行 P0 仓库审计与修复，不启动 pilot 或训练。
+
+### DEC-002：采用任务级 Git 提交与 Gate 审核工作流
+
+- 日期：2026-07-28
+- 阶段：G0
+- 类型：工程治理
+- 决策：
+  - 当前修复版作为首个可信基线，后续每个明确任务单独 commit 并 push；
+  - commit 使用 Conventional Commits 风格；
+  - 每次汇报分支、commit、完成内容、改动文件、测试、未通过项和下一步；
+  - 大阶段通过后才打里程碑 tag，并只在里程碑生成一次 ZIP；
+  - API key、`.env`、checkpoint、正式生成数据、全量缓存、W&B 缓存、
+    大日志和个人路径不得进入 Git。
+- 外部阻塞：当前机器已安装 Git，但未安装 GitHub CLI `gh`，因此尚不能创建
+  私有远端仓库或认证推送。
+- 状态：本地规则已实现，GitHub 发布阻塞
+
+### DEC-003：G0/D1 可信性修复合同
+
+- 日期：2026-07-28
+- 阶段：G0/P0
+- 类型：数据 / reward / split / 评测合同
+- 输入快照：`CodeGuide_G0_D1_fixed_20260727.zip`，SHA-256
+  `601DE8B1CF77B1FE97F3BD73E390C7E5A90C88F59877B2DC5543797A8A85AF6A`。
+- 决策：
+  1. `scripts/train_grpo.py` 是唯一公开 GRPO 命令；
+  2. 无可执行测试时 correctness 为 0，AST 不代理语义正确性；
+  3. GRPO 题至少 4 个测试，并按 SHA-256 确定性拆分 online/held-out；
+  4. teacher 输出 unsupported、报错、无测试或非全通过时不得进入 accepted SFT；
+  5. Docker 是正式执行后端，subprocess 只用于受信任的本地检查；
+  6. TeachingCritic 准入前 reward 为 correctness 0.9 + contract 0.1；
+  7. 主实验关闭额外 batch Z-score，只记录 `zero_advantage_ratio`；
+  8. checkpoint 读取独立 `grpo.eval_data`，按整题全通过率计算 Pass@1；
+  9. SFT 与 GRPO adapter 统一为 `r=16, alpha=32`；
+  10. tokenizer 审计前 `max_seq_length` 保持未冻结且训练 fail fast；
+  11. v1.2 的 SFT 起始配置固定为 `1e-4`、1 epoch、completion-only loss、
+      length-grouped sampling。
+- 隐私修复：环境快照只记录 Python 可执行文件名；早期 APPS 脚本改为相对路径/CLI。
+- 云端消耗：无。
+- 状态：代码已合并，当前机器复验待执行
+
+### EXP-005：G0/D1 修复快照本机静态复验
+
+- 日期：2026-07-28
+- 阶段：G0/P0
+- 环境：Windows 10、Python 3.11.9、RTX 4060 Laptop 8 GB。
+- 实际命令与结果：
+  - `python -m compileall`：PASS；
+  - `python -m pytest -q`：42 passed in 4.86s；
+  - `bash -n`：PASS；
+  - `validate_config.py --allow-unfrozen`：PASS with 3 warnings；
+  - 严格配置验证：按设计因两个长度未冻结而失败；
+  - call-based 标签重验：5/5；
+  - historical standard-input 标签重验：4/5，准确检出已知错误标签；
+  - manifest SHA-256/count：PASS；
+  - 密钥与个人绝对路径扫描：0 命中。
+- 环境阻塞：
+  - RTX 4060 可见，驱动 576.40；
+  - Docker CLI 已安装，但 Linux daemon 未运行；
+  - 当前虚拟环境没有 torch/Transformers/TRL/PEFT/bitsandbytes/Unsloth/vLLM。
+- 云端消耗：无。
+- 结论：G0 静态/P0 子阶段通过；Docker verifier、CUDA lock 和代理模型
+  SFT/GRPO dry-run 未通过，完整 G0 仍为阻塞。

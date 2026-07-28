@@ -1,0 +1,281 @@
+[
+  {
+    "train_ID": "train_0016",
+    "problem_id": 2436,
+    "url": "https://leetcode.com/problems/valid-palindrome/",
+    "category": "two_pointers_sliding_window",
+    "difficulty": "introductory",
+    "problem_statement": "Given a string, determine if it is a palindrome, considering only alphanumeric characters and ignoring cases.\n\nNote: For the purpose of this problem, we define empty string as valid palindrome.\n\nExample 1:\n\n\nInput: \"A man, a plan, a canal: Panama\"\nOutput: true\n\n\nExample 2:\n\n\nInput: \"race a car\"\nOutput: false",
+    "starter_code": "\nclass Solution:\n    def isPalindrome(self, s: str) -> bool:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          "\"A man, a plan, a canal: Panama\""
+        ]
+      ],
+      "outputs": [
+        true
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given a string, determine whether it reads the same forward and backward after ignoring all non-alphanumeric characters and ignoring letter case.",
+      "key_observation": "This is a direct two-pointer problem. The only twist is that punctuation and spaces do not matter, so before comparing the two ends, we must skip all non-alphanumeric characters.",
+      "step_by_step_plan": [
+        "Initialize two pointers: left at the start of the string and right at the end.",
+        "Move left forward until it points to an alphanumeric character or crosses right.",
+        "Move right backward until it points to an alphanumeric character or crosses left.",
+        "Compare the lowercase versions of the two characters.",
+        "If they differ, return false immediately.",
+        "If they match, move both pointers inward and continue.",
+        "If the pointers cross without a mismatch, return true."
+      ],
+      "complexity": {
+        "time": "O(N), because each character is visited at most once by either pointer.",
+        "space": "O(1), because only two pointers and a few temporary variables are used."
+      },
+      "common_mistakes": [
+        "Comparing characters without first skipping punctuation, spaces, or other non-alphanumeric symbols.",
+        "Forgetting to ignore case when comparing letters.",
+        "Building a fully filtered new string first, which works but misses the intended in-place two-pointer idea."
+      ],
+      "annotated_code": "class Solution:\n    def isPalindrome(self, s: str) -> bool:\n        left, right = 0, len(s) - 1\n        \n        while left < right:\n            # Skip non-alphanumeric characters on the left\n            while left < right and not s[left].isalnum():\n                left += 1\n            \n            # Skip non-alphanumeric characters on the right\n            while left < right and not s[right].isalnum():\n                right -= 1\n            \n            # Compare in lowercase form\n            if s[left].lower() != s[right].lower():\n                return False\n            \n            left += 1\n            right -= 1\n        \n        return True"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": false,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0017",
+    "problem_id": 2447,
+    "url": "https://leetcode.com/problems/reverse-vowels-of-a-string/",
+    "category": "two_pointers_sliding_window",
+    "difficulty": "introductory",
+    "problem_statement": "Write a function that takes a string as input and reverse only the vowels of a string.\n\n\nExample 1:\nGiven s = \"hello\", return \"holle\".\n\n\n\nExample 2:\nGiven s = \"leetcode\", return \"leotcede\".\n\n\n\nNote:\nThe vowels does not include the letter \"y\".",
+    "starter_code": "\nclass Solution:\n    def reverseVowels(self, s: str) -> str:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          "\"hello\""
+        ]
+      ],
+      "outputs": [
+        "\"holle\""
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given a string, reverse only its vowels while keeping all non-vowel characters in their original positions.",
+      "key_observation": "The positions of non-vowel characters never change, so we only need two pointers that move inward until they each land on a vowel, then swap those vowels.",
+      "step_by_step_plan": [
+        "Convert the string into a list of characters, since Python strings are immutable.",
+        "Prepare a set containing all vowels in both lowercase and uppercase.",
+        "Initialize left and right pointers at the two ends of the list.",
+        "Move left forward until it points to a vowel.",
+        "Move right backward until it points to a vowel.",
+        "Swap the two vowels, then move both pointers inward.",
+        "After the pointers cross, join the list back into a string and return it."
+      ],
+      "complexity": {
+        "time": "O(N), because each pointer scans the string at most once.",
+        "space": "O(N), because we convert the string into a mutable list."
+      },
+      "common_mistakes": [
+        "Trying to modify the original string directly in Python, even though strings are immutable.",
+        "Forgetting to include uppercase vowels in the vowel set.",
+        "Reversing all characters instead of only vowels."
+      ],
+      "annotated_code": "class Solution:\n    def reverseVowels(self, s: str) -> str:\n        vowels = set('aeiouAEIOU')\n        chars = list(s)\n        left, right = 0, len(chars) - 1\n        \n        while left < right:\n            while left < right and chars[left] not in vowels:\n                left += 1\n            while left < right and chars[right] not in vowels:\n                right -= 1\n            \n            chars[left], chars[right] = chars[right], chars[left]\n            left += 1\n            right -= 1\n        \n        return ''.join(chars)"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": false,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0018",
+    "problem_id": 143,
+    "url": "https://leetcode.com/problems/fruit-into-baskets/",
+    "category": "two_pointers_sliding_window",
+    "difficulty": "interview",
+    "problem_statement": "In a row of trees, the i-th tree produces fruit with type tree[i].\nYou start at any tree of your choice, then repeatedly perform the following steps:\n\nAdd one piece of fruit from this tree to your baskets.  If you cannot, stop.\nMove to the next tree to the right of the current tree.  If there is no tree to the right, stop.\n\nNote that you do not have any choice after the initial choice of starting tree: you must perform step 1, then step 2, then back to step 1, then step 2, and so on until you stop.\nYou have two baskets, and each basket can carry any quantity of fruit, but you want each basket to only carry one type of fruit each.\nWhat is the total amount of fruit you can collect with this procedure?\n \nExample 1:\nInput: [1,2,1]\nOutput: 3\nExplanation: We can collect [1,2,1].\n\n\nExample 2:\nInput: [0,1,2,2]\nOutput: 3\nExplanation: We can collect [1,2,2].\nIf we started at the first tree, we would only collect [0, 1].\n\n\nExample 3:\nInput: [1,2,3,2,2]\nOutput: 4\nExplanation: We can collect [2,3,2,2].\nIf we started at the first tree, we would only collect [1, 2].\n\n\nExample 4:\nInput: [3,3,3,1,2,1,1,2,3,3,4]\nOutput: 5\nExplanation: We can collect [1,2,1,1,2].\nIf we started at the first tree or the eighth tree, we would only collect 4 fruits.\n\n \n\n\n\nNote:\n\n1 <= tree.length <= 40000\n0 <= tree[i] < tree.length",
+    "starter_code": "\nclass Solution:\n    def totalFruit(self, tree: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            2,
+            1
+          ]
+        ]
+      ],
+      "outputs": [
+        3
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "You walk from left to right collecting fruit, and you have exactly two baskets, each of which may hold only one fruit type. Return the maximum number of fruits you can collect in one continuous walk.",
+      "key_observation": "Because you must move continuously to the right once you start, the answer is exactly the length of the longest contiguous subarray containing at most two distinct fruit types. That is a standard sliding-window pattern.",
+      "step_by_step_plan": [
+        "Use a sliding window with two pointers left and right.",
+        "Maintain a frequency map counting how many times each fruit type appears in the current window.",
+        "Expand right one tree at a time and update the frequency map.",
+        "If the map contains more than two fruit types, shrink the window from the left until only two types remain.",
+        "After every expansion, update the best window length seen so far.",
+        "Return the maximum length at the end."
+      ],
+      "complexity": {
+        "time": "O(N), because each tree enters and leaves the sliding window at most once.",
+        "space": "O(1), because the window stores at most 3 fruit types temporarily and at most 2 in a valid state."
+      },
+      "common_mistakes": [
+        "Thinking you can skip trees or restart in the middle after the walk has begun. The collected fruits must form one contiguous segment.",
+        "Using a greedy local pairing strategy instead of the standard 'at most 2 distinct values' sliding window.",
+        "Forgetting to shrink the window fully when the number of fruit types becomes 3."
+      ],
+      "annotated_code": "from collections import defaultdict\n\n\nclass Solution:\n    def totalFruit(self, tree: List[int]) -> int:\n        count = defaultdict(int)\n        left = 0\n        ans = 0\n        \n        for right, fruit in enumerate(tree):\n            count[fruit] += 1\n            \n            # Keep shrinking until the window has at most 2 fruit types\n            while len(count) > 2:\n                count[tree[left]] -= 1\n                if count[tree[left]] == 0:\n                    del count[tree[left]]\n                left += 1\n            \n            ans = max(ans, right - left + 1)\n        \n        return ans"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0019",
+    "problem_id": 198,
+    "url": "https://leetcode.com/problems/get-equal-substrings-within-budget/",
+    "category": "two_pointers_sliding_window",
+    "difficulty": "interview",
+    "problem_statement": "You are given two strings s and t of the same length. You want to change s to t. Changing the i-th character of s to i-th character of t costs |s[i] - t[i]| that is, the absolute difference between the ASCII values of the characters.\nYou are also given an integer maxCost.\nReturn the maximum length of a substring of s that can be changed to be the same as the corresponding substring of twith a cost less than or equal to maxCost.\nIf there is no substring from s that can be changed to its corresponding substring from t, return 0.\n \nExample 1:\nInput: s = \"abcd\", t = \"bcdf\", maxCost = 3\nOutput: 3\nExplanation: \"abc\" of s can change to \"bcd\". That costs 3, so the maximum length is 3.\nExample 2:\nInput: s = \"abcd\", t = \"cdef\", maxCost = 3\nOutput: 1\nExplanation: Each character in s costs 2 to change to charactor in t, so the maximum length is 1.\n\nExample 3:\nInput: s = \"abcd\", t = \"acde\", maxCost = 0\nOutput: 1\nExplanation: You can't make any change, so the maximum length is 1.\n\n \nConstraints:\n\n1 <= s.length, t.length <= 10^5\n0 <= maxCost <= 10^6\ns and t only contain lower case English letters.",
+    "starter_code": "\nclass Solution:\n    def equalSubstring(self, s: str, t: str, maxCost: int) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          "\"abcd\"",
+          "\"bcdf\"",
+          3
+        ]
+      ],
+      "outputs": [
+        3
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given two equal-length strings s and t, each position has a conversion cost equal to the absolute difference between the two characters. Find the longest contiguous substring whose total conversion cost is at most maxCost.",
+      "key_observation": "For any fixed right endpoint, if the current window costs too much, moving the left endpoint rightward is the only way to reduce the cost. This makes the window monotonic and allows a linear-time sliding window solution.",
+      "step_by_step_plan": [
+        "Initialize left, current_cost, and answer to 0.",
+        "Scan right from 0 to len(s) - 1.",
+        "Add the cost of converting s[right] to t[right] into current_cost.",
+        "While current_cost is greater than maxCost, remove the cost at left and increment left.",
+        "After the window is valid again, update answer with right - left + 1.",
+        "Return answer after all right endpoints have been processed."
+      ],
+      "complexity": {
+        "time": "O(N), because each index enters and leaves the sliding window at most once.",
+        "space": "O(1), because only a few integer variables are used."
+      },
+      "common_mistakes": [
+        "Using nested loops to recompute every substring cost, which is O(N^2) and unnecessary.",
+        "Shrinking the window only once when the cost may still exceed maxCost.",
+        "Forgetting to subtract the left character's conversion cost before moving left forward."
+      ],
+      "annotated_code": "class Solution:\n    def equalSubstring(self, s: str, t: str, maxCost: int) -> int:\n        left = 0\n        current_cost = 0\n        best = 0\n\n        for right in range(len(s)):\n            # Add the cost of including this new position in the window.\n            current_cost += abs(ord(s[right]) - ord(t[right]))\n\n            # Shrink from the left until the window is affordable again.\n            while current_cost > maxCost:\n                current_cost -= abs(ord(s[left]) - ord(t[left]))\n                left += 1\n\n            best = max(best, right - left + 1)\n\n        return best"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0020",
+    "problem_id": 2024,
+    "url": "https://codeforces.com/problemset/problem/235/B",
+    "category": "two_pointers_sliding_window",
+    "difficulty": "competition",
+    "problem_statement": "You're playing a game called Osu! Here's a simplified version of it. There are n clicks in a game. For each click there are two outcomes: correct or bad. Let us denote correct as \"O\", bad as \"X\", then the whole play can be encoded as a sequence of n characters \"O\" and \"X\".\n\nUsing the play sequence you can calculate the score for the play as follows: for every maximal consecutive \"O\"s block, add the square of its length (the number of characters \"O\") to the score. For example, if your play can be encoded as \"OOXOOOXXOO\", then there's three maximal consecutive \"O\"s block \"OO\", \"OOO\", \"OO\", so your score will be 2^2 + 3^2 + 2^2 = 17. If there are no correct clicks in a play then the score for the play equals to 0.\n\nYou know that the probability to click the i-th (1 ≤ i ≤ n) click correctly is p_{i}. In other words, the i-th character in the play sequence has p_{i} probability to be \"O\", 1 - p_{i} to be \"X\". You task is to calculate the expected score for your play.\n\n\n-----Input-----\n\nThe first line contains an integer n (1 ≤ n ≤ 10^5) — the number of clicks. The second line contains n space-separated real numbers p_1, p_2, ..., p_{n} (0 ≤ p_{i} ≤ 1).\n\nThere will be at most six digits after the decimal point in the given p_{i}.\n\n\n-----Output-----\n\nPrint a single real number — the expected score for your play. Your answer will be considered correct if its absolute or relative error does not exceed 10^{ - 6}.\n\n\n-----Examples-----\nInput\n3\n0.5 0.5 0.5\n\nOutput\n2.750000000000000\n\nInput\n4\n0.7 0.2 0.1 0.9\n\nOutput\n2.489200000000000\n\nInput\n5\n1 1 1 1 1\n\nOutput\n25.000000000000000\n\n\n\n-----Note-----\n\nFor the first example. There are 8 possible outcomes. Each has a probability of 0.125.  \"OOO\"  →  3^2 = 9;  \"OOX\"  →  2^2 = 4;  \"OXO\"  →  1^2 + 1^2 = 2;  \"OXX\"  →  1^2 = 1;  \"XOO\"  →  2^2 = 4;  \"XOX\"  →  1^2 = 1;  \"XXO\"  →  1^2 = 1;  \"XXX\"  →  0. \n\nSo the expected score is $\\frac{9 + 4 + 2 + 1 + 4 + 1 + 1}{8} = 2.75$",
+    "starter_code": "import sys\n\ndef solve():\n    # Read all standard input\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    # Your code here\n\nif __name__ == '__main__':\n    solve()",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "3\n0.5 0.5 0.5\n",
+        "4\n0.7 0.2 0.1 0.9\n",
+        "5\n1 1 1 1 1\n",
+        "10\n0.684846 0.156794 0.153696 0.714526 0.281868 0.628256 0.745339 0.123854 0.748936 0.856333\n",
+        "10\n0.684488 0.834971 0.834886 0.643646 0.162710 0.119851 0.659401 0.743950 0.220986 0.839665\n",
+        "10\n0.684416 0.170607 0.491124 0.469470 0.458879 0.658170 0.322214 0.707969 0.275396 0.836331\n",
+        "10\n0.684631 0.563700 0.722410 0.191998 0.370373 0.643213 0.533776 0.815911 0.112166 0.846332\n",
+        "10\n0.684559 0.699336 0.378648 0.817822 0.666542 0.381532 0.196589 0.779930 0.166576 0.842998\n",
+        "10\n0.999453 0.999188 0.998398 0.999609 0.999113 0.999426 0.998026 0.999244 0.998842 0.999807\n",
+        "10\n0.000733 0.000769 0.000772 0.000595 0.000930 0.000395 0.000596 0.000584 0.000496 0.000905\n",
+        "30\n0.684344 0.306242 0.147362 0.295294 0.755047 0.396489 0.785026 0.671988 0.329806 0.832998 0.106621 0.452498 0.125067 0.838169 0.869683 0.740625 0.449522 0.751800 0.272185 0.865612 0.272859 0.416162 0.339155 0.478441 0.401937 0.626148 0.305498 0.716523 0.734322 0.751335\n",
+        "30\n0.684273 0.441878 0.603600 0.121118 0.251216 0.134808 0.447839 0.636007 0.384215 0.829664 0.204397 0.627395 0.243031 0.424765 0.525065 0.585464 0.893844 0.377080 0.246110 0.356372 0.836239 0.670558 0.546182 0.310427 0.343287 0.868653 0.269521 0.432699 0.288850 0.848816\n",
+        "30\n0.683914 0.320055 0.484789 0.850238 0.132058 0.426403 0.361901 0.456102 0.656265 0.812996 0.693279 0.701878 0.832853 0.757747 0.401974 0.609660 0.715452 0.103482 0.115733 0.210174 0.453140 0.342538 0.781317 0.270359 0.850037 0.481183 0.889637 0.613578 0.461492 0.536221\n",
+        "30\n0.683843 0.455691 0.141027 0.676062 0.428227 0.164722 0.824714 0.420121 0.710675 0.809662 0.791055 0.876775 0.150817 0.344344 0.857356 0.454499 0.359774 0.528762 0.889658 0.500934 0.216520 0.596934 0.188344 0.102346 0.791387 0.723689 0.853660 0.329754 0.816020 0.633702\n",
+        "30\n0.684058 0.848784 0.372313 0.398590 0.339721 0.149765 0.236276 0.528064 0.547445 0.819663 0.497726 0.352085 0.596924 0.784554 0.291210 0.119982 0.626809 0.852921 0.167884 0.428653 0.126380 0.633746 0.367263 0.606386 0.167337 0.796171 0.161591 0.381226 0.552435 0.341259\n",
+        "30\n0.999453 0.998210 0.999812 0.998309 0.999333 0.999463 0.999490 0.998975 0.999248 0.999782 0.999233 0.999062 0.999530 0.998674 0.999608 0.999654 0.998426 0.998941 0.998104 0.999541 0.999467 0.999961 0.999180 0.998842 0.998022 0.998345 0.998064 0.999984 0.998017 0.998843\n",
+        "30\n0.000735 0.000533 0.000518 0.000044 0.000677 0.000571 0.000138 0.000707 0.000793 0.000018 0.000326 0.000635 0.000789 0.000298 0.000445 0.000077 0.000226 0.000128 0.000933 0.000961 0.000726 0.000405 0.000610 0.000102 0.000990 0.000989 0.000254 0.000580 0.000053 0.000142\n"
+      ],
+      "outputs": [
+        "2.750000000000000\n",
+        "2.489200000000000\n",
+        "25.000000000000000\n",
+        "10.721778814471227\n",
+        "15.401334613504345\n",
+        "11.404416796704293\n",
+        "12.888929008957161\n",
+        "14.036752909261951\n",
+        "99.590738622894690\n",
+        "0.006782723279203\n",
+        "44.576745047411691\n",
+        "36.478162706163317\n",
+        "53.227679791398110\n",
+        "49.054872575308515\n",
+        "33.125615383310461\n",
+        "891.219052952586820\n",
+        "0.014416714297575\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Each click independently becomes 'O' with probability p[i] and 'X' otherwise. The score is the sum of squares of lengths of maximal consecutive 'O' blocks. We need the expected value of that score.",
+      "key_observation": "When a new click becomes 'O', it extends the current consecutive 'O' suffix by 1. If the expected current suffix length before this click is e, then making this click 'O' increases the score by exactly 2 * e + 1. Since that happens with probability p[i], we can update the answer using expectations directly in one pass.",
+      "step_by_step_plan": [
+        "Maintain e = expected length of the current consecutive 'O' suffix ending at the previous position.",
+        "Maintain ans = expected total score so far.",
+        "Process probabilities from left to right.",
+        "For a click with probability p, the expected new score contribution is p * (2 * e + 1). Add this to ans.",
+        "Update the expected suffix length as e = p * (e + 1).",
+        "After processing all clicks, print ans with sufficient floating-point precision."
+      ],
+      "complexity": {
+        "time": "O(N), because each probability is processed exactly once.",
+        "space": "O(1), because only a few floating-point variables are maintained."
+      },
+      "common_mistakes": [
+        "Trying to enumerate all 2^n click outcomes instead of using linearity of expectation.",
+        "Mistaking the problem for a sliding-window problem just because it involves consecutive segments.",
+        "Using the wrong recurrence for the expected suffix length; it must reset implicitly through multiplication by p.",
+        "Printing with too little precision for a floating-point expectation problem."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    n = int(input_data[0])\n    probs = list(map(float, input_data[1:1 + n]))\n    \n    # e = expected length of the current consecutive 'O' suffix\n    e = 0.0\n    ans = 0.0\n    \n    for p in probs:\n        # If this click is correct, the score increases by 2*e + 1\n        ans += p * (2.0 * e + 1.0)\n        # Update expected suffix length ending here\n        e = p * (e + 1.0)\n    \n    print(f\"{ans:.15f}\")\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": false,
+      "verifiable_by_tests": true
+    }
+  }
+]

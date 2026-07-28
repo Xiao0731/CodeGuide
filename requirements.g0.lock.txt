@@ -1,0 +1,6 @@
+# CPU-only G0 audit environment, verified on Python 3.12.13.
+# This is not the CUDA/QLoRA training lock.
+omegaconf==2.3.0
+pytest==8.4.1
+PyYAML==6.0.3
+tqdm==4.67.1

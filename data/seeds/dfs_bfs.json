@@ -1,0 +1,277 @@
+[
+  {
+    "train_ID": "train_0031",
+    "problem_id": 2388,
+    "url": "https://codeforces.com/problemset/problem/1176/E",
+    "category": "dfs_bfs",
+    "difficulty": "introductory",
+    "problem_statement": "You are given an undirected unweighted connected graph consisting of $n$ vertices and $m$ edges. It is guaranteed that there are no self-loops or multiple edges in the given graph.\n\nYour task is to choose at most $\\lfloor\\frac{n}{2}\\rfloor$ vertices in this graph so each unchosen vertex is adjacent (in other words, connected by an edge) to at least one of chosen vertices.\n\nIt is guaranteed that the answer exists. If there are multiple answers, you can print any.\n\nYou will be given multiple independent queries to answer.\n\n\n-----Input-----\n\nThe first line contains a single integer $t$ ($1 \\le t \\le 2 \\cdot 10^5$) — the number of queries.\n\nThen $t$ queries follow.\n\nThe first line of each query contains two integers $n$ and $m$ ($2 \\le n \\le 2 \\cdot 10^5$, $n - 1 \\le m \\le min(2 \\cdot 10^5, \\frac{n(n-1)}{2})$) — the number of vertices and the number of edges, respectively.\n\nThe following $m$ lines denote edges: edge $i$ is represented by a pair of integers $v_i$, $u_i$ ($1 \\le v_i, u_i \\le n$, $u_i \\ne v_i$), which are the indices of vertices connected by the edge.\n\nThere are no self-loops or multiple edges in the given graph, i. e. for each pair ($v_i, u_i$) there are no other pairs ($v_i, u_i$) or ($u_i, v_i$) in the list of edges, and for each pair ($v_i, u_i$) the condition $v_i \\ne u_i$ is satisfied. It is guaranteed that the given graph is connected.\n\nIt is guaranteed that $\\sum m \\le 2 \\cdot 10^5$ over all queries.\n\n\n-----Output-----\n\nFor each query print two lines.\n\nIn the first line print $k$ ($1 \\le \\lfloor\\frac{n}{2}\\rfloor$) — the number of chosen vertices.\n\nIn the second line print $k$ distinct integers $c_1, c_2, \\dots, c_k$ in any order, where $c_i$ is the index of the $i$-th chosen vertex.\n\nIt is guaranteed that the answer exists. If there are multiple answers, you can print any.\n\n\n-----Example-----\nInput\n2\n4 6\n1 2\n1 3\n1 4\n2 3\n2 4\n3 4\n6 8\n2 5\n5 4\n4 3\n4 1\n1 3\n2 3\n2 6\n5 6\n\nOutput\n2\n1 3\n3\n4 3 6\n\n\n\n-----Note-----\n\nIn the first query any vertex or any pair of vertices will suffice.\n\n [Image] \n\nNote that you don't have to minimize the number of chosen vertices. In the second query two vertices can be enough (vertices $2$ and $4$) but three is also ok.\n\n [Image]",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "2\n4 6\n1 2\n1 3\n1 4\n2 3\n2 4\n3 4\n6 8\n2 5\n5 4\n4 3\n4 1\n1 3\n2 3\n2 6\n5 6\n"
+      ],
+      "outputs": [
+        "1\n1 \n3\n3 4 6 \n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to choose at most floor(n / 2) vertices in a connected undirected graph so that every unchosen vertex is adjacent to at least one chosen vertex. Any valid construction is acceptable.",
+      "key_observation": "A BFS from any start vertex partitions the graph into even-depth and odd-depth layers. Every edge connects vertices whose depths differ by exactly 1 modulo 2, so one parity layer can dominate the other. Therefore, choosing the smaller of the two BFS parity sets always gives a valid answer with size at most floor(n / 2).",
+      "step_by_step_plan": [
+        "Run BFS from vertex 1 and compute the depth parity (even or odd) of every vertex.",
+        "Collect all even-depth vertices into one list and all odd-depth vertices into another list.",
+        "Compare the sizes of the two lists.",
+        "Choose the smaller list as the answer, because its size is guaranteed to be at most floor(n / 2).",
+        "Print its size and the vertices in that list."
+      ],
+      "complexity": {
+        "time": "O(N + M) per query, because we perform one BFS traversal of the graph.",
+        "space": "O(N + M), for the adjacency list, visited/depth arrays, and the BFS queue."
+      },
+      "common_mistakes": [
+        "Overthinking the problem as a minimum dominating set problem. The task only asks for any valid set of size at most floor(n / 2).",
+        "Trying to greedily pick high-degree vertices, which is unnecessary and can make the solution harder to prove.",
+        "Forgetting that this is a multi-solution output problem. A valid answer may differ from the sample output and should not be exact-string matched."
+      ],
+      "annotated_code": "import sys\nfrom collections import deque\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    t = next(it)\n    out = []\n    \n    for _ in range(t):\n        n = next(it)\n        m = next(it)\n        graph = [[] for _ in range(n + 1)]\n        \n        for _ in range(m):\n            u = next(it)\n            v = next(it)\n            graph[u].append(v)\n            graph[v].append(u)\n        \n        depth = [-1] * (n + 1)\n        q = deque([1])\n        depth[1] = 0\n        \n        while q:\n            u = q.popleft()\n            for v in graph[u]:\n                if depth[v] == -1:\n                    depth[v] = depth[u] + 1\n                    q.append(v)\n        \n        even = []\n        odd = []\n        for v in range(1, n + 1):\n            if depth[v] % 2 == 0:\n                even.append(v)\n            else:\n                odd.append(v)\n        \n        ans = even if len(even) <= len(odd) else odd\n        out.append(str(len(ans)))\n        out.append(' '.join(map(str, ans)))\n    \n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": false
+    }
+  },
+  {
+    "train_ID": "train_0032",
+    "problem_id": 2376,
+    "url": "https://codeforces.com/problemset/problem/1385/F",
+    "category": "dfs_bfs",
+    "difficulty": "introductory",
+    "problem_statement": "You are given a tree (connected graph without cycles) consisting of $n$ vertices. The tree is unrooted — it is just a connected undirected graph without cycles.\n\nIn one move, you can choose exactly $k$ leaves (leaf is such a vertex that is connected to only one another vertex) connected to the same vertex and remove them with edges incident to them. I.e. you choose such leaves $u_1, u_2, \\dots, u_k$ that there are edges $(u_1, v)$, $(u_2, v)$, $\\dots$, $(u_k, v)$ and remove these leaves and these edges.\n\nYour task is to find the maximum number of moves you can perform if you remove leaves optimally.\n\nYou have to answer $t$ independent test cases.\n\n\n-----Input-----\n\nThe first line of the input contains one integer $t$ ($1 \\le t \\le 2 \\cdot 10^4$) — the number of test cases. Then $t$ test cases follow.\n\nThe first line of the test case contains two integers $n$ and $k$ ($2 \\le n \\le 2 \\cdot 10^5$; $1 \\le k < n$) — the number of vertices in the tree and the number of leaves you remove in one move, respectively. The next $n-1$ lines describe edges. The $i$-th edge is represented as two integers $x_i$ and $y_i$ ($1 \\le x_i, y_i \\le n$), where $x_i$ and $y_i$ are vertices the $i$-th edge connects. It is guaranteed that the given set of edges forms a tree.\n\nIt is guaranteed that the sum of $n$ does not exceed $2 \\cdot 10^5$ ($\\sum n \\le 2 \\cdot 10^5$).\n\n\n-----Output-----\n\nFor each test case, print the answer — the maximum number of moves you can perform if you remove leaves optimally.\n\n\n-----Example-----\nInput\n4\n8 3\n1 2\n1 5\n7 6\n6 8\n3 1\n6 4\n6 1\n10 3\n1 2\n1 10\n2 3\n1 5\n1 6\n2 4\n7 10\n10 9\n8 10\n7 2\n3 1\n4 5\n3 6\n7 4\n1 2\n1 4\n5 1\n1 2\n2 3\n4 3\n5 3\n\nOutput\n2\n3\n3\n4\n\n\n\n-----Note-----\n\nThe picture corresponding to the first test case of the example:\n\n[Image]\n\nThere you can remove vertices $2$, $5$ and $3$ during the first move and vertices $1$, $7$ and $4$ during the second move.\n\nThe picture corresponding to the second test case of the example:\n\n[Image]\n\nThere you can remove vertices $7$, $8$ and $9$ during the first move, then vertices $5$, $6$ and $10$ during the second move and vertices $1$, $3$ and $4$ during the third move.\n\nThe picture corresponding to the third test case of the example:\n\n$\\text{of}$\n\nThere you can remove vertices $5$ and $7$ during the first move, then vertices $2$ and $4$ during the second move and vertices $1$ and $6$ during the third move.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "4\n8 3\n1 2\n1 5\n7 6\n6 8\n3 1\n6 4\n6 1\n10 3\n1 2\n1 10\n2 3\n1 5\n1 6\n2 4\n7 10\n10 9\n8 10\n7 2\n3 1\n4 5\n3 6\n7 4\n1 2\n1 4\n5 1\n1 2\n2 3\n4 3\n5 3\n"
+      ],
+      "outputs": [
+        "2\n3\n3\n4\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We repeatedly remove exactly k leaves that share the same parent in a tree. The goal is to maximize how many such moves can be performed.",
+      "key_observation": "Only current leaves matter. For each vertex, count how many leaf neighbors it has; every complete group of k such leaves can be removed. After removing leaves, their parent may itself become a new leaf for its remaining neighbor, so the process is naturally handled with a queue.",
+      "step_by_step_plan": [
+        "Build the undirected tree and degree array.",
+        "If k is 1, every move removes one leaf edge, so the answer is n - 1.",
+        "For every vertex, store the adjacent vertices that are currently leaves.",
+        "Push every vertex with at least k leaf neighbors into a queue.",
+        "When processing a vertex, discard stale leaves that were already removed.",
+        "Remove exactly k current leaf neighbors, mark them inactive, decrease the vertex degree, and add one move.",
+        "If the vertex still has at least k leaf neighbors, process it again later.",
+        "If the vertex becomes a leaf, add it to its only remaining active neighbor's leaf list."
+      ],
+      "complexity": {
+        "time": "O(N) per test case, because every node enters the queue at most once and every edge is processed a constant number of times.",
+        "space": "O(N), for the tree, parent array, degree array, and queue."
+      },
+      "common_mistakes": [
+        "Trying to delete leaves explicitly with repeated scans of the whole tree, which leads to an inefficient simulation.",
+        "Forgetting the special case k = 1, where the answer is simply n - 1.",
+        "Resetting the whole structure after one batch removal instead of letting the leaf effect propagate incrementally upward.",
+        "Treating the root like an ordinary node when checking whether it becomes a leaf."
+      ],
+      "annotated_code": "import sys\nfrom collections import deque\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    t = next(it)\n    out = []\n\n    for _ in range(t):\n        n = next(it)\n        k = next(it)\n\n        graph = [[] for _ in range(n + 1)]\n        degree = [0] * (n + 1)\n        for _ in range(n - 1):\n            u = next(it)\n            v = next(it)\n            graph[u].append(v)\n            graph[v].append(u)\n            degree[u] += 1\n            degree[v] += 1\n\n        if k == 1:\n            out.append(str(n - 1))\n            continue\n\n        leaf_neighbors = [[] for _ in range(n + 1)]\n        for u in range(1, n + 1):\n            if degree[u] == 1:\n                parent = graph[u][0]\n                leaf_neighbors[parent].append(u)\n\n        q = deque(u for u in range(1, n + 1) if len(leaf_neighbors[u]) >= k)\n        answer = 0\n\n        while q:\n            u = q.popleft()\n\n            # Remove stale leaves that may have been deleted by an earlier operation.\n            while leaf_neighbors[u] and degree[leaf_neighbors[u][-1]] == 0:\n                leaf_neighbors[u].pop()\n\n            if len(leaf_neighbors[u]) < k or degree[u] == 0:\n                continue\n\n            # Remove exactly k current leaf neighbors of u.\n            for _ in range(k):\n                leaf = leaf_neighbors[u].pop()\n                degree[leaf] = 0\n            degree[u] -= k\n            answer += 1\n\n            # u may still have another complete group of leaf neighbors.\n            if len(leaf_neighbors[u]) >= k:\n                q.append(u)\n\n            # If u becomes a leaf, it contributes to its only remaining active neighbor.\n            if degree[u] == 1:\n                for v in graph[u]:\n                    if degree[v] > 0:\n                        leaf_neighbors[v].append(u)\n                        if len(leaf_neighbors[v]) >= k:\n                            q.append(v)\n                        break\n\n        out.append(str(answer))\n\n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0033",
+    "problem_id": 89,
+    "url": "https://codeforces.com/problemset/problem/1437/D",
+    "category": "dfs_bfs",
+    "difficulty": "interview",
+    "problem_statement": "Monocarp had a tree which consisted of $n$ vertices and was rooted at vertex $1$. He decided to study BFS (Breadth-first search), so he ran BFS on his tree, starting from the root. BFS can be described by the following pseudocode:a = [] # the order in which vertices were processed\n\nq = Queue()\n\nq.put(1) # place the root at the end of the queue\n\nwhile not q.empty():\n\n    k = q.pop() # retrieve the first vertex from the queue\n\n    a.append(k) # append k to the end of the sequence in which vertices were visited\n\n    for y in g[k]: # g[k] is the list of all children of vertex k, sorted in ascending order\n\n        q.put(y)\n\n\n\nMonocarp was fascinated by BFS so much that, in the end, he lost his tree. Fortunately, he still has a sequence of vertices, in which order vertices were visited by the BFS algorithm (the array a from the pseudocode). Monocarp knows that each vertex was visited exactly once (since they were put and taken from the queue exactly once). Also, he knows that all children of each vertex were viewed in ascending order.\n\nMonocarp knows that there are many trees (in the general case) with the same visiting order $a$, so he doesn't hope to restore his tree. Monocarp is okay with any tree that has minimum height.\n\nThe height of a tree is the maximum depth of the tree's vertices, and the depth of a vertex is the number of edges in the path from the root to it. For example, the depth of vertex $1$ is $0$, since it's the root, and the depth of all root's children are $1$.\n\nHelp Monocarp to find any tree with given visiting order $a$ and minimum height.\n\n\n-----Input-----\n\nThe first line contains a single integer $t$ ($1 \\le t \\le 1000$) — the number of test cases.\n\nThe first line of each test case contains a single integer $n$ ($2 \\le n \\le 2 \\cdot 10^5$) — the number of vertices in the tree.\n\nThe second line of each test case contains $n$ integers $a_1, a_2, \\dots, a_n$ ($1 \\le a_i \\le n$; $a_i \\neq a_j$; $a_1 = 1$) — the order in which the vertices were visited by the BFS algorithm.\n\nIt's guaranteed that the total sum of $n$ over test cases doesn't exceed $2 \\cdot 10^5$.\n\n\n-----Output-----\n\nFor each test case print the minimum possible height of a tree with the given visiting order $a$.\n\n\n-----Example-----\nInput\n3\n4\n1 4 3 2\n2\n1 2\n3\n1 2 3\n\nOutput\n3\n1\n1\n\n\n\n-----Note-----\n\nIn the first test case, there is only one tree with the given visiting order:  [Image] \n\nIn the second test case, there is only one tree with the given visiting order as well:  [Image] \n\nIn the third test case, an optimal tree with the given visiting order is shown below:  [Image]",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "3\n4\n1 4 3 2\n2\n1 2\n3\n1 2 3\n"
+      ],
+      "outputs": [
+        "3\n1\n1\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We are given the order in which vertices were visited by BFS in some rooted tree whose children are processed in increasing order. Many trees may fit this order, and we only need the minimum possible height among them.",
+      "key_observation": "In a BFS order with children processed in increasing order, the children of a single parent form one maximal increasing block in the sequence. Therefore, we can simulate BFS level by level using only block boundaries, without explicitly reconstructing the whole tree.",
+      "step_by_step_plan": [
+        "The root 1 is already fixed at depth 0, so start scanning the BFS order from index 1.",
+        "Maintain how many vertices are in the current BFS layer.",
+        "For each parent in the current layer, consume one increasing block of the remaining sequence as that parent's children.",
+        "The total number of consumed children blocks forms the next BFS layer.",
+        "Once all parents in the current layer are processed, increase the height by 1 and move to the next layer.",
+        "Repeat until the whole sequence is consumed."
+      ],
+      "complexity": {
+        "time": "O(N) per test case, because we scan the BFS order once.",
+        "space": "O(1) extra space beyond the input array."
+      },
+      "common_mistakes": [
+        "Trying to explicitly rebuild the whole tree, even though the problem only asks for the minimum possible height.",
+        "Missing the fact that one parent's children must appear as one increasing block in the BFS order.",
+        "Treating every increasing pair as staying on the same level, instead of grouping them under parent blocks correctly."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    t = next(it)\n    out = []\n    \n    for _ in range(t):\n        n = next(it)\n        a = [next(it) for _ in range(n)]\n        \n        if n == 1:\n            out.append('0')\n            continue\n        \n        height = 0\n        i = 1              # current position in BFS order after the root\n        parents = 1        # number of vertices in the current layer\n        \n        while i < n:\n            height += 1\n            next_parents = 0\n            \n            # Process every parent in the current BFS layer\n            while parents > 0 and i < n:\n                next_parents += 1\n                \n                # Consume one maximal increasing block as this parent's children\n                while i + 1 < n and a[i] < a[i + 1]:\n                    i += 1\n                    next_parents += 1\n                \n                i += 1\n                parents -= 1\n            \n            parents = next_parents\n        \n        out.append(str(height))\n    \n    sys.stdout.write('\\n'.join(out))\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0034",
+    "problem_id": 155,
+    "url": "https://leetcode.com/problems/jump-game-v/",
+    "category": "dfs_bfs",
+    "difficulty": "interview",
+    "problem_statement": "Given an array of integers arr and an integer d. In one step you can jump from index i to index:\n\ni + x where: i + x < arr.length and  0 < x <= d.\ni - x where: i - x >= 0 and  0 < x <= d.\n\nIn addition, you can only jump from index i to index j if arr[i] > arr[j] and arr[i] > arr[k] for all indices k between i and j (More formally min(i, j) < k < max(i, j)).\nYou can choose any index of the array and start jumping. Return the maximum number of indices you can visit.\nNotice that you can not jump outside of the array at any time.\n \nExample 1:\n\nInput: arr = [6,4,14,6,8,13,9,7,10,6,12], d = 2\nOutput: 4\nExplanation: You can start at index 10. You can jump 10 --> 8 --> 6 --> 7 as shown.\nNote that if you start at index 6 you can only jump to index 7. You cannot jump to index 5 because 13 > 9. You cannot jump to index 4 because index 5 is between index 4 and 6 and 13 > 9.\nSimilarly You cannot jump from index 3 to index 2 or index 1.\n\nExample 2:\nInput: arr = [3,3,3,3,3], d = 3\nOutput: 1\nExplanation: You can start at any index. You always cannot jump to any index.\n\nExample 3:\nInput: arr = [7,6,5,4,3,2,1], d = 1\nOutput: 7\nExplanation: Start at index 0. You can visit all the indicies. \n\nExample 4:\nInput: arr = [7,1,7,1,7,1], d = 2\nOutput: 2\n\nExample 5:\nInput: arr = [66], d = 1\nOutput: 1\n\n \nConstraints:\n\n1 <= arr.length <= 1000\n1 <= arr[i] <= 10^5\n1 <= d <= arr.length",
+    "starter_code": "\nclass Solution:\n    def maxJumps(self, arr: List[int], d: int) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            6,
+            4,
+            14,
+            6,
+            8,
+            13,
+            9,
+            7,
+            10,
+            6,
+            12
+          ],
+          2
+        ]
+      ],
+      "outputs": [
+        4
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "From any index i, you may jump left or right by at most d positions, but only to a strictly smaller value, and only if every value in between is also smaller than arr[i]. Return the maximum number of indices that can be visited starting from the best possible starting index.",
+      "key_observation": "Every legal jump goes from a higher value to a lower value, so the jump graph is acyclic. That makes this a perfect memoized DFS problem: define dfs(i) as the maximum number of indices visitable starting from i, and compute it once per index.",
+      "step_by_step_plan": [
+        "Create a memoized DFS function dfs(i) that returns the best answer starting from index i.",
+        "Initialize the answer for dfs(i) as 1, because staying at i already counts as visiting one index.",
+        "Scan to the right from i+1 up to i+d. If you hit an index with value >= arr[i], stop scanning in that direction.",
+        "For every valid smaller value before the barrier, update dfs(i) using 1 + dfs(next_index).",
+        "Do the same scan to the left from i-1 down to i-d, again stopping at the first barrier.",
+        "Take the maximum dfs(i) over all starting positions."
+      ],
+      "complexity": {
+        "time": "O(N * D), because each index explores at most D positions to the left and D positions to the right, and each dfs state is memoized.",
+        "space": "O(N), for the memoization array and recursion stack."
+      },
+      "common_mistakes": [
+        "Continuing to scan past the first blocking index where arr[next] >= arr[i]. The rules say you must stop immediately in that direction.",
+        "Using plain DFS without memoization, which causes repeated recomputation.",
+        "Thinking equal values are allowed as jump targets. The condition is strictly arr[i] > arr[j]."
+      ],
+      "annotated_code": "from functools import lru_cache\n\n\nclass Solution:\n    def maxJumps(self, arr: List[int], d: int) -> int:\n        n = len(arr)\n        \n        @lru_cache(None)\n        def dfs(i: int) -> int:\n            best = 1  # Count the current index itself\n            \n            # Try jumping to the right\n            for j in range(i + 1, min(n, i + d + 1)):\n                if arr[j] >= arr[i]:\n                    break  # Barrier blocks any farther jump in this direction\n                best = max(best, 1 + dfs(j))\n            \n            # Try jumping to the left\n            for j in range(i - 1, max(-1, i - d - 1), -1):\n                if arr[j] >= arr[i]:\n                    break\n                best = max(best, 1 + dfs(j))\n            \n            return best\n        \n        return max(dfs(i) for i in range(n))"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0035",
+    "problem_id": 2068,
+    "url": "https://codeforces.com/problemset/problem/1083/A",
+    "category": "dfs_bfs",
+    "difficulty": "competition",
+    "problem_statement": "The Fair Nut is going to travel to the Tree Country, in which there are $n$ cities. Most of the land of this country is covered by forest. Furthermore, the local road system forms a tree (connected graph without cycles). Nut wants to rent a car in the city $u$ and go by a simple path to city $v$. He hasn't determined the path, so it's time to do it. Note that chosen path can consist of only one vertex.\n\nA filling station is located in every city. Because of strange law, Nut can buy only $w_i$ liters of gasoline in the $i$-th city. We can assume, that he has infinite money. Each road has a length, and as soon as Nut drives through this road, the amount of gasoline decreases by length. Of course, Nut can't choose a path, which consists of roads, where he runs out of gasoline. He can buy gasoline in every visited city, even in the first and the last.\n\nHe also wants to find the maximum amount of gasoline that he can have at the end of the path. Help him: count it.\n\n\n-----Input-----\n\nThe first line contains a single integer $n$ ($1 \\leq n \\leq 3 \\cdot 10^5$) — the number of cities.\n\nThe second line contains $n$ integers $w_1, w_2, \\ldots, w_n$ ($0 \\leq w_{i} \\leq 10^9$) — the maximum amounts of liters of gasoline that Nut can buy in cities.\n\nEach of the next $n - 1$ lines describes road and contains three integers $u$, $v$, $c$ ($1 \\leq u, v \\leq n$, $1 \\leq c \\leq 10^9$, $u \\ne v$), where $u$ and $v$ — cities that are connected by this road and $c$ — its length.\n\nIt is guaranteed that graph of road connectivity is a tree.\n\n\n-----Output-----\n\nPrint one number — the maximum amount of gasoline that he can have at the end of the path.\n\n\n-----Examples-----\nInput\n3\n1 3 3\n1 2 2\n1 3 2\n\nOutput\n3\n\nInput\n5\n6 3 2 5 0\n1 2 10\n2 3 3\n2 4 1\n1 5 1\n\nOutput\n7\n\n\n\n-----Note-----\n\nThe optimal way in the first example is $2 \\to 1 \\to 3$.  [Image] \n\nThe optimal way in the second example is $2 \\to 4$.  [Image]",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "3\n1 3 3\n1 2 2\n1 3 2\n",
+        "5\n6 3 2 5 0\n1 2 10\n2 3 3\n2 4 1\n1 5 1\n",
+        "1\n42\n",
+        "10\n11 43 11 96 18 53 25 89 31 41\n2 4 41\n7 1 88\n3 2 19\n10 3 38\n8 4 97\n7 5 21\n7 2 71\n3 6 69\n9 5 19\n",
+        "10\n28 8 0 1 5 2 9 1 2 81\n10 1 9\n6 5 78\n8 4 38\n3 10 74\n8 6 41\n7 2 21\n9 2 54\n2 6 90\n4 1 30\n",
+        "10\n67 9 7 2 33 5 1 7 43 55\n2 4 38\n2 5 77\n9 8 91\n9 5 8\n10 5 4\n2 6 49\n9 1 5\n7 5 100\n3 10 13\n",
+        "10\n8 63 0 10 86 14 5 49 13 5\n1 9 48\n6 9 5\n3 7 35\n9 5 3\n10 9 43\n2 6 4\n9 4 36\n8 7 10\n7 2 6\n",
+        "10\n46 76 45 9 4 58 28 7 40 100\n10 2 8\n3 9 6\n6 1 9\n2 7 10\n4 6 31\n10 1 1\n8 4 29\n5 9 9\n7 5 3\n",
+        "10\n81 34 31 38 69 62 54 18 72 29\n4 8 12\n2 9 25\n4 5 17\n5 7 35\n10 1 13\n9 3 53\n7 6 22\n1 6 82\n3 10 42\n",
+        "10\n80 63 78 18 65 77 24 83 79 48\n5 3 67\n1 8 4\n1 2 83\n7 4 16\n6 7 50\n3 9 27\n10 7 74\n2 3 21\n10 2 47\n",
+        "10\n96 72 39 45 93 64 13 7 3 28\n9 1 18\n1 7 15\n1 10 52\n4 1 93\n1 6 94\n1 5 23\n1 2 20\n8 1 13\n3 1 34\n",
+        "10\n19 48 77 50 74 26 8 10 47 7\n6 9 95\n3 9 94\n9 7 76\n5 9 95\n8 9 4\n2 4 85\n1 2 77\n4 10 29\n1 9 60\n",
+        "10\n4 85 87 24 19 100 27 73 89 46\n5 4 63\n8 9 18\n7 9 98\n8 1 61\n7 2 17\n3 9 39\n10 8 57\n1 4 80\n6 1 10\n",
+        "4\n10408 544831 53650 494619\n1 4 682017\n4 3 46433\n4 2 98094\n"
+      ],
+      "outputs": [
+        "3\n",
+        "7\n",
+        "42\n",
+        "98\n",
+        "100\n",
+        "181\n",
+        "202\n",
+        "351\n",
+        "187\n",
+        "248\n",
+        "218\n",
+        "77\n",
+        "225\n",
+        "948573\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Each city gives you up to w[i] liters of fuel when you visit it, and each road consumes c liters when you travel along it. We may choose any simple path in the tree, even a single vertex, and we want to maximize the amount of fuel remaining at the end.",
+      "key_observation": "The path's final fuel is exactly the sum of node gains minus the sum of edge costs along the path. So this is a tree maximum-path-sum problem. For each node u, compute the best downward path starting at u, and also try combining the two best positive child contributions through u to update the global answer.",
+      "step_by_step_plan": [
+        "Build the tree adjacency list with edge costs.",
+        "Run a DFS (or iterative postorder traversal) to process children before their parent.",
+        "For each node u, compute the best gain of a downward path that starts at u: w[u] plus the best positive contribution from one child branch.",
+        "For every child v, its contribution to u is down[v] - cost(u, v). Ignore it if this value is negative.",
+        "Track the two largest positive child contributions for each node.",
+        "A path passing through u can use both top contributions, so update the global answer with w[u] + best1 + best2.",
+        "Return the global maximum over the whole tree."
+      ],
+      "complexity": {
+        "time": "O(N), because each edge is processed a constant number of times.",
+        "space": "O(N), for the adjacency list, traversal order, and DP arrays."
+      },
+      "common_mistakes": [
+        "Treating the problem as a shortest-path or greedy refueling problem instead of recognizing it as a maximum weighted path on a tree.",
+        "Forgetting that a path may consist of just one vertex, so the answer is at least max(w[i]).",
+        "Always taking a child branch even when its net contribution is negative.",
+        "Using deep recursive DFS in Python without care on very large trees. An iterative postorder traversal is safer for robustness."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    it = iter(data)\n    n = next(it)\n    w = [0] + [next(it) for _ in range(n)]\n    \n    graph = [[] for _ in range(n + 1)]\n    for _ in range(n - 1):\n        u = next(it)\n        v = next(it)\n        c = next(it)\n        graph[u].append((v, c))\n        graph[v].append((u, c))\n    \n    # Iterative DFS to get a postorder traversal\n    parent = [0] * (n + 1)\n    order = [1]\n    parent[1] = -1\n    edge_to_parent = [0] * (n + 1)\n    \n    for u in order:\n        for v, cost in graph[u]:\n            if v != parent[u]:\n                parent[v] = u\n                edge_to_parent[v] = cost\n                order.append(v)\n    \n    down = [0] * (n + 1)\n    ans = 0\n    \n    for u in reversed(order):\n        best1 = 0\n        best2 = 0\n        \n        for v, cost in graph[u]:\n            if v == parent[u]:\n                continue\n            gain = down[v] - cost\n            if gain > best1:\n                best2 = best1\n                best1 = gain\n            elif gain > best2:\n                best2 = gain\n        \n        # Best downward path starting at u\n        down[u] = w[u] + max(0, best1)\n        \n        # Best path passing through u may use two child branches\n        ans = max(ans, w[u] + max(0, best1) + max(0, best2))\n    \n    print(ans)\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  }
+]

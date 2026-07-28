@@ -1,0 +1,296 @@
+[
+  {
+    "train_ID": "train_0021",
+    "problem_id": 2415,
+    "url": "https://leetcode.com/problems/search-insert-position/",
+    "category": "binary_search",
+    "difficulty": "introductory",
+    "problem_statement": "Given a sorted array and a target value, return the index if the target is found. If not, return the index where it would be if it were inserted in order.\n\nYou may assume no duplicates in the array.\n\nExample 1:\n\n\nInput: [1,3,5,6], 5\nOutput: 2\n\n\nExample 2:\n\n\nInput: [1,3,5,6], 2\nOutput: 1\n\n\nExample 3:\n\n\nInput: [1,3,5,6], 7\nOutput: 4\n\n\nExample 4:\n\n\nInput: [1,3,5,6], 0\nOutput: 0",
+    "starter_code": "\nclass Solution:\n    def searchInsert(self, nums: List[int], target: int) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            3,
+            5,
+            6
+          ],
+          5
+        ]
+      ],
+      "outputs": [
+        2
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given a sorted array with no duplicates and a target value, return the index if the target exists. Otherwise, return the index where it should be inserted so that the array remains sorted.",
+      "key_observation": "This is a classic lower_bound problem: we want the first index i such that nums[i] >= target. If target exists, that index is its position; if it does not, that index is exactly where it should be inserted.",
+      "step_by_step_plan": [
+        "Initialize two pointers left = 0 and right = len(nums). Use a half-open interval [left, right).",
+        "While left < right, compute mid as the middle index.",
+        "If nums[mid] is smaller than target, the answer must be to the right of mid, so move left to mid + 1.",
+        "Otherwise, nums[mid] is already large enough, so keep mid as a candidate and move right to mid.",
+        "When the loop ends, left is the first position where nums[left] >= target, or len(nums) if all elements are smaller.",
+        "Return left."
+      ],
+      "complexity": {
+        "time": "O(log N), because each binary-search step halves the remaining search interval.",
+        "space": "O(1), because only a few pointers are used."
+      },
+      "common_mistakes": [
+        "Using a closed interval but updating boundaries inconsistently, which can cause infinite loops or off-by-one errors.",
+        "Returning mid directly when the loop ends, even though mid is not guaranteed to be the final insertion position.",
+        "Searching only for exact equality instead of the first position where the value is at least the target."
+      ],
+      "annotated_code": "class Solution:\n    def searchInsert(self, nums: List[int], target: int) -> int:\n        left, right = 0, len(nums)\n        \n        # Search for the first index with value >= target\n        while left < right:\n            mid = (left + right) // 2\n            if nums[mid] < target:\n                left = mid + 1\n            else:\n                right = mid\n        \n        return left"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0022",
+    "problem_id": 2474,
+    "url": "https://leetcode.com/problems/sqrtx/",
+    "category": "binary_search",
+    "difficulty": "introductory",
+    "problem_statement": "Implement int sqrt(int x).\n\nCompute and return the square root of x, where x is guaranteed to be a non-negative integer.\n\nSince the return type is an integer, the decimal digits are truncated and only the integer part of the result is returned.\n\nExample 1:\n\n\nInput: 4\nOutput: 2\n\n\nExample 2:\n\n\nInput: 8\nOutput: 2\nExplanation: The square root of 8 is 2.82842..., and since \n             the decimal part is truncated, 2 is returned.",
+    "starter_code": "\nclass Solution:\n    def mySqrt(self, x: int) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          4
+        ]
+      ],
+      "outputs": [
+        2
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given a non-negative integer x, return the integer part of its square root. In other words, return the greatest integer y such that y * y <= x.",
+      "key_observation": "We are not looking for an exact square root unless x is a perfect square. Instead, we want the maximum integer y satisfying y^2 <= x, which is a monotonic condition and therefore perfect for binary search.",
+      "step_by_step_plan": [
+        "Handle small values such as x < 2 directly, because the answer is x itself.",
+        "Binary-search over the answer range from 1 to x // 2 + 1.",
+        "For each mid, check whether mid * mid <= x.",
+        "If the condition is true, mid is a valid answer candidate, so move left upward to search for a larger one.",
+        "Otherwise, mid is too large, so move right downward.",
+        "At the end, return the largest valid mid."
+      ],
+      "complexity": {
+        "time": "O(log X), because binary search halves the numeric range each step.",
+        "space": "O(1), because only a few integer variables are used."
+      },
+      "common_mistakes": [
+        "Trying to use floating-point sqrt and then converting to int, which is unnecessary and can be risky in some languages.",
+        "Returning the first mid whose square is <= x instead of the largest such mid.",
+        "Forgetting that x = 0 and x = 1 are trivial edge cases."
+      ],
+      "annotated_code": "class Solution:\n    def mySqrt(self, x: int) -> int:\n        if x < 2:\n            return x\n        \n        left, right = 1, x // 2 + 1\n        ans = 1\n        \n        while left <= right:\n            mid = (left + right) // 2\n            sq = mid * mid\n            \n            if sq <= x:\n                ans = mid\n                left = mid + 1\n            else:\n                right = mid - 1\n        \n        return ans"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": false,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0023",
+    "problem_id": 124,
+    "url": "https://leetcode.com/problems/search-in-rotated-sorted-array-ii/",
+    "category": "binary_search",
+    "difficulty": "interview",
+    "problem_statement": "Suppose an array sorted in ascending order is rotated at some pivot unknown to you beforehand.\n\n(i.e., [0,0,1,2,2,5,6] might become [2,5,6,0,0,1,2]).\n\nYou are given a target value to search. If found in the array return true, otherwise return false.\n\nExample 1:\n\n\nInput: nums = [2,5,6,0,0,1,2], target = 0\nOutput: true\n\n\nExample 2:\n\n\nInput: nums = [2,5,6,0,0,1,2], target = 3\nOutput: false\n\nFollow up:\n\n\n       This is a follow up problem to Search in Rotated Sorted Array, where nums may contain duplicates.\n       Would this affect the run-time complexity? How and why?",
+    "starter_code": "\nclass Solution:\n    def search(self, nums: List[int], target: int) -> bool:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            2,
+            5,
+            6,
+            0,
+            0,
+            1,
+            2
+          ],
+          0
+        ]
+      ],
+      "outputs": [
+        true
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We are given a rotated sorted array that may contain duplicates, and we need to determine whether a target value exists in it.",
+      "key_observation": "The usual rotated-array binary search still works most of the time, but duplicates can destroy the ability to decide which half is sorted. In the ambiguous case nums[left] == nums[mid] == nums[right], the only safe move is to shrink the boundaries.",
+      "step_by_step_plan": [
+        "Initialize left and right as the two ends of the array.",
+        "While left <= right, compute mid.",
+        "If nums[mid] equals the target, return true immediately.",
+        "If nums[left] == nums[mid] == nums[right], shrink both ends by one, because we cannot tell which side is sorted.",
+        "Otherwise, determine whether the left half or the right half is sorted.",
+        "If the sorted half could contain the target, keep that half; otherwise, discard it and search the other half.",
+        "If the loop ends without finding the target, return false."
+      ],
+      "complexity": {
+        "time": "O(log N) on many cases, but O(N) in the worst case because duplicates can force us to shrink the search range one step at a time.",
+        "space": "O(1), because only pointers are used."
+      },
+      "common_mistakes": [
+        "Assuming duplicates do not affect the usual rotated-array binary search logic.",
+        "Failing to handle the ambiguous case nums[left] == nums[mid] == nums[right], which can lead to wrong pruning.",
+        "Claiming the algorithm is always O(log N), even though duplicates can force worst-case linear behavior."
+      ],
+      "annotated_code": "class Solution:\n    def search(self, nums: List[int], target: int) -> bool:\n        left, right = 0, len(nums) - 1\n        \n        while left <= right:\n            mid = (left + right) // 2\n            \n            if nums[mid] == target:\n                return True\n            \n            # Ambiguous case caused by duplicates\n            if nums[left] == nums[mid] == nums[right]:\n                left += 1\n                right -= 1\n            # Left half is sorted\n            elif nums[left] <= nums[mid]:\n                if nums[left] <= target < nums[mid]:\n                    right = mid - 1\n                else:\n                    left = mid + 1\n            # Right half is sorted\n            else:\n                if nums[mid] < target <= nums[right]:\n                    left = mid + 1\n                else:\n                    right = mid - 1\n        \n        return False"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0024",
+    "problem_id": 152,
+    "url": "https://leetcode.com/problems/magnetic-force-between-two-balls/",
+    "category": "binary_search",
+    "difficulty": "interview",
+    "problem_statement": "In universe Earth C-137, Rick discovered a special form of magnetic force between two balls if they are put in his new invented basket. Rick has n empty baskets, the ith basket is at position[i], Morty has m balls and needs to distribute the balls into the baskets such that the minimum magnetic force between any two balls is maximum.\nRick stated that magnetic force between two different balls at positions x and y is |x - y|.\nGiven the integer array position and the integer m. Return the required force.\n \nExample 1:\n\nInput: position = [1,2,3,4,7], m = 3\nOutput: 3\nExplanation: Distributing the 3 balls into baskets 1, 4 and 7 will make the magnetic force between ball pairs [3, 3, 6]. The minimum magnetic force is 3. We cannot achieve a larger minimum magnetic force than 3.\n\nExample 2:\nInput: position = [5,4,3,2,1,1000000000], m = 2\nOutput: 999999999\nExplanation: We can use baskets 1 and 1000000000.\n\n \nConstraints:\n\nn == position.length\n2 <= n <= 10^5\n1 <= position[i] <= 10^9\nAll integers in position are distinct.\n2 <= m <= position.length",
+    "starter_code": "\nclass Solution:\n    def maxDistance(self, position: List[int], m: int) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            2,
+            3,
+            4,
+            7
+          ],
+          3
+        ]
+      ],
+      "outputs": [
+        3
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We need to place m balls into distinct basket positions so that the minimum distance between any two placed balls is as large as possible. Return that largest possible minimum distance.",
+      "key_observation": "This is a binary search on the answer value, not on array indices. If a minimum distance d is feasible, then every smaller distance is also feasible. This monotonicity lets us binary-search the answer, while a greedy placement checks feasibility.",
+      "step_by_step_plan": [
+        "Sort the basket positions in ascending order.",
+        "Binary-search the candidate answer dist between 1 and position[-1] - position[0].",
+        "To check whether dist is feasible, greedily place the first ball at the leftmost basket.",
+        "Then scan from left to right and place the next ball whenever the current basket is at least dist away from the last placed ball.",
+        "Count how many balls can be placed this way.",
+        "If at least m balls can be placed, dist is feasible and we try a larger answer; otherwise, we try a smaller one.",
+        "Return the largest feasible distance."
+      ],
+      "complexity": {
+        "time": "O(N log R), where N is the number of baskets and R is the search range of distances.",
+        "space": "O(1) extra space beyond sorting."
+      },
+      "common_mistakes": [
+        "Trying to optimize pairwise distances directly instead of recognizing the monotonic feasibility condition.",
+        "Using a non-greedy feasibility check, even though left-to-right greedy placement is optimal for testing a fixed distance.",
+        "Binary-searching the basket index instead of the answer distance."
+      ],
+      "annotated_code": "class Solution:\n    def maxDistance(self, position: List[int], m: int) -> int:\n        position.sort()\n        \n        def can_place(dist: int) -> bool:\n            count = 1\n            last = position[0]\n            \n            for x in position[1:]:\n                if x - last >= dist:\n                    count += 1\n                    last = x\n                    if count >= m:\n                        return True\n            \n            return False\n        \n        left, right = 1, position[-1] - position[0]\n        ans = 1\n        \n        while left <= right:\n            mid = (left + right) // 2\n            if can_place(mid):\n                ans = mid\n                left = mid + 1\n            else:\n                right = mid - 1\n        \n        return ans"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0025",
+    "problem_id": 2039,
+    "url": "https://codeforces.com/problemset/problem/1168/A",
+    "category": "binary_search",
+    "difficulty": "competition",
+    "problem_statement": "Toad Zitz has an array of integers, each integer is between $0$ and $m-1$ inclusive. The integers are $a_1, a_2, \\ldots, a_n$.\n\nIn one operation Zitz can choose an integer $k$ and $k$ indices $i_1, i_2, \\ldots, i_k$ such that $1 \\leq i_1 < i_2 < \\ldots < i_k \\leq n$. He should then change $a_{i_j}$ to $((a_{i_j}+1) \\bmod m)$ for each chosen integer $i_j$. The integer $m$ is fixed for all operations and indices.\n\nHere $x \\bmod y$ denotes the remainder of the division of $x$ by $y$.\n\nZitz wants to make his array non-decreasing with the minimum number of such operations. Find this minimum number of operations.\n\n\n-----Input-----\n\nThe first line contains two integers $n$ and $m$ ($1 \\leq n, m \\leq 300\\,000$) — the number of integers in the array and the parameter $m$.\n\nThe next line contains $n$ space-separated integers $a_1, a_2, \\ldots, a_n$ ($0 \\leq a_i < m$) — the given array.\n\n\n-----Output-----\n\nOutput one integer: the minimum number of described operations Zitz needs to make his array non-decreasing. If no operations required, print $0$.\n\nIt is easy to see that with enough operations Zitz can always make his array non-decreasing.\n\n\n-----Examples-----\nInput\n5 3\n0 0 0 1 2\n\nOutput\n0\n\nInput\n5 7\n0 6 1 3 2\n\nOutput\n1\n\n\n\n-----Note-----\n\nIn the first example, the array is already non-decreasing, so the answer is $0$.\n\nIn the second example, you can choose $k=2$, $i_1 = 2$, $i_2 = 5$, the array becomes $[0,0,1,3,3]$. It is non-decreasing, so the answer is $1$.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "5 3\n0 0 0 1 2\n",
+        "5 7\n0 6 1 3 2\n",
+        "10 10\n5 0 5 9 4 6 4 5 0 0\n",
+        "4 6\n0 3 5 1\n",
+        "6 4\n1 3 0 2 1 0\n",
+        "10 1000\n981 824 688 537 969 72 39 734 929 718\n",
+        "10 300000\n111862 91787 271781 182224 260248 142019 30716 102643 141870 19206\n",
+        "100 10\n8 4 4 9 0 7 9 5 1 1 2 3 7 1 8 4 8 8 6 0 8 7 8 3 7 0 6 4 8 4 2 7 0 0 3 8 4 4 2 0 0 4 7 2 4 7 9 1 3 3 6 2 9 6 0 6 3 5 6 5 5 3 0 0 8 7 1 4 2 4 1 3 9 7 9 0 6 6 7 4 2 3 7 1 7 3 5 1 4 3 7 5 7 5 0 5 1 9 0 9\n",
+        "100 1\n0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
+        "100 2\n1 1 0 1 0 1 0 0 0 1 0 1 0 0 1 1 1 1 1 0 1 1 1 1 1 1 0 0 0 1 1 0 1 0 0 0 0 0 1 1 1 1 1 0 0 0 0 1 1 1 1 0 1 0 0 1 0 0 1 0 1 0 1 1 1 0 1 1 0 1 1 0 1 0 0 0 1 0 1 1 0 1 1 0 1 0 1 0 0 0 0 0 1 0 0 0 0 1 1 1\n",
+        "100 1000\n980 755 745 448 424 691 210 545 942 979 555 783 425 942 495 741 487 514 752 434 187 874 372 617 414 505 659 445 81 397 243 986 441 587 31 350 831 801 194 103 723 166 108 182 252 846 328 905 639 690 738 638 986 340 559 626 572 808 442 410 179 549 880 153 449 99 434 945 163 687 173 797 999 274 975 626 778 456 407 261 988 43 25 391 937 856 54 110 884 937 940 205 338 250 903 244 424 871 979 810\n",
+        "1 1\n0\n",
+        "10 10\n1 2 3 4 5 6 7 8 9 0\n",
+        "2 1\n0 0\n",
+        "2 2\n0 1\n",
+        "2 2\n1 0\n"
+      ],
+      "outputs": [
+        "0\n",
+        "1\n",
+        "6\n",
+        "3\n",
+        "2\n",
+        "463\n",
+        "208213\n",
+        "8\n",
+        "0\n",
+        "1\n",
+        "860\n",
+        "0\n",
+        "9\n",
+        "0\n",
+        "0\n",
+        "1\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "We are given an array whose values lie in [0, m-1]. In one operation, we may increase any chosen positions by 1 modulo m. We need the minimum number of operations required so that the final array can become non-decreasing.",
+      "key_observation": "Binary-search the answer x: assume every element may be increased at most x times. Then greedily check from left to right whether the array can be made non-decreasing. For each a[i], either we keep the current required lower bound prev, or, if even after at most x increments it cannot wrap around enough to stay at least prev, we must raise prev to a[i].",
+      "step_by_step_plan": [
+        "Binary-search the minimum feasible number of operations x in the range [0, m - 1].",
+        "Write a check(x) function that greedily tries to make the array non-decreasing using at most x increments per element.",
+        "Maintain prev, the minimum value the current position must end up with in order to keep the sequence non-decreasing.",
+        "For each a[i], determine whether it can be transformed to some value >= prev within x operations, considering modulo wrap-around.",
+        "If yes, keep prev unchanged because that is always best for future elements.",
+        "If no, then the current element must stay at least at its original value a[i], so set prev = a[i].",
+        "If at any point this becomes impossible, return false. Otherwise return true.",
+        "Use binary search to find the smallest x for which check(x) succeeds."
+      ],
+      "complexity": {
+        "time": "O(N log M), because each feasibility check scans the array once and binary search tests O(log M) values.",
+        "space": "O(1), because only a few variables are maintained."
+      },
+      "common_mistakes": [
+        "Thinking the operation count applies globally to the whole array, when in the feasibility check x is interpreted as the maximum increments allowed per position under the binary-searched answer.",
+        "Forgetting to handle modulo wrap-around, which is the entire source of the problem's difficulty.",
+        "Trying to greedily modify the array itself instead of maintaining the smallest possible required lower bound prev."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    n = data[0]\n    m = data[1]\n    a = data[2:2 + n]\n    \n    def check(x: int) -> bool:\n        prev = 0\n        \n        for val in a:\n            # Maximum value reachable without wrapping is val + x\n            # If val can be wrapped around to cover prev, we keep prev unchanged.\n            if val + x < m:\n                # No wrap-around possible: val must end up in [val, val+x]\n                if prev > val + x:\n                    return False\n                prev = max(prev, val)\n            else:\n                # Wrap-around is possible. Then val can cover [val, m-1] and [0, (val+x)%m].\n                # If prev is in the wrapped range, we can keep prev unchanged.\n                wrapped_max = (val + x) % m\n                if prev > wrapped_max and prev < val:\n                    prev = val\n        \n        return True\n    \n    left, right = 0, m - 1\n    ans = m - 1\n    \n    while left <= right:\n        mid = (left + right) // 2\n        if check(mid):\n            ans = mid\n            right = mid - 1\n        else:\n            left = mid + 1\n    \n    print(ans)\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": false,
+      "verifiable_by_tests": true
+    }
+  }
+]

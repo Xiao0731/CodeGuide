@@ -1,0 +1,279 @@
+[
+  {
+    "train_ID": "train_0041",
+    "problem_id": 2440,
+    "url": "https://leetcode.com/problems/climbing-stairs/",
+    "category": "dp",
+    "difficulty": "introductory",
+    "problem_statement": "You are climbing a stair case. It takes n steps to reach to the top.\n\nEach time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?\n\nNote: Given n will be a positive integer.\n\nExample 1:\n\n\nInput: 2\nOutput: 2\nExplanation: There are two ways to climb to the top.\n1. 1 step + 1 step\n2. 2 steps\n\n\nExample 2:\n\n\nInput: 3\nOutput: 3\nExplanation: There are three ways to climb to the top.\n1. 1 step + 1 step + 1 step\n2. 1 step + 2 steps\n3. 2 steps + 1 step",
+    "starter_code": "\nclass Solution:\n    def climbStairs(self, n: int) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          2
+        ]
+      ],
+      "outputs": [
+        2
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "You need to reach the top of a staircase with n steps. Each move can climb either 1 step or 2 steps. Return how many different ways there are to reach exactly the top.",
+      "key_observation": "To arrive at step n, the last move must come either from step n-1 or from step n-2. Therefore, the number of ways satisfies the recurrence f(n) = f(n-1) + f(n-2), which is exactly a Fibonacci-style dynamic programming transition.",
+      "step_by_step_plan": [
+        "Handle the smallest base cases first: if n is 1, there is 1 way; if n is 2, there are 2 ways.",
+        "Let two variables store the answers for the previous two steps.",
+        "Iterate from step 3 up to step n, and compute the current answer as the sum of the previous two answers.",
+        "Shift the two variables forward after each step.",
+        "Return the final computed value."
+      ],
+      "complexity": {
+        "time": "O(N), because we compute the answer for each step once.",
+        "space": "O(1), because we only keep the previous two DP values instead of storing the whole array."
+      },
+      "common_mistakes": [
+        "Using plain recursion without memoization, which causes exponential repeated computation.",
+        "Forgetting the base cases for n = 1 and n = 2.",
+        "Thinking this is a greedy problem instead of a recurrence-based counting problem."
+      ],
+      "annotated_code": "class Solution:\n    def climbStairs(self, n: int) -> int:\n        # Base cases: directly known answers\n        if n <= 2:\n            return n\n        \n        # prev2 = ways to reach step i-2\n        # prev1 = ways to reach step i-1\n        prev2, prev1 = 1, 2\n        \n        for _ in range(3, n + 1):\n            curr = prev1 + prev2\n            prev2 = prev1\n            prev1 = curr\n        \n        return prev1"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": false,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0042",
+    "problem_id": 2471,
+    "url": "https://leetcode.com/problems/house-robber/",
+    "category": "dp",
+    "difficulty": "introductory",
+    "problem_statement": "You are a professional robber planning to rob houses along a street. Each house has a certain amount of money stashed, the only constraint stopping you from robbing each of them is that adjacent houses have security system connected and it will automatically contact the police if two adjacent houses were broken into on the same night.\nGiven a list of non-negative integers representing the amount of money of each house, determine the maximum amount of money you can rob tonight without alerting the police.\n \nExample 1:\nInput: nums = [1,2,3,1]\nOutput: 4\nExplanation: Rob house 1 (money = 1) and then rob house 3 (money = 3).\n             Total amount you can rob = 1 + 3 = 4.\n\nExample 2:\nInput: nums = [2,7,9,3,1]\nOutput: 12\nExplanation: Rob house 1 (money = 2), rob house 3 (money = 9) and rob house 5 (money = 1).\n             Total amount you can rob = 2 + 9 + 1 = 12.\n\n \nConstraints:\n\n0 <= nums.length <= 100\n0 <= nums[i] <= 400",
+    "starter_code": "\nclass Solution:\n    def rob(self, nums: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            2,
+            3,
+            1
+          ]
+        ]
+      ],
+      "outputs": [
+        4
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "You are given a row of houses, each with some amount of money. You cannot rob two adjacent houses on the same night. Return the maximum total money you can steal.",
+      "key_observation": "At each house, there are only two meaningful choices: skip it and keep the previous best answer, or rob it and add its money to the best answer from two houses ago. This gives the DP transition: dp[i] = max(dp[i-1], dp[i-2] + nums[i]).",
+      "step_by_step_plan": [
+        "If the list is empty, return 0 immediately.",
+        "Maintain two rolling DP values: the best answer up to i-2 and the best answer up to i-1.",
+        "For each house value, compute the current best as max(previous best, best two houses ago + current money).",
+        "Move the rolling variables forward after processing each house.",
+        "Return the final best value."
+      ],
+      "complexity": {
+        "time": "O(N), because we scan the array once.",
+        "space": "O(1), because we only store two previous DP states."
+      },
+      "common_mistakes": [
+        "Using a greedy strategy like always taking the larger of two adjacent houses, which does not guarantee the global optimum.",
+        "Forgetting the empty-array edge case.",
+        "Writing the transition incorrectly as max(dp[i-1] + nums[i], dp[i-2]), which breaks the adjacency rule."
+      ],
+      "annotated_code": "class Solution:\n    def rob(self, nums: List[int]) -> int:\n        # prev2 = best answer up to house i-2\n        # prev1 = best answer up to house i-1\n        prev2, prev1 = 0, 0\n        \n        for money in nums:\n            # Either skip this house, or rob it and add prev2\n            curr = max(prev1, prev2 + money)\n            prev2 = prev1\n            prev1 = curr\n        \n        return prev1"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0043",
+    "problem_id": 132,
+    "url": "https://leetcode.com/problems/minimum-cost-for-tickets/",
+    "category": "dp",
+    "difficulty": "interview",
+    "problem_statement": "In a country popular for train travel, you have planned some train travelling one year in advance.  The days of the year that you will travel is given as an array days.  Each day is an integer from 1 to 365.\nTrain tickets are sold in 3 different ways:\n\na 1-day pass is sold for costs[0] dollars;\na 7-day pass is sold for costs[1] dollars;\na 30-day pass is sold for costs[2] dollars.\n\nThe passes allow that many days of consecutive travel.  For example, if we get a 7-day pass on day 2, then we can travel for 7 days: day 2, 3, 4, 5, 6, 7, and 8.\nReturn the minimum number of dollars you need to travel every day in the given list of days.\n \nExample 1:\nInput: days = [1,4,6,7,8,20], costs = [2,7,15]\nOutput: 11\nExplanation: \nFor example, here is one way to buy passes that lets you travel your travel plan:\nOn day 1, you bought a 1-day pass for costs[0] = $2, which covered day 1.\nOn day 3, you bought a 7-day pass for costs[1] = $7, which covered days 3, 4, ..., 9.\nOn day 20, you bought a 1-day pass for costs[0] = $2, which covered day 20.\nIn total you spent $11 and covered all the days of your travel.\n\n\nExample 2:\nInput: days = [1,2,3,4,5,6,7,8,9,10,30,31], costs = [2,7,15]\nOutput: 17\nExplanation: \nFor example, here is one way to buy passes that lets you travel your travel plan:\nOn day 1, you bought a 30-day pass for costs[2] = $15 which covered days 1, 2, ..., 30.\nOn day 31, you bought a 1-day pass for costs[0] = $2 which covered day 31.\nIn total you spent $17 and covered all the days of your travel.\n\n \n\nNote:\n\n1 <= days.length <= 365\n1 <= days[i] <= 365\ndays is in strictly increasing order.\ncosts.length == 3\n1 <= costs[i] <= 1000",
+    "starter_code": "\nclass Solution:\n    def mincostTickets(self, days: List[int], costs: List[int]) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          [
+            1,
+            4,
+            6,
+            7,
+            8,
+            20
+          ],
+          [
+            2,
+            7,
+            15
+          ]
+        ]
+      ],
+      "outputs": [
+        11
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "You know in advance on which days you will travel during the year. There are 1-day, 7-day, and 30-day passes with different prices. Return the minimum total cost needed to cover all travel days.",
+      "key_observation": "The DP should be built over calendar days, not over ticket combinations. If a day is not a travel day, its answer is exactly the same as the previous day. If it is a travel day, we only need to try the three pass options and take the minimum.",
+      "step_by_step_plan": [
+        "Put all travel days into a set so we can quickly check whether a day requires coverage.",
+        "Create a DP array where dp[d] means the minimum cost to cover all travel days from day 1 to day d.",
+        "Iterate day by day from 1 to 365.",
+        "If the current day is not a travel day, set dp[d] = dp[d-1].",
+        "If the current day is a travel day, try buying a 1-day, 7-day, or 30-day pass ending on this day, and take the minimum.",
+        "Return dp[365], which represents the minimum cost for the whole year."
+      ],
+      "complexity": {
+        "time": "O(365), because we process each day of the year once.",
+        "space": "O(365), for the DP array."
+      },
+      "common_mistakes": [
+        "Trying to greedily buy the pass with the best cost-per-day ratio. That can fail because travel days are sparse and irregular.",
+        "Forgetting that non-travel days should simply carry forward the previous answer.",
+        "Using dp[d-7] or dp[d-30] without guarding against negative indices."
+      ],
+      "annotated_code": "class Solution:\n    def mincostTickets(self, days: List[int], costs: List[int]) -> int:\n        travel_days = set(days)\n        dp = [0] * 366\n        \n        for day in range(1, 366):\n            if day not in travel_days:\n                # No travel today, so cost does not increase\n                dp[day] = dp[day - 1]\n            else:\n                # Try all three ticket types\n                one_day = dp[max(0, day - 1)] + costs[0]\n                seven_day = dp[max(0, day - 7)] + costs[1]\n                thirty_day = dp[max(0, day - 30)] + costs[2]\n                dp[day] = min(one_day, seven_day, thirty_day)\n        \n        return dp[365]"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0044",
+    "problem_id": 162,
+    "url": "https://leetcode.com/problems/longest-common-subsequence/",
+    "category": "dp",
+    "difficulty": "interview",
+    "problem_statement": "Given two strings text1 and text2, return the length of their longest common subsequence.\nA subsequence of a string is a new string generated from the original string with some characters(can be none) deleted without changing the relative order of the remaining characters. (eg, \"ace\" is a subsequence of \"abcde\" while \"aec\" is not). A common subsequence of two strings is a subsequence that is common to both strings.\n \nIf there is no common subsequence, return 0.\n \nExample 1:\nInput: text1 = \"abcde\", text2 = \"ace\" \nOutput: 3  \nExplanation: The longest common subsequence is \"ace\" and its length is 3.\n\nExample 2:\nInput: text1 = \"abc\", text2 = \"abc\"\nOutput: 3\nExplanation: The longest common subsequence is \"abc\" and its length is 3.\n\nExample 3:\nInput: text1 = \"abc\", text2 = \"def\"\nOutput: 0\nExplanation: There is no such common subsequence, so the result is 0.\n\n \nConstraints:\n\n1 <= text1.length <= 1000\n1 <= text2.length <= 1000\nThe input strings consist of lowercase English characters only.",
+    "starter_code": "\nclass Solution:\n    def longestCommonSubsequence(self, text1: str, text2: str) -> int:\n        ",
+    "io_format": {
+      "mode": "call_based",
+      "inputs": [
+        [
+          "\"abcde\"",
+          "\"ace\""
+        ]
+      ],
+      "outputs": [
+        3
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "Given two strings, return the length of their longest common subsequence. A subsequence does not need to stay contiguous; it only needs to preserve the original relative order.",
+      "key_observation": "This is a classic 2D DP problem. Let dp[i][j] represent the LCS length between the first i characters of text1 and the first j characters of text2. If the current characters match, we extend the answer from dp[i-1][j-1]. If they do not match, we must skip one character from either side and take the better result.",
+      "step_by_step_plan": [
+        "Create a 2D DP table of size (len(text1) + 1) x (len(text2) + 1), initialized with zeros.",
+        "Iterate through both strings using indices i and j starting from 1 in the DP table.",
+        "If text1[i-1] == text2[j-1], set dp[i][j] = dp[i-1][j-1] + 1.",
+        "Otherwise, set dp[i][j] = max(dp[i-1][j], dp[i][j-1]).",
+        "After filling the table, return dp[len(text1)][len(text2)]."
+      ],
+      "complexity": {
+        "time": "O(N * M), where N and M are the lengths of the two strings, because every DP cell is computed once.",
+        "space": "O(N * M), for the 2D DP table."
+      },
+      "common_mistakes": [
+        "Confusing subsequence with substring. A subsequence does not need to be contiguous.",
+        "Using the substring-style transition of resetting to 0 on mismatch, which is wrong for LCS.",
+        "Getting the indices wrong when mapping string positions to DP rows and columns."
+      ],
+      "annotated_code": "class Solution:\n    def longestCommonSubsequence(self, text1: str, text2: str) -> int:\n        n, m = len(text1), len(text2)\n        dp = [[0] * (m + 1) for _ in range(n + 1)]\n        \n        for i in range(1, n + 1):\n            for j in range(1, m + 1):\n                if text1[i - 1] == text2[j - 1]:\n                    # Matching characters can extend the previous LCS\n                    dp[i][j] = dp[i - 1][j - 1] + 1\n                else:\n                    # Otherwise, skip one character from either string\n                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])\n        \n        return dp[n][m]"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  },
+  {
+    "train_ID": "train_0045",
+    "problem_id": 2088,
+    "url": "https://codeforces.com/problemset/problem/607/B",
+    "category": "dp",
+    "difficulty": "competition",
+    "problem_statement": "Genos recently installed the game Zuma on his phone. In Zuma there exists a line of n gemstones, the i-th of which has color c_{i}. The goal of the game is to destroy all the gemstones in the line as quickly as possible.\n\nIn one second, Genos is able to choose exactly one continuous substring of colored gemstones that is a palindrome and remove it from the line. After the substring is removed, the remaining gemstones shift to form a solid line again. What is the minimum number of seconds needed to destroy the entire line?\n\nLet us remind, that the string (or substring) is called palindrome, if it reads same backwards or forward. In our case this means the color of the first gemstone is equal to the color of the last one, the color of the second gemstone is equal to the color of the next to last and so on.\n\n\n-----Input-----\n\nThe first line of input contains a single integer n (1 ≤ n ≤ 500) — the number of gemstones.\n\nThe second line contains n space-separated integers, the i-th of which is c_{i} (1 ≤ c_{i} ≤ n) — the color of the i-th gemstone in a line.\n\n\n-----Output-----\n\nPrint a single integer — the minimum number of seconds needed to destroy the entire line.\n\n\n-----Examples-----\nInput\n3\n1 2 1\n\nOutput\n1\n\nInput\n3\n1 2 3\n\nOutput\n3\n\nInput\n7\n1 4 4 2 3 2 1\n\nOutput\n2\n\n\n\n-----Note-----\n\nIn the first sample, Genos can destroy the entire line in one second.\n\nIn the second sample, Genos can only destroy one gemstone at a time, so destroying three gemstones takes three seconds.\n\nIn the third sample, to achieve the optimal time of two seconds, destroy palindrome 4 4 first and then destroy palindrome 1 2 3 2 1.",
+    "starter_code": "",
+    "io_format": {
+      "mode": "standard_input",
+      "inputs": [
+        "3\n1 2 1\n",
+        "3\n1 2 3\n",
+        "7\n1 4 4 2 3 2 1\n",
+        "1\n1\n",
+        "2\n1 1\n",
+        "2\n1 2\n",
+        "8\n1 2 1 3 4 1 2 1\n",
+        "50\n5 7 5 10 7 9 1 9 10 2 8 3 5 7 3 10 2 3 7 6 2 7 1 2 2 2 4 7 3 5 8 3 4 4 1 6 7 10 5 4 8 1 9 5 5 3 4 4 8 3\n",
+        "50\n13 17 20 5 14 19 4 17 9 13 10 19 16 13 17 2 18 3 1 9 19 4 19 10 17 12 16 20 10 11 15 10 3 19 8 6 2 8 9 15 13 7 8 8 5 8 15 18 9 4\n",
+        "50\n22 19 14 22 20 11 16 28 23 15 3 23 6 16 30 15 15 10 24 28 19 19 22 30 28 1 27 12 12 14 17 30 17 26 21 26 27 1 11 23 9 30 18 19 17 29 11 20 29 24\n",
+        "50\n30 17 31 15 10 3 39 36 5 29 16 11 31 2 38 1 32 40 7 15 39 34 24 11 4 23 9 35 39 32 4 5 14 37 10 34 11 33 30 14 4 34 23 10 34 34 26 34 26 16\n",
+        "50\n19 25 46 17 1 41 50 19 7 1 43 8 19 38 42 32 38 22 8 5 5 31 29 35 43 12 23 48 40 29 30 9 46 3 39 24 36 36 32 22 21 29 43 33 36 49 48 22 47 37\n",
+        "6\n1 2 1 1 3 1\n"
+      ],
+      "outputs": [
+        "1\n",
+        "3\n",
+        "2\n",
+        "1\n",
+        "1\n",
+        "2\n",
+        "2\n",
+        "21\n",
+        "28\n",
+        "25\n",
+        "36\n",
+        "36\n",
+        "2\n"
+      ]
+    },
+    "teaching_answer": {
+      "problem_restatement": "You are given a line of colored gemstones. In one second, you may remove any continuous palindromic substring. After removal, the remaining parts close up. Return the minimum number of seconds needed to remove the entire line.",
+      "key_observation": "This is an interval DP problem. Let dp[l][r] be the minimum time to remove the subarray from l to r. The naive action is to remove a[l] separately, giving 1 + dp[l+1][r]. But if a[l] matches some later a[k], we may first clear the middle part so that these equal colors can be removed together, which can reduce the answer.",
+      "step_by_step_plan": [
+        "Define dp[l][r] as the minimum number of seconds to remove the interval a[l..r].",
+        "Initialize the base case dp[i][i] = 1, because a single gemstone is always a palindrome.",
+        "Process intervals by increasing length from 2 up to n.",
+        "Start with the default transition: remove a[l] alone, so dp[l][r] = 1 + dp[l+1][r].",
+        "If a[l] matches a later position k, try merging them by first removing the middle interval a[l+1..k-1], then combining a[l] with a[k]. Update dp[l][r] with that smaller value.",
+        "The final answer is dp[0][n-1]."
+      ],
+      "complexity": {
+        "time": "O(N^3), because we enumerate interval length, left boundary, and matching split positions.",
+        "space": "O(N^2), for the interval DP table."
+      },
+      "common_mistakes": [
+        "Trying to simulate greedy palindrome deletions directly. A locally longest palindrome is not always part of the optimal strategy.",
+        "Using substring matching without interval DP, which misses the effect of the line closing up after deletions.",
+        "Forgetting the merge optimization when a[l] == a[k], which is the key to beating the naive recurrence."
+      ],
+      "annotated_code": "import sys\n\n\ndef solve():\n    data = list(map(int, sys.stdin.buffer.read().split()))\n    n = data[0]\n    a = data[1:]\n    \n    dp = [[0] * n for _ in range(n)]\n    \n    # Base case: one gemstone can always be removed in one second\n    for i in range(n):\n        dp[i][i] = 1\n    \n    # Process intervals by increasing length\n    for length in range(2, n + 1):\n        for l in range(n - length + 1):\n            r = l + length - 1\n            \n            # Default: remove a[l] alone first\n            dp[l][r] = 1 + dp[l + 1][r]\n            \n            # Special case: if the first two are equal, they can be removed together\n            if a[l] == a[l + 1]:\n                dp[l][r] = min(dp[l][r], 1 + (dp[l + 2][r] if l + 2 <= r else 0))\n            \n            # Try to merge a[l] with any later same-colored gemstone a[k]\n            for k in range(l + 2, r + 1):\n                if a[l] == a[k]:\n                    middle = dp[l + 1][k - 1] if l + 1 <= k - 1 else 0\n                    right = dp[k + 1][r] if k + 1 <= r else 0\n                    dp[l][r] = min(dp[l][r], middle + right)\n    \n    print(dp[0][n - 1])\n\n\nif __name__ == '__main__':\n    solve()"
+    },
+    "quality_tags": {
+      "clear_explanation": true,
+      "contains_trap": true,
+      "python_friendly": true,
+      "verifiable_by_tests": true
+    }
+  }
+]
