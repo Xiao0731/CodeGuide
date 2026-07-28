@@ -295,3 +295,23 @@
   - 禁止直接 force-push，需保留可审计历史并显式解决无共同祖先问题；
   - 评审者通过 private repository collaborator 方式访问。
 - 状态：仓库已选定；私有化、认证、远端历史合并和 push 待完成。
+
+### EXP-006：可信基线 GitHub 私有仓库交付
+
+- 日期：2026-07-28
+- 阶段：G0
+- 远端：`https://github.com/Xiao0731/CodeGuide`，Private。
+- 远端旧提交：`e6c7bae`，仅含早期 APPS 下载/环境文件。
+- 审计：
+  - 旧提交密钥扫描 0 命中；
+  - 旧提交个人绝对路径扫描 0 命中；
+  - 本地与远端无共同祖先。
+- 整合：
+  - 使用 `ours` merge 保留旧提交历史；
+  - merge commit：`af2a0fb`；
+  - merge 前后工作树 diff 为 0；
+  - 未使用 force-push。
+- 复验：42 passed in 5.21s。
+- 推送：普通 fast-forward push 成功，本地 `main` 与 `origin/main` 均为
+  `af2a0fb368fd0e9e4722eded9b1c055900ff307e`。
+- 状态：首个可信私有 Git 基线已交付；未打 G0 tag。

@@ -399,3 +399,18 @@ small smoke outputs, and small reference-cache examples. It excludes:
   history, and merge without force-pushing.
 - A private repository can be shared with the intended reviewer by explicitly
   adding that GitHub account as a collaborator.
+
+### 2026-07-28: trustworthy baseline pushed
+
+- GitHub authentication succeeded for `Xiao0731`.
+- `Xiao0731/CodeGuide` was confirmed private with `main` as default branch.
+- Legacy remote commit `e6c7bae` contained only early APPS/environment files;
+  secret and personal-path scans had no matches.
+- Local and remote histories had no common ancestor. Merge `af2a0fb` used the
+  `ours` strategy to retain `e6c7bae` for audit while keeping the repaired local
+  tree byte-for-byte unchanged.
+- Tests after the merge passed: 42/42.
+- Normal fast-forward push succeeded; local `main` and `origin/main` both point
+  to `af2a0fb368fd0e9e4722eded9b1c055900ff307e`.
+- No milestone tag was created because Docker, CUDA lock, and proxy-model
+  dry-runs remain incomplete.

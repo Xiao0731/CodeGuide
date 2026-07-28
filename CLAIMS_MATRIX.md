@@ -24,7 +24,7 @@
 | best checkpoint 基于独立冻结 dev 严格 Pass@1 | 已实现，待代理 dry-run | `src/training/grpo_train.py`、独立 `grpo.eval_data` 合同 | checkpoint 选择合同已修复 | callback 已在目标训练环境跑通 |
 | ExplainBench / TutorBench | 未实现 | 仅规划设计 | 评测集待冻结 | 已验证模型会交互式教学 |
 | Base / SFT / GRPO 最终对比 | 未开始 | 无冻结输出 | 尚无最终模型实验结论 | 显著优于基座或外部方案 |
-| 仓库 G0 | 阻塞 | 本地可信 commit `b3fb3a8`；Docker/CUDA/代理 dry-run 未完成 | 已建立本地静态可信基线 | 仓库开箱即复现或 G0 已通过 |
+| 仓库 G0 | 阻塞 | 私有远端已同步至 `af2a0fb`；Docker/CUDA/代理 dry-run 未完成 | 已建立并推送静态可信基线 | 仓库开箱即复现或 G0 已通过 |
 | GPT 代码包包含项目治理文档且排除敏感大文件 | 已跑通 | ZIP 84 条目检查，必需入口全存在，排除项命中 0 | 当前代码包已通过内容清单检查 | 所有未来代码包天然正确，无需复验 |
 
 ## 更新记录
@@ -42,3 +42,5 @@
   5/5 和 manifest 通过；Docker daemon 与训练栈未就绪，因此 G0 仍为阻塞。
 - 选定复用 `Xiao0731/CodeGuide`；发现其当前为 Public 且含一个旧 commit，
   私有化、远端历史审计和非强制合并尚未完成。
+- 远端现已 Private；旧提交 `e6c7bae` 经扫描后通过 `af2a0fb` 非强制 merge
+  保留，本地/远端 `main` 已一致。该证据只覆盖基线后的 provenance。

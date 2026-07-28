@@ -15,14 +15,19 @@ These assets remain subject to their own licenses and citation requirements.
 
 ## Repository source status
 
-The review snapshot available on 2026-07-27 does not contain `.git` metadata.
-Consequently this snapshot alone cannot prove file authorship, commit dates, or
-whether every historical file was independently authored. Public release is
-blocked until the original Git repository is audited.
+The review snapshot available on 2026-07-27 did not contain `.git` metadata.
+On 2026-07-28, the repaired tree was committed as baseline `b3fb3a8` and pushed
+to the private `Xiao0731/CodeGuide` repository. The repository's single legacy
+commit, `e6c7bae`, was inspected and preserved as a parent of merge commit
+`af2a0fb`; the audited baseline tree remained unchanged by that merge.
+
+This establishes provenance for work after the baseline. It does not
+retroactively prove authorship of every file imported into `b3fb3a8`, so public
+release still requires source and license auditing.
 
 Required release checks:
 
-1. inspect the complete Git history and remotes;
+1. audit the pre-baseline source of files imported into `b3fb3a8`;
 2. identify copied or adapted snippets, if any, and preserve their licenses;
 3. remove external promotional wording and directory descriptions;
 4. record AI-assisted code generation honestly;

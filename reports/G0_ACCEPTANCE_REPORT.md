@@ -232,7 +232,8 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 | Docker reward smoke | BLOCKED | 当前环境无 Docker，镜像 digest 未冻结 |
 | 训练环境 lock | BLOCKED | 仅完成 `requirements.g0.lock.txt`；CUDA 训练栈未验证 |
 | 无密钥入库 | PASS | 静态扫描无命中 |
-| Git/来源审计 | BLOCKED | 当前快照不是 Git 仓库 |
+| Git 私有基线 | PASS | `main`/`origin/main` 已同步至 `af2a0fb`，未强推 |
+| pre-baseline 来源审计 | PARTIAL | 旧远端提交已保留；导入文件作者/许可证仍待公开发布前审计 |
 
 ## 5. 当前环境证据
 
@@ -306,3 +307,7 @@ rg -n --hidden -g '!.venv-g0/**' -g '!artifacts/**' \
 本机复验结论：**G0 静态/P0 子阶段再次通过；完整 G0 仍未通过。**
 下一任务必须先建立可推送的可信 Git 基线，再冻结 RTX 4060/CUDA 依赖，
 启动 Docker daemon 并完成 verifier 实测，最后运行代理模型 dry-run。
+
+Git 基线随后已完成：私有远端 `Xiao0731/CodeGuide` 的旧提交通过非强制
+merge 保留，本地与远端 `main` 同步至 `af2a0fb`。下一阻塞现为 CUDA lock、
+Docker verifier 实测和代理模型 dry-run。
