@@ -924,6 +924,17 @@ def load_latest_records(path: Path) -> dict[str, dict[str, Any]]:
     return records
 
 
+def is_recoverable_rejected_record(record: dict[str, Any]) -> bool:
+    """Allow external teacher/API failures to resume after service recovery."""
+    if record.get("failure_type") == "recovery_llm_failed":
+        return True
+    metadata = record.get("metadata") or {}
+    return (
+        not bool(metadata.get("recovery_attempted", False))
+        or int(metadata.get("recovery_version", 0) or 0) < 2
+    )
+
+
 def _short_text(value: Any, max_chars: int = 600) -> str | None:
     if value is None:
         return None
@@ -1622,10 +1633,7 @@ async def async_main(args: argparse.Namespace) -> None:
         problem_id
         for problem_id, record in rejected_records.items()
         if problem_id not in accepted_ids
-        and (
-            not bool((record.get("metadata") or {}).get("recovery_attempted", False))
-            or int((record.get("metadata") or {}).get("recovery_version", 0) or 0) < 2
-        )
+        and is_recoverable_rejected_record(record)
     }
     permanently_rejected_ids = set(rejected_records) - recoverable_rejected_ids
     done_ids = accepted_ids | permanently_rejected_ids

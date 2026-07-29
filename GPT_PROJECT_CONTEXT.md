@@ -48,6 +48,18 @@
 - Single-attempt log messages now state failure directly instead of claiming a
   retry that cannot occur when `distill_retries=1`.
 
+### 2026-07-29: payment-failure resume semantics
+
+- DeepSeek returned HTTP 402 `Insufficient Balance`. The run ended with 7,100
+  accepted lines and 3,534 rejected lines safely flushed.
+- 3,298 Class-B attempts were recorded as `recovery_llm_failed`. These are
+  external teacher/API failures, not code correctness failures.
+- Resume logic now treats `recovery_llm_failed` as retryable after service
+  restoration. Syntax, interface, execution, and wrong-answer recovery
+  failures remain final.
+- Retried records enter Class B directly; accepted labels and Class A are not
+  regenerated.
+
 This file is the entry point for reviewing the packaged CodeGuide source code.
 It describes the code that currently exists on disk and the evidence currently
 available for each project stage.

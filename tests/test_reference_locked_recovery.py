@@ -8,6 +8,7 @@ from scripts.build_sft_dataset import (
     Counter,
     comments_only_equivalent,
     inject_reference_comments,
+    is_recoverable_rejected_record,
     load_latest_records,
     process_one,
     replace_final_code_block,
@@ -108,6 +109,21 @@ def test_rejected_recovery_records_are_versioned():
 
     assert record["metadata"]["recovery_attempted"] is True
     assert record["metadata"]["recovery_version"] == 2
+
+
+def test_teacher_api_failure_remains_recoverable_after_current_version():
+    assert is_recoverable_rejected_record(
+        {
+            "failure_type": "recovery_llm_failed",
+            "metadata": {"recovery_attempted": True, "recovery_version": 2},
+        }
+    )
+    assert not is_recoverable_rejected_record(
+        {
+            "failure_type": "recovery_runtime_error",
+            "metadata": {"recovery_attempted": True, "recovery_version": 2},
+        }
+    )
 
 
 def test_process_one_falls_back_to_reference_locked_after_wrong_answer(monkeypatch):

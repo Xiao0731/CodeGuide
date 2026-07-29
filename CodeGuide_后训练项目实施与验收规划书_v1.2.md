@@ -53,6 +53,12 @@ about 1,478 accepted labels. Because Docker verification synchronously blocks
 the API event loop, the local production default is reduced to 20. The 2,500
 DeepSeek account limit is treated only as a remote service ceiling.
 
+External teacher failures such as HTTP 402, transport interruption, or an
+unavailable API are represented by `recovery_llm_failed` and remain retryable
+after service restoration. They resume directly in Class B. Syntax,
+interface, execution, and wrong-answer recovery failures remain terminal for
+the current recovery version.
+
 ## 0. 本规划书的效力
 
 本文件是后续实现的**项目总约束与阶段验收依据**，优先级高于仓库内陈旧 README、旧配置、Notebook 和未经验证的功能说明。

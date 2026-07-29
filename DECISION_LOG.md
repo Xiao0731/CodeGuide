@@ -48,6 +48,16 @@
   20, and do not resume automatically until the operator confirms.
 - The service limit of 2,500 remains documented as an account ceiling only.
 
+### DEC-012: retry external Class-B API failures after recharge
+
+- Date: 2026-07-29.
+- Trigger: HTTP 402 `Insufficient Balance` ended production with 3,298
+  `recovery_llm_failed` records.
+- Decision: teacher/API failures remain retryable on a later resume. Code and
+  execution failures remain terminal.
+- Cost boundary: affected records enter Class B directly; accepted labels and
+  prior Class-A requests are never regenerated.
+
 ## 1. 记录规则
 
 每个有效步骤至少记录：
