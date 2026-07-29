@@ -59,6 +59,10 @@
   failures remain final.
 - Retried records enter Class B directly; accepted labels and Class A are not
   regenerated.
+- A second HTTP 402 run recovered 1,317 additional labels before balance was
+  exhausted again. HTTP 402/`Insufficient Balance` is now a fatal batch
+  condition: remaining tasks are cancelled immediately and the flushed JSONL
+  checkpoint is retained.
 
 This file is the entry point for reviewing the packaged CodeGuide source code.
 It describes the code that currently exists on disk and the evidence currently

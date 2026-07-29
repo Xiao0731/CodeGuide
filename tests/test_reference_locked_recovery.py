@@ -8,6 +8,7 @@ from scripts.build_sft_dataset import (
     Counter,
     comments_only_equivalent,
     inject_reference_comments,
+    is_fatal_distill_error,
     is_recoverable_rejected_record,
     load_latest_records,
     process_one,
@@ -124,6 +125,14 @@ def test_teacher_api_failure_remains_recoverable_after_current_version():
             "metadata": {"recovery_attempted": True, "recovery_version": 2},
         }
     )
+
+
+def test_insufficient_balance_is_a_fatal_batch_error():
+    error = RuntimeError(
+        "Error code: 402 - {'error': {'message': 'Insufficient Balance'}}"
+    )
+    assert is_fatal_distill_error(error)
+    assert not is_fatal_distill_error(RuntimeError("Request timed out"))
 
 
 def test_process_one_falls_back_to_reference_locked_after_wrong_answer(monkeypatch):

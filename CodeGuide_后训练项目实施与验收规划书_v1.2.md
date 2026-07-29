@@ -59,6 +59,10 @@ after service restoration. They resume directly in Class B. Syntax,
 interface, execution, and wrong-answer recovery failures remain terminal for
 the current recovery version.
 
+HTTP 402/`Insufficient Balance` is a fatal batch condition. On first
+observation the pipeline cancels remaining tasks and preserves the JSONL
+checkpoint instead of exhausting the queue with guaranteed failed requests.
+
 ## 0. 本规划书的效力
 
 本文件是后续实现的**项目总约束与阶段验收依据**，优先级高于仓库内陈旧 README、旧配置、Notebook 和未经验证的功能说明。

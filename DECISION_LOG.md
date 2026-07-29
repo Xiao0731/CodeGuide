@@ -57,6 +57,8 @@
   execution failures remain terminal.
 - Cost boundary: affected records enter Class B directly; accepted labels and
   prior Class-A requests are never regenerated.
+- Follow-up: the first insufficient-balance response now trips a batch circuit
+  breaker instead of exhausting the remaining queue with guaranteed failures.
 
 ## 1. 记录规则
 

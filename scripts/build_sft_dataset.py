@@ -78,6 +78,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+class FatalDistillError(RuntimeError):
+    """Stop the batch when continuing would repeat a permanent API error."""
+
+
+def is_fatal_distill_error(error: BaseException) -> bool:
+    status_code = getattr(error, "status_code", None)
+    text = str(error).lower()
+    return status_code == 402 or "insufficient balance" in text
+
 # ── 提示词 ───────────────────────────────────────────────────
 
 SFT_SYSTEM = """\
@@ -672,6 +682,14 @@ async def call_distill_model_async(
                 return content
 
             except Exception as e:
+                if is_fatal_distill_error(e):
+                    logger.error(
+                        "[%s] DeepSeek 余额不足，立即熔断当前批次；已落盘记录可断点恢复",
+                        problem.id,
+                    )
+                    raise FatalDistillError(
+                        "DeepSeek API insufficient balance"
+                    ) from e
                 if attempt + 1 < retry:
                     wait = 2 ** attempt
                     logger.warning(
