@@ -35,7 +35,17 @@ boundaries, proves executable-token equality after removing comments, and
 then runs syntax and Docker execution verification.
 
 Recovery state is versioned to prevent repeated API consumption. Production
-concurrency is configurable and is currently 3.
+concurrency is configurable and is currently 1,000 API requests.
+
+Operational amendment: after confirming an account-level
+`deepseek-v4-flash` API concurrency limit of 2,500, the production teacher
+request concurrency is set to 1,000. Docker verification remains locally
+serialized by the current synchronous verifier call. This setting accelerates
+generation but can consume API budget rapidly.
+
+The API client must set `max_retries=0`; retries are controlled only by the
+pipeline. With `distill_retries=1`, a failed Class-A request proceeds to the
+single Class-B recovery path instead of being retried invisibly by the SDK.
 
 ## 0. 本规划书的效力
 

@@ -23,6 +23,20 @@
 - Resume state: concurrency 3, 1,343 accepted preserved, 204 historical
   rejected prioritized, 9,072 total pending.
 
+### DEC-010: raise production teacher concurrency to 1,000
+
+- Date: 2026-07-29.
+- Account limit supplied by the operator: 2,500 concurrent requests for
+  `deepseek-v4-flash`.
+- Production wrapper default changed from 3 to 1,000 API requests.
+- Safety boundary: the API semaphore does not wrap Docker verification;
+  synchronous verification prevents 1,000 simultaneous local containers.
+- Operational trade-off: generation and API spend can advance very quickly.
+  JSONL flush and ID-based resume remain mandatory.
+- Observation: the SDK still retried transport failures despite
+  `distill_retries=1`. It is now constructed with `max_retries=0`, preventing
+  hidden same-request API consumption.
+
 ## 1. 记录规则
 
 每个有效步骤至少记录：

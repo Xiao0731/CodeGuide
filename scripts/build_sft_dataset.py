@@ -1474,7 +1474,13 @@ async def async_main(args: argparse.Namespace) -> None:
         logger.error("缺少 openai SDK：请先安装 openai，或运行 pip install -r requirements.txt")
         sys.exit(1)
 
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    # Business-level retry policy is controlled by --distill-retries. Disable
+    # the SDK's hidden transport retries so one attempt means one billed call.
+    client = AsyncOpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        max_retries=0,
+    )
     logger.info("蒸馏模型：%s (%s)", distill_model, base_url)
     logger.info(
         "生成配置：max_output_tokens=%d, thinking_mode=%s, distill_mode=%s",

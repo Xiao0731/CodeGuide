@@ -19,6 +19,20 @@
 - Production resumed at concurrency 3 with 1,343 accepted records preserved,
   204 historical rejected records prioritized, and 9,072 total pending.
 
+### 2026-07-29: DeepSeek API concurrency increase
+
+- The production wrapper API concurrency was raised from 3 to 1,000 after the
+  account limit for `deepseek-v4-flash` was confirmed as 2,500.
+- The semaphore covers only asynchronous teacher API calls. Docker
+  `verify_code()` remains synchronous in the event loop, so this change does
+  not launch 1,000 verifier containers simultaneously.
+- Resume-safe JSONL output preserves completed accepted/rejected records.
+  Higher concurrency substantially increases short-term API spend and may be
+  capped below 1,000 by local networking or the HTTP connection pool.
+- The OpenAI-compatible SDK's implicit transport retry was explicitly disabled
+  with `max_retries=0`; `--distill-retries 1` now truly means one Class-A
+  request before Class-B fallback.
+
 This file is the entry point for reviewing the packaged CodeGuide source code.
 It describes the code that currently exists on disk and the evidence currently
 available for each project stage.
