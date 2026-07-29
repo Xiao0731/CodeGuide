@@ -33,6 +33,21 @@
   with `max_retries=0`; `--distill-retries 1` now truly means one Class-A
   request before Class-B fallback.
 
+### 2026-07-29: concurrency rollback after cost amplification
+
+- A production run at API concurrency 1,000 produced 1,999 logged HTTP 200
+  responses and 454 client-side request timeouts while accepted records grew
+  by only about 1,478.
+- Root cause: Docker verification is synchronous inside the same asyncio event
+  loop. While code is being verified, hundreds of API responses cannot be
+  consumed promptly; server-side work may finish and be billed after the
+  client has timed out.
+- The 2,500 account concurrency limit is a service ceiling, not a suitable
+  local pipeline setting. Production was paused and the wrapper default was
+  reduced to 20 pending operator approval to resume.
+- Single-attempt log messages now state failure directly instead of claiming a
+  retry that cannot occur when `distill_retries=1`.
+
 This file is the entry point for reviewing the packaged CodeGuide source code.
 It describes the code that currently exists on disk and the evidence currently
 available for each project stage.

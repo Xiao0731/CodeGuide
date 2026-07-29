@@ -35,7 +35,7 @@ boundaries, proves executable-token equality after removing comments, and
 then runs syntax and Docker execution verification.
 
 Recovery state is versioned to prevent repeated API consumption. Production
-concurrency is configurable and is currently 1,000 API requests.
+concurrency is configurable and the current local default is 20 API requests.
 
 Operational amendment: after confirming an account-level
 `deepseek-v4-flash` API concurrency limit of 2,500, the production teacher
@@ -46,6 +46,12 @@ generation but can consume API budget rapidly.
 The API client must set `max_retries=0`; retries are controlled only by the
 pipeline. With `distill_retries=1`, a failed Class-A request proceeds to the
 single Class-B recovery path instead of being retried invisibly by the SDK.
+
+Observed production evidence invalidated the 1,000-concurrency local setting:
+1,999 HTTP 200 responses were accompanied by 454 client timeouts and only
+about 1,478 accepted labels. Because Docker verification synchronously blocks
+the API event loop, the local production default is reduced to 20. The 2,500
+DeepSeek account limit is treated only as a remote service ceiling.
 
 ## 0. 本规划书的效力
 

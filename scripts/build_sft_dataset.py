@@ -650,31 +650,39 @@ async def call_distill_model_async(
                 # 检测截断（finish_reason == "length"）
                 if choice.finish_reason == "length":
                     logger.warning(
-                        "[%s] 触发 max_tokens 截断（attempt %d/%d），重试…",
+                        "[%s] 触发 max_tokens 截断（attempt %d/%d）",
                         problem.id, attempt + 1, retry,
                     )
-                    await asyncio.sleep(2 ** attempt)
+                    if attempt + 1 < retry:
+                        await asyncio.sleep(2 ** attempt)
                     continue
 
                 # 质量过滤
                 quality_score = quality_checker.score(content)
                 if quality_score < quality_checker.threshold:
                     logger.warning(
-                        "[%s] 质量分 %.2f < %.2f（attempt %d/%d），重试…",
+                        "[%s] 质量分 %.2f < %.2f（attempt %d/%d）",
                         problem.id, quality_score, quality_checker.threshold,
                         attempt + 1, retry,
                     )
-                    await asyncio.sleep(2 ** attempt)
+                    if attempt + 1 < retry:
+                        await asyncio.sleep(2 ** attempt)
                     continue
 
                 return content
 
             except Exception as e:
-                wait = 2 ** attempt
-                logger.warning(
-                    "[%s] 调用失败（%s），%.1fs 后重试…", problem.id, e, wait
-                )
-                await asyncio.sleep(wait)
+                if attempt + 1 < retry:
+                    wait = 2 ** attempt
+                    logger.warning(
+                        "[%s] 调用失败（%s），%.1fs 后重试…",
+                        problem.id,
+                        e,
+                        wait,
+                    )
+                    await asyncio.sleep(wait)
+                else:
+                    logger.warning("[%s] 单次调用失败（%s）", problem.id, e)
 
     logger.error("[%s] 已重试 %d 次，放弃", problem.id, retry)
     return None

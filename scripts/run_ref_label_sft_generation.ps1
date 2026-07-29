@@ -8,7 +8,7 @@ param(
     [string]$FullRejected = "data/sft_train_ref_label_rejected.jsonl",
     [string]$FullLog = "data/cache/ref_label_full_generation.log",
     [int]$PilotPerBucket = 5,
-    [int]$Concurrency = 1000,
+    [int]$Concurrency = 20,
     [switch]$PilotOnly,
     [switch]$StartFullOnly
 )

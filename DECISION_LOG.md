@@ -37,6 +37,17 @@
   `distill_retries=1`. It is now constructed with `max_retries=0`, preventing
   hidden same-request API consumption.
 
+### DEC-011: roll concurrency back to 20 after timeout amplification
+
+- Date: 2026-07-29.
+- Evidence: 1,999 logged HTTP 200 responses, 454 request timeouts, and only
+  about 1,478 newly accepted records in the observed run.
+- Root cause: synchronous Docker verification blocks the asyncio event loop,
+  delaying receipt of already-running API responses.
+- Decision: pause generation, reduce production API concurrency from 1,000 to
+  20, and do not resume automatically until the operator confirms.
+- The service limit of 2,500 remains documented as an account ceiling only.
+
 ## 1. 记录规则
 
 每个有效步骤至少记录：
