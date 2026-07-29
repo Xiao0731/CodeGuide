@@ -1,5 +1,24 @@
 # CodeGuide Project Context
 
+## 2026-07-29: deterministic Class-B comment-plan recovery
+
+- Class A remains the original pedagogical rewrite and receives one API
+  request. Existing accepted labels are immutable.
+- Any Class-A failure and each historical rejected item enter Class B. Class B
+  uses one API response for the teaching explanation and a JSON line-comment
+  plan; it does not ask the teacher to rewrite the full Python program.
+- The pipeline inserts comments at AST-safe statement boundaries in the
+  verified reference. Removing comments with `tokenize` must reproduce the
+  exact executable token stream; syntax and Docker execution remain hard
+  gates.
+- Recovery records use `recovery_version=2`, allowing old recovery failures
+  one refined attempt without creating an unbounded retry loop.
+- Validation: 15 tests passed. The first four live version-2 recoveries passed
+  every test, preserved executable-token equivalence, and inserted 7, 10, 8,
+  and 11 comments.
+- Production resumed at concurrency 3 with 1,343 accepted records preserved,
+  204 historical rejected records prioritized, and 9,072 total pending.
+
 This file is the entry point for reviewing the packaged CodeGuide source code.
 It describes the code that currently exists on disk and the evidence currently
 available for each project stage.
@@ -454,3 +473,28 @@ small smoke outputs, and small reference-cache examples. It excludes:
   audit and must not be described as a universally secure sandbox.
 - G0 remains blocked by the CUDA dependency lock and proxy-model SFT/GRPO
   dry-runs. No training, API distillation, or milestone tag was performed.
+
+### 2026-07-29: hybrid A/B SFT label generation
+
+- The production `reference_guided_label` path now keeps successful teacher
+  rewrites as class A (`label_strategy=pedagogical_rewrite`).
+- Class A makes one API attempt. Any generation, structure, syntax, interface,
+  execution, timeout, or wrong-answer failure immediately switches the same
+  problem to class B instead of repeating the same free rewrite.
+- Class B (`label_strategy=reference_locked`) asks the teacher to explain the
+  verified reference and permits only `#` comments in the final code.
+- Python `tokenize` removes comment-only tokens and compares the remaining
+  token stream with the verified reference. Any executable-token difference
+  causes deterministic injection of the original reference code.
+- The assembled class B label is still syntax checked and executed through the
+  same Docker `verify_code()` hard gate.
+- Existing accepted records remain immutable and are skipped on resume.
+  Existing rejected records are processed directly by class B before any
+  unprocessed problem enters class A.
+- The production wrapper now uses concurrency 3 (configurable) and explicitly
+  sets `--distill-retries 1`.
+- Unit/contract checks: 13 passed.
+- First live recovery evidence: two historical rejected records
+  (`runtime_error`, `wrong_answer`) were recovered to pass rate 1.0. In both
+  cases the teacher changed executable tokens, so the pipeline correctly
+  injected the verified reference.

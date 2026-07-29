@@ -5,6 +5,24 @@
 > 当前阶段：G0 仓库可信 / P0 修复。  
 > 状态口径：`已实现`、`已跑通`、`已验证`必须严格区分。
 
+### EXP-009: reference-locked comment-plan recovery
+
+- Date: 2026-07-29.
+- Decision: preserve all accepted Class-A labels. Route each new A failure and
+  each historical rejected item to one Class-B request.
+- API ceiling: A success uses one request; A failure uses one A plus one B;
+  historical rejected uses one B. Same-mode retries are disabled.
+- Class B generates teaching text and a JSON comment plan. The program injects
+  comments into the verified reference at AST-safe statement lines.
+- Acceptance requires comment-stripped executable-token equality, valid
+  syntax, and full Docker `verify_code()` success.
+- Recovery records are versioned so legacy failures receive one improved
+  attempt and version-2 failures do not loop.
+- Evidence: 15 tests passed. First four live refined recoveries had pass rate
+  1.0, token equivalence true, and 7/10/8/11 inserted comments.
+- Resume state: concurrency 3, 1,343 accepted preserved, 204 historical
+  rejected prioritized, 9,072 total pending.
+
 ## 1. 记录规则
 
 每个有效步骤至少记录：
@@ -356,3 +374,24 @@
 - 云端/API/训练消耗：无。
 - 状态：Docker verifier 子项通过；G0 仍被 CUDA lock 与代理模型
   SFT/GRPO dry-run 阻塞。
+
+### EXP-008：rejected 根因抽检与 A/B 混合恢复
+
+- 日期：2026-07-29。
+- 抽样：从当时 203 条正式 rejected 中用 `seed=42` 固定抽取 100 条。
+- 失败分布：84 条 wrong answer、15 条 runtime error、1 条 syntax error。
+- 通过率分布：46 条为 0；7 条位于 `(0, 0.1)`；18 条位于
+  `[0.1, 0.5)`；20 条位于 `[0.5, 0.9)`；9 条位于 `[0.9, 1.0)`。
+- reference 差异：80 条已是不同算法或结构，18 条大幅改写，1 条少量
+  可执行 token 修改，1 条接口变化，0 条仅修改注释或格式。
+- token 相似度均值为 0.430，中位数为 0.417。
+- verifier 旁路发现：至少 3 条首失败仅为空白差异；11 条 wrong answer
+  带 constructive 标签，可能需要 checker-aware 解释，不能全部直接归因
+  为算法错误。
+- 决策：通过全部测试的自由教学化改写保留为 A 类；失败样本使用不可变
+  verified reference 生成 B 类讲解；不直接把旧讲解与另一份代码拼接。
+- 成本约束：A 类只请求一次；失败后只请求一次 B 类，不重复自由改写；
+  已 accepted 样本永不重跑。
+- 首批在线验证：2 条历史 rejected（runtime error、wrong answer）均恢复
+  到 pass rate 1.0；模型修改了可执行 token，系统按预期注入原 reference。
+- 状态：已实现并通过 13 项测试；正式任务以并发 3 恢复运行。

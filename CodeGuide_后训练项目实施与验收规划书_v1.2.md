@@ -21,6 +21,22 @@
 
 ---
 
+## 2026-07-29 execution amendment: A/B label generation
+
+The production label pipeline keeps successful pedagogical rewrites as Class
+A and never regenerates existing accepted records. Class A receives one API
+request. Any failure enters Class B, while historical rejected records enter
+Class B directly.
+
+Class B uses one teacher call for the teaching explanation and a JSON
+line-comment plan. It does not request a complete Python rewrite. The pipeline
+inserts comments into the verified TACO reference at AST-safe statement
+boundaries, proves executable-token equality after removing comments, and
+then runs syntax and Docker execution verification.
+
+Recovery state is versioned to prevent repeated API consumption. Production
+concurrency is configurable and is currently 3.
+
 ## 0. 本规划书的效力
 
 本文件是后续实现的**项目总约束与阶段验收依据**，优先级高于仓库内陈旧 README、旧配置、Notebook 和未经验证的功能说明。
@@ -1663,3 +1679,22 @@ Codex 必须先回答：
 | 四层全部通过 | 完成并验证了更可信的算法教学 SFT + GRPO 闭环 |
 
 任何层级都不允许把外部同类项目写成本项目的代码来源。没有通过的层级不进入简历结论。
+
+## 20. 2026-07-29 SFT 生成执行调整
+
+本调整不废弃已经 accepted 的数据，正式标签生成采用 A/B 混合策略：
+
+1. A 类保留现有 reference-guided 教学化改写，每题只进行一次 API 请求，
+   且必须通过全部 Docker 测试才可 accepted。
+2. A 类任何失败以及历史 rejected 都进入 B 类。
+3. B 类把 verified TACO reference 视为不可变代码真值，teacher 只生成
+   教学层，并且只允许增加 `#` 注释。
+4. 去掉注释后的 Python token 必须与 reference 一致；否则由程序注入
+   原始 reference，再执行语法检查和 Docker 全测试。
+5. 历史 rejected 的 B 类恢复阶段必须先于剩余新题的 A 类生成。
+6. 正式并发默认设为 3 且可配置；同类自由改写重试关闭，
+   `distill_retries=1`。
+
+该调整在保留 A 类讲解与代码融合优势的同时，减少错误改写造成的数据
+浪费和重复 API 消耗。执行验证仍只能证明通过当前 TACO 测试，不能外推
+为对未知隐藏测试的绝对正确性保证。

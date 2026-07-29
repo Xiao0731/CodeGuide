@@ -47,13 +47,17 @@ SFT 数据集全量构建（异步并发版）
 from __future__ import annotations
 
 import argparse
+import ast
 import asyncio
+import io
 import json
 import logging
 import os
 import random
+import re
 import sys
 import time
+import tokenize
 from pathlib import Path
 from typing import Any, Optional
 
@@ -229,6 +233,50 @@ REFERENCE_GUIDED_LABEL_TEACHER_USER_TMPL = """\
 6. 如果 io_mode == call_based，必须严格实现给定 fn_name 或 starter_code 中的函数/类接口，不得自行改名、改参数或改返回格式。
 7. 不要在最终代码里写演示测试 main；只保留题目要求的提交代码。
 8. 代码要有适量注释，解释关键设计原因，而不是逐行复述语句。\
+"""
+
+REFERENCE_LOCKED_TEACHER_USER_TMPL = """\
+请围绕下面这道算法题和已经执行验证通过的参考解，生成适合初学者的完整中文教学回答。
+
+这是 rejected 样本的可靠性恢复流程。参考解是不可变的代码真值，你只负责把它讲明白，不能重新实现算法。
+
+【题目描述】
+{description}
+
+【难度】{difficulty}
+【标签】{tags}
+
+【判题接口】
+- io_mode: {io_mode}
+- fn_name: {fn_name}
+
+【starter_code】
+```python
+{starter_code}
+```
+
+【测试样例摘要】
+{test_summary}
+
+{seed_examples}
+
+【不可变参考解（左侧行号不属于代码）】
+{reference_numbered}
+
+【允许添加注释的安全行号】
+{safe_comment_lines}
+
+【输出要求】
+1. 回答必须包含：题意重述、关键观察、分步推导、正确性说明、复杂度和常见错误。
+2. 所有讲解都必须针对上面的参考解，不得换一种算法，不得虚构另一份实现。
+3. 不要重新输出 Python 代码。程序会自动使用原始 reference。
+4. 在回答末尾输出一个 ```json 代码块，内容必须是 JSON 数组；每项格式为
+   {{"line": 安全行号, "comment": "放在该行前面的中文注释"}}。
+5. 只使用“允许添加注释的安全行号”，建议提供 3 到 12 条有教学价值的注释。
+6. comment 只能解释该行代码的目的、状态含义或设计原因，不得包含换行。
+7. 不得使用 docstring，不得建议修改变量名、表达式、函数、类、参数、导入、缩进结构或入口。
+8. call_based 必须保持 fn_name/starter_code 接口；standard_input 必须保持完整 stdin/stdout 程序。
+9. 不要写演示测试。\
 """
 
 CODE_EXPLANATION_TEACHER_USER_TMPL = """\
@@ -444,11 +492,38 @@ def build_student_user_content(
     return template.format(**kwargs)
 
 
+def _safe_comment_line_numbers(code: str) -> list[int]:
+    """Return statement starts where a full-line comment can be inserted safely."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    lines: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.stmt) or not hasattr(node, "lineno"):
+            continue
+        line = int(node.lineno)
+        decorators = getattr(node, "decorator_list", None) or []
+        if decorators:
+            line = min(line, *(int(item.lineno) for item in decorators))
+        lines.add(line)
+    return sorted(lines)
+
+
+def _number_reference_lines(code: str) -> str:
+    width = max(1, len(str(max(1, len(code.splitlines())))))
+    return "\n".join(
+        f"{line_no:>{width}} | {line}"
+        for line_no, line in enumerate(code.splitlines(), 1)
+    )
+
+
 def build_teacher_user_content(
     problem: Problem,
     *,
     distill_mode: str,
     max_reference_chars: int,
+    reference_locked: bool = False,
     seed_examples: dict[str, list[dict[str, Any]]] | None = None,
     seed_examples_per_prompt: int = 0,
 ) -> str:
@@ -475,6 +550,15 @@ def build_teacher_user_content(
         ),
     }
 
+    if reference_locked:
+        # Recovery must explain the exact verified implementation. Do not
+        # truncate it and then ask the teacher to explain an unseen suffix.
+        reference = problem.reference_solution or ""
+        safe_lines = _safe_comment_line_numbers(reference)
+        common_kwargs["reference_solution"] = reference
+        common_kwargs["reference_numbered"] = _number_reference_lines(reference)
+        common_kwargs["safe_comment_lines"] = ", ".join(map(str, safe_lines)) or "无"
+        return REFERENCE_LOCKED_TEACHER_USER_TMPL.format(**common_kwargs)
     if distill_mode == "reference_guided_label" and problem.reference_solution:
         return REFERENCE_GUIDED_LABEL_TEACHER_USER_TMPL.format(**common_kwargs)
     if distill_mode == "code_explanation" and problem.reference_solution:
@@ -500,10 +584,11 @@ async def call_distill_model_async(
     problem: Problem,
     semaphore: asyncio.Semaphore,
     quality_checker: "DataQualityChecker",
-    retry: int = 3,
+    retry: int = 1,
     max_tokens: int = 8192,
     thinking_mode: str = "off",
     distill_mode: str = "scratch",
+    reference_locked: bool = False,
     max_reference_chars: int = 12000,
     seed_examples: dict[str, list[dict[str, Any]]] | None = None,
     seed_examples_per_prompt: int = 0,
@@ -521,6 +606,7 @@ async def call_distill_model_async(
         problem,
         distill_mode=distill_mode,
         max_reference_chars=max_reference_chars,
+        reference_locked=reference_locked,
         seed_examples=seed_examples,
         seed_examples_per_prompt=seed_examples_per_prompt,
     )
@@ -594,6 +680,131 @@ async def call_distill_model_async(
     return None
 
 
+# ── Reference-locked recovery helpers ─────────────────────────
+
+_CODE_FENCE_RE = re.compile(
+    r"```(?:python3?|py)?\s*\n(.*?)```",
+    re.DOTALL | re.IGNORECASE,
+)
+_JSON_FENCE_RE = re.compile(
+    r"```json\s*\n(.*?)```",
+    re.DOTALL | re.IGNORECASE,
+)
+_IGNORED_EQUIVALENCE_TOKENS = {
+    tokenize.ENCODING,
+    tokenize.COMMENT,
+    tokenize.NL,
+    tokenize.ENDMARKER,
+}
+
+
+def _executable_token_signature(code: str) -> list[tuple[int, str]] | None:
+    """Return all non-comment Python tokens while preserving executable structure."""
+    try:
+        tokens = tokenize.tokenize(io.BytesIO(code.encode("utf-8")).readline)
+        return [
+            (
+                token.type,
+                "\n" if token.type == tokenize.NEWLINE else token.string,
+            )
+            for token in tokens
+            if token.type not in _IGNORED_EQUIVALENCE_TOKENS
+        ]
+    except (IndentationError, SyntaxError, tokenize.TokenError, UnicodeError):
+        return None
+
+
+def comments_only_equivalent(candidate: str, reference: str) -> bool:
+    """Allow comments/physical formatting changes, but no executable token edits."""
+    candidate_signature = _executable_token_signature(candidate)
+    reference_signature = _executable_token_signature(reference)
+    return bool(
+        candidate_signature is not None
+        and reference_signature is not None
+        and candidate_signature == reference_signature
+    )
+
+
+def replace_final_code_block(text: str, code: str) -> str:
+    """Replace the final fenced code block, or append one when the teacher omitted it."""
+    matches = list(_CODE_FENCE_RE.finditer(text))
+    replacement = f"```python\n{code.strip()}\n```"
+    if not matches:
+        return text.rstrip() + "\n\n" + replacement
+    match = matches[-1]
+    return text[: match.start()] + replacement + text[match.end() :]
+
+
+def _extract_comment_plan(text: str) -> list[dict[str, Any]]:
+    matches = list(_JSON_FENCE_RE.finditer(text))
+    if not matches:
+        return []
+    try:
+        plan = json.loads(matches[-1].group(1))
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return plan if isinstance(plan, list) else []
+
+
+def _strip_final_json_plan(text: str) -> str:
+    matches = list(_JSON_FENCE_RE.finditer(text))
+    if not matches:
+        return text.rstrip()
+    match = matches[-1]
+    return (text[: match.start()] + text[match.end() :]).rstrip()
+
+
+def inject_reference_comments(
+    reference: str,
+    plan: list[dict[str, Any]],
+    *,
+    max_comments: int = 12,
+) -> tuple[str, int]:
+    """Insert model-authored comments only at AST statement boundaries."""
+    safe_lines = set(_safe_comment_line_numbers(reference))
+    comments_by_line: dict[int, list[str]] = {}
+    accepted = 0
+    for item in plan:
+        if accepted >= max_comments or not isinstance(item, dict):
+            break
+        try:
+            line_no = int(item.get("line"))
+        except (TypeError, ValueError):
+            continue
+        if line_no not in safe_lines:
+            continue
+        comment = str(item.get("comment") or "").replace("\r", " ").replace("\n", " ")
+        comment = re.sub(r"\s+", " ", comment).strip().lstrip("#").strip()
+        if not comment:
+            continue
+        comment = comment[:240]
+        comments_by_line.setdefault(line_no, []).append(comment)
+        accepted += 1
+
+    if not comments_by_line and safe_lines:
+        first_line = min(safe_lines)
+        comments_by_line[first_line] = [
+            "以下实现保持已验证参考解的算法与接口不变。"
+        ]
+        accepted = 1
+
+    source_lines = reference.splitlines(keepends=True)
+    output: list[str] = []
+    for line_no, source_line in enumerate(source_lines, 1):
+        indent = source_line[: len(source_line) - len(source_line.lstrip(" \t"))]
+        for comment in comments_by_line.get(line_no, []):
+            output.append(f"{indent}# {comment}\n")
+        output.append(source_line)
+    annotated = "".join(output)
+    if reference and not source_lines:
+        annotated = reference
+
+    # This is a defensive invariant; a comment-plan bug must never alter code.
+    if not comments_only_equivalent(annotated, reference):
+        return reference, 0
+    return annotated, accepted
+
+
 # ── ChatML 组装 ──────────────────────────────────────────────
 
 def to_chatml(
@@ -603,6 +814,8 @@ def to_chatml(
     *,
     distill_mode: str,
     max_reference_chars: int,
+    label_strategy: str = "pedagogical_rewrite",
+    recovery_metadata: dict[str, Any] | None = None,
 ) -> dict:
     """将题目 + 蒸馏模型输出组装为 ChatML 格式记录。"""
     metadata_for_reward = _io_metadata(problem)
@@ -612,7 +825,7 @@ def to_chatml(
     reward_compatible = supports_verification(metadata_for_reward)
     reference_guided = distill_mode == "reference_guided_label"
 
-    return {
+    record = {
         "id": problem.id,
         "messages": [
             {"role": "system",    "content": SFT_SYSTEM},
@@ -652,8 +865,12 @@ def to_chatml(
             "selected_raw_solution_index": problem.metadata.get("selected_raw_solution_index"),
             "candidate_count": problem.metadata.get("candidate_count"),
             "attempted_candidates": problem.metadata.get("attempted_candidates"),
+            "label_strategy": label_strategy,
         },
     }
+    if recovery_metadata:
+        record["metadata"].update(recovery_metadata)
+    return record
 
 
 # ── 断点续传：加载已完成的 ID ─────────────────────────────────
@@ -673,6 +890,102 @@ def load_done_ids(out_path: Path) -> set[str]:
             except Exception:
                 pass
     return done
+
+
+def load_done_ids_many(paths: list[Path]) -> set[str]:
+    done: set[str] = set()
+    for path in paths:
+        done.update(load_done_ids(path))
+    return done
+
+
+def load_latest_records(path: Path) -> dict[str, dict[str, Any]]:
+    """Load the latest JSONL record for each id, tolerating interrupted tail lines."""
+    records: dict[str, dict[str, Any]] = {}
+    if not path.exists():
+        return records
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                record = json.loads(line)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            problem_id = record.get("id")
+            if isinstance(problem_id, str):
+                records[problem_id] = record
+    return records
+
+
+def _short_text(value: Any, max_chars: int = 600) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text if len(text) <= max_chars else text[:max_chars] + "..."
+
+
+def classify_verification_failure(result: object) -> str:
+    error = str(getattr(result, "error", "") or "").lower()
+    first_failure = str(getattr(result, "first_failure", "") or "").lower()
+    text = f"{error} {first_failure}"
+    if getattr(result, "unsupported", False):
+        if "container image must be pinned" in text:
+            return "docker_unsupported"
+        if "no top-level function" in text or "no callable method" in text or "callable method" in text:
+            return "interface_mismatch"
+        return "unsupported"
+    if "timeout" in text or "timed out" in text:
+        return "timeout"
+    if "traceback" in text or "error:" in text or "exception" in text:
+        return "runtime_error"
+    return "wrong_answer"
+
+
+def rejected_record(
+    problem: Problem,
+    failure_type: str,
+    *,
+    distill_mode: str,
+    pass_rate: float = 0.0,
+    error: Any = None,
+    first_failure: Any = None,
+    assistant_content: str | None = None,
+    recovery_attempted: bool = False,
+    initial_failure: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    metadata = _io_metadata(problem)
+    return {
+        "id": problem.id,
+        "failure_type": failure_type,
+        "pass_rate": round(float(pass_rate or 0.0), 3),
+        "error": _short_text(error),
+        "first_failure": _short_text(first_failure),
+        "assistant_content": assistant_content,
+        "metadata": {
+            "source": problem.source,
+            "difficulty": problem.difficulty,
+            "tags": list(problem.tags or []),
+            "skill_types": list(problem.skill_types or []),
+            "raw_tags": list(problem.raw_tags or []),
+            "url": problem.url,
+            "io_mode": metadata.get("io_mode"),
+            "fn_name": metadata.get("fn_name"),
+            "starter_code": metadata.get("starter_code"),
+            "test_cases": metadata.get("test_cases") or [],
+            "distill_mode": distill_mode,
+            "reference_guided": distill_mode == "reference_guided_label",
+            "reference_verified": bool(problem.metadata.get("reference_verified", False)),
+            "reference_pass_rate": problem.metadata.get("reference_pass_rate"),
+            "reference_error": problem.metadata.get("reference_error"),
+            "reference_error_type": problem.metadata.get("reference_error_type"),
+            "selected_reference_index": problem.metadata.get("selected_reference_index"),
+            "selected_raw_solution_index": problem.metadata.get("selected_raw_solution_index"),
+            "candidate_count": problem.metadata.get("candidate_count"),
+            "attempted_candidates": problem.metadata.get("attempted_candidates"),
+            "recovery_attempted": recovery_attempted,
+            "recovery_version": 2 if recovery_attempted else 0,
+            "initial_failure": initial_failure,
+        },
+    }
 
 
 def load_reference_cache(cache_path: str | None) -> dict[str, dict[str, Any]]:
@@ -805,6 +1118,49 @@ def stratified_sample_by_difficulty(
     return selected
 
 
+def stratified_sample_by_io_and_difficulty(
+    problems: list[Problem],
+    io_modes: list[str],
+    difficulties: list[str],
+    per_bucket: int,
+    seed: int,
+) -> list[Problem]:
+    """Sample from each io_mode x difficulty bucket for pilot generation."""
+    if not io_modes or not difficulties:
+        return problems
+    if per_bucket <= 0:
+        raise ValueError("--per-io-difficulty must be positive")
+
+    by_bucket: dict[tuple[str, str], list[Problem]] = {}
+    for problem in problems:
+        io_mode = str(_io_metadata(problem).get("io_mode") or "unknown")
+        diff = _difficulty_key(problem)
+        by_bucket.setdefault((io_mode, diff), []).append(problem)
+
+    rng = random.Random(seed)
+    selected: list[Problem] = []
+    selected_ids: set[str] = set()
+    for io_mode in io_modes:
+        for raw_diff in difficulties:
+            diff = raw_diff.lower()
+            pool = by_bucket.get((io_mode, diff), [])
+            if len(pool) < per_bucket:
+                logger.warning(
+                    "io_mode=%s difficulty=%s available samples are insufficient: need %d, got %d",
+                    io_mode,
+                    diff,
+                    per_bucket,
+                    len(pool),
+                )
+            take_n = min(per_bucket, len(pool))
+            sampled = rng.sample(pool, take_n) if len(pool) > take_n else list(pool)
+            for problem in sampled:
+                if problem.id not in selected_ids:
+                    selected.append(problem)
+                    selected_ids.add(problem.id)
+    return selected
+
+
 def sample_problems(
     problems: list[Problem],
     sample_size: int,
@@ -829,6 +1185,10 @@ class Counter:
         self.syntax_fail = 0
         self.exec_fail = 0
         self.saved = 0
+        self.direct_saved = 0
+        self.recovery_attempted = 0
+        self.recovery_saved = 0
+        self.final_rejected = 0
 
     def summary(self) -> str:
         return (
@@ -839,6 +1199,10 @@ class Counter:
             f"  ├ 无代码块:   {self.no_code}\n"
             f"  ├ 语法错误:   {self.syntax_fail}\n"
             f"  ├ 执行失败:   {self.exec_fail}\n"
+            f"  ├ A类直接写入: {self.direct_saved}\n"
+            f"  ├ B类恢复尝试: {self.recovery_attempted}\n"
+            f"  ├ B类恢复写入: {self.recovery_saved}\n"
+            f"  ├ 最终 rejected: {self.final_rejected}\n"
             f"  └ 最终写入:   {self.saved}"
         )
 
@@ -867,74 +1231,216 @@ async def process_one(
     max_reference_chars: int,
     seed_examples: dict[str, list[dict[str, Any]]],
     seed_examples_per_prompt: int,
+    distill_retries: int,
     verification_timeout: float,
     run_code: bool,
     execution_backend: str,
     container_image: str,
     counter: Counter,
     out_file,
+    rejected_file,
     lock: asyncio.Lock,
+    force_reference_locked: bool = False,
+    previous_rejection: dict[str, Any] | None = None,
 ) -> None:
     counter.total += 1
 
-    # 蒸馏模型标注（含截断重试 + 质量过滤）
-    cot = await call_distill_model_async(
-        client,
-        distill_model,
-        problem,
-        semaphore,
-        quality_checker,
-        max_tokens=max_output_tokens,
-        thinking_mode=thinking_mode,
-        distill_mode=distill_mode,
-        max_reference_chars=max_reference_chars,
-        seed_examples=seed_examples,
-        seed_examples_per_prompt=seed_examples_per_prompt,
-    )
-    if cot is None:
+    initial_failure = None
+    if previous_rejection:
+        initial_failure = {
+            "failure_type": previous_rejection.get("failure_type"),
+            "pass_rate": previous_rejection.get("pass_rate"),
+            "error": previous_rejection.get("error"),
+            "first_failure": previous_rejection.get("first_failure"),
+        }
+
+    # A class: retain the existing pedagogical rewrite path, but make only the
+    # configured number of attempts. Any failure falls through to B class.
+    if not force_reference_locked:
+        cot = await call_distill_model_async(
+            client,
+            distill_model,
+            problem,
+            semaphore,
+            quality_checker,
+            retry=max(1, distill_retries),
+            max_tokens=max_output_tokens,
+            thinking_mode=thinking_mode,
+            distill_mode=distill_mode,
+            max_reference_chars=max_reference_chars,
+            seed_examples=seed_examples,
+            seed_examples_per_prompt=seed_examples_per_prompt,
+        )
+        code = extract_code(cot) if cot else None
+        verification = None
+
+        if cot is None:
+            counter.gpt_failed += 1
+            initial_failure = {"failure_type": "llm_failed", "pass_rate": 0.0}
+        elif code is None:
+            counter.no_code += 1
+            initial_failure = {"failure_type": "no_code_block", "pass_rate": 0.0}
+        else:
+            syntax_ok, syntax_error = validate_syntax(code)
+            if not syntax_ok:
+                counter.syntax_fail += 1
+                initial_failure = {
+                    "failure_type": "syntax_error",
+                    "pass_rate": 0.0,
+                    "error": syntax_error,
+                }
+            elif run_code:
+                verification = verify_code(
+                    code,
+                    _io_metadata(problem),
+                    timeout=verification_timeout,
+                    backend=execution_backend,
+                    container_image=container_image or None,
+                )
+                if not _is_accepted_verification(verification):
+                    counter.exec_fail += 1
+                    initial_failure = {
+                        "failure_type": classify_verification_failure(verification),
+                        "pass_rate": verification.pass_rate,
+                        "error": _short_text(verification.error),
+                        "first_failure": _short_text(verification.first_failure),
+                    }
+
+        if initial_failure is None and cot is not None:
+            pass_rate = verification.pass_rate if verification is not None else 0.0
+            record = to_chatml(
+                problem,
+                cot,
+                pass_rate,
+                distill_mode=distill_mode,
+                max_reference_chars=max_reference_chars,
+                label_strategy="pedagogical_rewrite",
+            )
+            async with lock:
+                out_file.write(json.dumps(record, ensure_ascii=False) + "\n")
+                out_file.flush()
+                counter.saved += 1
+                counter.direct_saved += 1
+            return
+
+    # B class: generate an explanation tied to the immutable verified
+    # reference. The teacher's annotated code is used only when removing
+    # comments yields exactly the same executable token stream.
+    counter.recovery_attempted += 1
+    reference = problem.reference_solution or ""
+    locked_cot = None
+    if reference:
+        locked_cot = await call_distill_model_async(
+            client,
+            distill_model,
+            problem,
+            semaphore,
+            quality_checker,
+            retry=1,
+            max_tokens=max_output_tokens,
+            thinking_mode=thinking_mode,
+            distill_mode=distill_mode,
+            reference_locked=True,
+            max_reference_chars=max_reference_chars,
+            seed_examples=seed_examples,
+            seed_examples_per_prompt=seed_examples_per_prompt,
+        )
+
+    if not reference or locked_cot is None:
         counter.gpt_failed += 1
+        failure_type = "no_verified_reference" if not reference else "recovery_llm_failed"
+        reject = rejected_record(
+            problem,
+            failure_type,
+            distill_mode=distill_mode,
+            assistant_content=locked_cot,
+            recovery_attempted=True,
+            initial_failure=initial_failure,
+        )
+        async with lock:
+            rejected_file.write(json.dumps(reject, ensure_ascii=False) + "\n")
+            rejected_file.flush()
+            counter.final_rejected += 1
         return
 
-    # Code extraction, syntax, and full execution are hard gates for accepted
-    # SFT labels. A fluent explanation with failing code is a wrong label.
-    code = extract_code(cot)
-    if code is None:
-        counter.no_code += 1
-        return
+    comment_plan = _extract_comment_plan(locked_cot)
+    final_code, inserted_comment_count = inject_reference_comments(
+        reference,
+        comment_plan,
+    )
+    comments_preserved = comments_only_equivalent(final_code, reference)
+    explanation = _strip_final_json_plan(locked_cot)
+    # Remove any teacher-authored Python block as well. The final block is
+    # always assembled from the immutable reference plus safe comments.
+    teacher_code = extract_code(explanation)
+    if teacher_code is not None:
+        explanation = replace_final_code_block(explanation, "").replace(
+            "```python\n\n```",
+            "",
+        ).rstrip()
+    final_content = explanation + f"\n\n```python\n{final_code.strip()}\n```"
 
-    syntax_ok, syntax_error = validate_syntax(code)
-    if not syntax_ok:
-        counter.syntax_fail += 1
-        return
-
+    syntax_ok, syntax_error = validate_syntax(final_code)
+    verification = None
     pass_rate = 0.0
-    if run_code:
+    if syntax_ok and run_code:
         verification = verify_code(
-            code,
+            final_code,
             _io_metadata(problem),
             timeout=verification_timeout,
             backend=execution_backend,
             container_image=container_image or None,
         )
         pass_rate = verification.pass_rate
-        if not _is_accepted_verification(verification):
-            counter.exec_fail += 1
-            return
 
-    # 组装 ChatML
+    recovery_ok = syntax_ok and (
+        not run_code or (verification is not None and _is_accepted_verification(verification))
+    )
+    if not recovery_ok:
+        counter.exec_fail += int(bool(syntax_ok))
+        counter.syntax_fail += int(not syntax_ok)
+        failure_type = (
+            "recovery_syntax_error"
+            if not syntax_ok
+            else "recovery_" + classify_verification_failure(verification)
+        )
+        reject = rejected_record(
+            problem,
+            failure_type,
+            distill_mode=distill_mode,
+            pass_rate=pass_rate,
+            error=syntax_error if not syntax_ok else verification.error,
+            first_failure=None if verification is None else verification.first_failure,
+            assistant_content=final_content,
+            recovery_attempted=True,
+            initial_failure=initial_failure,
+        )
+        async with lock:
+            rejected_file.write(json.dumps(reject, ensure_ascii=False) + "\n")
+            rejected_file.flush()
+            counter.final_rejected += 1
+        return
+
     record = to_chatml(
         problem,
-        cot,
+        final_content,
         pass_rate,
         distill_mode=distill_mode,
         max_reference_chars=max_reference_chars,
+        label_strategy="reference_locked",
+        recovery_metadata={
+            "recovery_from_rejected": True,
+            "initial_failure": initial_failure,
+            "comment_only_equivalent": comments_preserved,
+            "reference_code_injected": True,
+            "comment_plan_count": inserted_comment_count,
+        },
     )
-
-    # 原子写入（asyncio 单线程，lock 防止多条记录交错）
     async with lock:
         out_file.write(json.dumps(record, ensure_ascii=False) + "\n")
         out_file.flush()
         counter.saved += 1
+        counter.recovery_saved += 1
 
 
 # ── 主流程 ───────────────────────────────────────────────────
@@ -1050,7 +1556,20 @@ async def async_main(args: argparse.Namespace) -> None:
             len(all_problems),
         )
 
-    if args.stratified_difficulties:
+    if args.stratified_io_modes:
+        all_problems = stratified_sample_by_io_and_difficulty(
+            all_problems,
+            args.stratified_io_modes,
+            args.stratified_difficulties,
+            args.per_io_difficulty,
+            args.stratified_seed,
+        )
+        logger.info(
+            "io_mode x difficulty stratified sample size: %d, difficulty distribution: %s",
+            len(all_problems),
+            _difficulty_distribution(all_problems),
+        )
+    elif args.stratified_difficulties:
         all_problems = stratified_sample_by_difficulty(
             all_problems,
             args.stratified_difficulties,
@@ -1077,14 +1596,35 @@ async def async_main(args: argparse.Namespace) -> None:
             args.sample_seed,
         )
 
-    # 2. 断点续传
+    # 2. Resume. Accepted ids are immutable. Older rejected ids are recovered
+    # directly with the reference-locked path; they never pay for A class again.
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    done_ids = load_done_ids(out_path)
+    rejected_path = Path(args.rejected_out) if args.rejected_out else out_path.with_name(out_path.stem + "_rejected.jsonl")
+    rejected_path.parent.mkdir(parents=True, exist_ok=True)
+    accepted_ids = load_done_ids(out_path)
+    rejected_records = load_latest_records(rejected_path)
+    recoverable_rejected_ids = {
+        problem_id
+        for problem_id, record in rejected_records.items()
+        if problem_id not in accepted_ids
+        and (
+            not bool((record.get("metadata") or {}).get("recovery_attempted", False))
+            or int((record.get("metadata") or {}).get("recovery_version", 0) or 0) < 2
+        )
+    }
+    permanently_rejected_ids = set(rejected_records) - recoverable_rejected_ids
+    done_ids = accepted_ids | permanently_rejected_ids
     if done_ids:
         logger.info("断点续传：跳过已完成 %d 条", len(done_ids))
+    if recoverable_rejected_ids:
+        logger.info(
+            "reference-locked recovery：已有 rejected 中 %d 条将直接进入 B 类",
+            len(recoverable_rejected_ids),
+        )
 
     pending = [p for p in all_problems if p.id not in done_ids]
+    pending.sort(key=lambda problem: problem.id not in recoverable_rejected_ids)
     logger.info("待处理：%d 条，并发数：%d", len(pending), args.concurrency)
     logger.info("待处理 difficulty 分布：%s", _difficulty_distribution(pending))
     logger.info(
@@ -1106,36 +1646,58 @@ async def async_main(args: argparse.Namespace) -> None:
     logger.info("质量过滤阈值：%.2f（低于此分数的样本触发重试或丢弃）",
                 args.quality_threshold)
 
-    with open(out_path, "a", encoding="utf-8") as out_file:
-        tasks = [
-            process_one(
-                client,
-                distill_model,
-                p,
-                semaphore,
-                quality_checker,
-                args.max_output_tokens,
-                args.thinking_mode,
-                args.distill_mode,
-                args.max_reference_chars,
-                seed_examples,
-                args.seed_examples_per_prompt,
-                args.verification_timeout,
-                args.run_code,
-                args.execution_backend,
-                args.container_image,
-                counter,
-                out_file,
-                lock,
-            )
-            for p in pending
+    with open(out_path, "a", encoding="utf-8") as out_file, open(rejected_path, "a", encoding="utf-8") as rejected_file:
+        recovery_pending = [
+            problem for problem in pending if problem.id in recoverable_rejected_ids
         ]
-        # tqdm 进度条
-        for coro in async_tqdm.as_completed(tasks, total=len(tasks), desc="蒸馏进度"):
-            await coro
+        fresh_pending = [
+            problem for problem in pending if problem.id not in recoverable_rejected_ids
+        ]
+        phases = [
+            ("B类恢复", recovery_pending),
+            ("A类生成", fresh_pending),
+        ]
+        for phase_name, phase_problems in phases:
+            if not phase_problems:
+                continue
+            logger.info("%s阶段开始：%d 条", phase_name, len(phase_problems))
+            tasks = [
+                process_one(
+                    client,
+                    distill_model,
+                    problem,
+                    semaphore,
+                    quality_checker,
+                    args.max_output_tokens,
+                    args.thinking_mode,
+                    args.distill_mode,
+                    args.max_reference_chars,
+                    seed_examples,
+                    args.seed_examples_per_prompt,
+                    args.distill_retries,
+                    args.verification_timeout,
+                    args.run_code,
+                    args.execution_backend,
+                    args.container_image,
+                    counter,
+                    out_file,
+                    rejected_file,
+                    lock,
+                    problem.id in recoverable_rejected_ids,
+                    rejected_records.get(problem.id),
+                )
+                for problem in phase_problems
+            ]
+            for coro in async_tqdm.as_completed(
+                tasks,
+                total=len(tasks),
+                desc=phase_name,
+            ):
+                await coro
 
     logger.info("\n%s", counter.summary())
     logger.info("输出文件：%s", out_path)
+    logger.info("rejected output file: %s", rejected_path)
 
 
 def main() -> None:
@@ -1147,10 +1709,18 @@ def main() -> None:
     parser.add_argument("--taco-data-root", type=str, default="data/raw/TACO/ALL",
                         help="本地 TACO parquet 根目录（默认 data/raw/TACO/ALL）")
     parser.add_argument("--out",         type=str,  default="data/sft_train.jsonl")
+    parser.add_argument("--rejected-out", type=str, default="",
+                        help="Write rejected generations and failure reasons to this JSONL file")
     parser.add_argument("--concurrency", type=int,  default=10,
                         help="并发蒸馏模型请求数（建议 5-20，避免触发限速）")
     parser.add_argument("--max-output-tokens", type=int, default=8192,
                         help="单次蒸馏响应的最大输出 token 数（默认 8192，降低 hard 题截断概率）")
+    parser.add_argument(
+        "--distill-retries",
+        type=int,
+        default=1,
+        help="A 类生成在截断、低质量或 API 异常时的最大尝试次数；默认 1，失败后转 B 类",
+    )
     parser.add_argument("--thinking-mode", choices=["off", "on", "omit"], default="off",
                         help="OpenAI-compatible 额外 thinking 开关：off 默认关闭，on 开启，omit 不传该字段")
     parser.add_argument(
@@ -1183,6 +1753,11 @@ def main() -> None:
                         help="按验证接口类型过滤题目；call_based 专项 smoke 可设为 call_based")
     parser.add_argument("--stratified-difficulties", nargs="+", default=[],
                         help="按 difficulty 分层抽样，仅用于 smoke/pilot，例如 easy medium hard very_hard")
+    parser.add_argument("--stratified-io-modes", nargs="+", default=[],
+                        choices=["standard_input", "call_based"],
+                        help="Sample each io_mode x difficulty bucket; use with --stratified-difficulties")
+    parser.add_argument("--per-io-difficulty", type=int, default=1,
+                        help="Samples per io_mode x difficulty bucket")
     parser.add_argument("--per-difficulty", type=int, default=1,
                         help="分层抽样时每个 difficulty 抽取多少条（默认 1）")
     parser.add_argument("--stratified-seed", type=int, default=42,

@@ -14,6 +14,25 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Load-LocalEnv {
+    param([string]$EnvPath)
+    if (Test-Path $EnvPath) {
+        Get-Content -LiteralPath $EnvPath | ForEach-Object {
+            $line = $_.Trim()
+            if (!$line -or $line.StartsWith("#")) {
+                return
+            }
+            if ($line -match '^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"(.*)"\s*$') {
+                [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], "Process")
+            }
+            elseif ($line -match '^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*''(.*)''\s*$') {
+                [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], "Process")
+            }
+        }
+        Write-Host "Loaded environment variables from $EnvPath"
+    }
+}
+
 function Resolve-Python {
     param([string]$RequestedPython)
     if ($RequestedPython) {
@@ -32,6 +51,9 @@ function Require-Env {
     if ([string]::IsNullOrWhiteSpace($value)) {
         throw "Missing environment variable: $Name"
     }
+    if ($value -match "YOUR_|your_|placeholder|PLACEHOLDER") {
+        throw "Environment variable ${Name} still looks like a placeholder; please fill it in .env"
+    }
 }
 
 function Quote-CmdArg {
@@ -41,6 +63,9 @@ function Quote-CmdArg {
     }
     return '"' + ($Value -replace '"', '\"') + '"'
 }
+
+$repoRoot = Split-Path $PSScriptRoot -Parent
+Load-LocalEnv (Join-Path $repoRoot ".env")
 
 $pythonExe = Resolve-Python $Python
 
@@ -125,6 +150,7 @@ Write-Host "============"
 $reportScript = @'
 # -*- coding: utf-8 -*-
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -214,7 +240,13 @@ for idx, record in enumerate(records, 1):
     if code_block_ok:
         syntax_ok, syntax_error = validate_syntax(code)
         if syntax_ok:
-            result = verify_code(code, metadata_for_reward(record), timeout=60.0)
+            result = verify_code(
+                code,
+                metadata_for_reward(record),
+                timeout=60.0,
+                backend="docker",
+                container_image=os.environ.get("CODEGUIDE_EXECUTION_IMAGE") or None,
+            )
             pass_rate = result.pass_rate
             exec_error = result.error
             first_failure = result.first_failure
