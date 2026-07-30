@@ -1002,13 +1002,26 @@ class CurrentRejectedStore:
             self.flush()
 
     def flush(self) -> None:
-        temp_path = self.path.with_suffix(self.path.suffix + ".tmp")
-        with temp_path.open("w", encoding="utf-8", newline="\n") as fh:
-            for record in self.records.values():
-                fh.write(json.dumps(record, ensure_ascii=False) + "\n")
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(temp_path, self.path)
+        temp_path = self.path.with_suffix(
+            f"{self.path.suffix}.{os.getpid()}.{time.time_ns()}.tmp"
+        )
+        try:
+            with temp_path.open("w", encoding="utf-8", newline="\n") as fh:
+                for record in self.records.values():
+                    fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+                fh.flush()
+                os.fsync(fh.fileno())
+
+            for attempt in range(6):
+                try:
+                    os.replace(temp_path, self.path)
+                    break
+                except PermissionError:
+                    if attempt == 5:
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
+        finally:
+            temp_path.unlink(missing_ok=True)
 
 
 def is_recoverable_rejected_record(record: dict[str, Any]) -> bool:

@@ -555,3 +555,8 @@ small smoke outputs, and small reference-cache examples. It excludes:
   (`runtime_error`, `wrong_answer`) were recovered to pass rate 1.0. In both
   cases the teacher changed executable tokens, so the pipeline correctly
   injected the verified reference.
+### 2026-07-30：Windows 并发 rejected 快照写入修复
+
+- 正式续跑在 20 并发下触发 `WinError 5`，定位为 rejected 快照替换时的临时文件争用/短暂占用。
+- 快照写入改为每次使用唯一临时文件；`os.replace` 对 Windows 短暂 `PermissionError` 做有限退避重试，并在结束时清理临时文件。
+- 该修复不改变蒸馏策略、API 重试次数、accepted 内容或断点语义。

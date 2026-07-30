@@ -442,3 +442,9 @@
 - 首批在线验证：2 条历史 rejected（runtime error、wrong answer）均恢复
   到 pass rate 1.0；模型修改了可执行 token，系统按预期注入原 reference。
 - 状态：已实现并通过 13 项测试；正式任务以并发 3 恢复运行。
+### DEC-014：rejected 快照采用唯一临时文件与有限替换重试
+
+- **日期**：2026-07-30
+- **背景**：20 并发正式续跑时，Windows 对共享 `.tmp` 到 rejected JSONL 的替换返回 `WinError 5`，生成进程退出。
+- **决定**：每次 flush 使用 PID 与纳秒时间组成的唯一临时文件；仅对 `os.replace` 的短暂 `PermissionError` 做 6 次有限退避重试。
+- **边界**：不增加 API 请求重试，不改变当前未解决 rejected 快照的业务定义。
