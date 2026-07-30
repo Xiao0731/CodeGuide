@@ -560,3 +560,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 正式续跑在 20 并发下触发 `WinError 5`，定位为 rejected 快照替换时的临时文件争用/短暂占用。
 - 快照写入改为每次使用唯一临时文件；`os.replace` 对 Windows 短暂 `PermissionError` 做有限退避重试，并在结束时清理临时文件。
 - 该修复不改变蒸馏策略、API 重试次数、accepted 内容或断点语义。
+### 2026-07-30：B 类集中失败根因纠正
+
+- 核对发现 accepted 为 9,691 条；日志“跳过已完成 10,133 条”还包含 442 条终态 rejected，不能解释为 accepted 数。
+- 410 条所谓 `recovery_wrong_answer` 的诊断文本全部是 Docker daemon 未运行，并非 reference 或 DeepSeek 代码错误；`pass_rate=0.0` 是验证器未执行任何测试时的默认失败值。
+- 正式生成增加 Docker API 前置预检。Docker 不可用时在调用教师 API 前退出。
+- Docker 连接失败新增 `docker_unavailable` 分类；历史误分类记录按错误文本重新视为可恢复。

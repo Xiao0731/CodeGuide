@@ -1734,3 +1734,8 @@ Codex 必须先回答：
 - rejected 文件已改为仅保存当前未解决题目的紧凑快照。
 - Windows 并发写快照采用唯一临时文件和有限原子替换重试，避免 `WinError 5` 中断正式生成。
 - 已接纳样本继续通过 ID 断点跳过，不因本修复重新调用教师 API。
+### 2026-07-30 SFT 生成口径修正
+
+- accepted 数只统计 accepted JSONL 的唯一 ID；“已完成”不得混同 accepted 与终态 rejected。
+- Docker verifier 必须在教师 API 请求前通过可用性预检。
+- Docker 连接失败属于可恢复基础设施故障，不属于 wrong answer；历史误分类样本恢复后重新进入 B 类。

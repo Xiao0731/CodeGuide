@@ -448,3 +448,9 @@
 - **背景**：20 并发正式续跑时，Windows 对共享 `.tmp` 到 rejected JSONL 的替换返回 `WinError 5`，生成进程退出。
 - **决定**：每次 flush 使用 PID 与纳秒时间组成的唯一临时文件；仅对 `os.replace` 的短暂 `PermissionError` 做 6 次有限退避重试。
 - **边界**：不增加 API 请求重试，不改变当前未解决 rejected 快照的业务定义。
+### DEC-015：基础设施失败不得归类为 wrong answer
+
+- **日期**：2026-07-30
+- **证据**：410 条 B 类 `recovery_wrong_answer` 的错误文本全部为 Docker daemon 连接失败，Docker Desktop 服务处于 stopped。
+- **决定**：Docker 生成前必须预检；连接失败使用 `docker_unavailable`，不记作代码错误，并允许断点恢复。
+- **影响**：避免在 verifier 不可用时先付费生成讲解，也避免把基础设施故障错误计入模型代码失败率。

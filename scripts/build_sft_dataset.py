@@ -55,6 +55,7 @@ import logging
 import os
 import random
 import re
+import subprocess
 import sys
 import time
 import tokenize
@@ -1026,7 +1027,20 @@ class CurrentRejectedStore:
 
 def is_recoverable_rejected_record(record: dict[str, Any]) -> bool:
     """Allow external teacher/API failures to resume after service recovery."""
-    if record.get("failure_type") == "recovery_llm_failed":
+    diagnostic = " ".join(
+        str(record.get(key) or "") for key in ("error", "first_failure")
+    ).lower()
+    if record.get("failure_type") in {"recovery_llm_failed", "recovery_docker_unavailable"}:
+        return True
+    # Compatibility for records created before Docker connection failures had
+    # their own failure type. These are infrastructure failures, not wrong
+    # answers, and must remain resumable.
+    if (
+        "docker_engine" in diagnostic
+        or "dockerdesktoplinuxengine" in diagnostic
+        or "docker daemon" in diagnostic
+        or "error during connect" in diagnostic
+    ):
         return True
     metadata = record.get("metadata") or {}
     return (
@@ -1046,6 +1060,13 @@ def classify_verification_failure(result: object) -> str:
     error = str(getattr(result, "error", "") or "").lower()
     first_failure = str(getattr(result, "first_failure", "") or "").lower()
     text = f"{error} {first_failure}"
+    if (
+        "docker_engine" in text
+        or "dockerdesktoplinuxengine" in text
+        or "docker daemon" in text
+        or "error during connect" in text
+    ):
+        return "docker_unavailable"
     if getattr(result, "unsupported", False):
         if "container image must be pinned" in text:
             return "docker_unsupported"
@@ -1586,6 +1607,25 @@ async def async_main(args: argparse.Namespace) -> None:
             "--no-run-code --allow-unverified-output，并使用独立 smoke 输出路径。"
         )
         sys.exit(1)
+    if args.run_code and args.execution_backend == "docker":
+        try:
+            docker_probe = subprocess.run(
+                ["docker", "info", "--format", "{{.ServerVersion}}"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            logger.error("Docker verifier 预检失败，未发送任何 API 请求：%s", exc)
+            sys.exit(1)
+        if docker_probe.returncode != 0:
+            diagnostic = (docker_probe.stderr or docker_probe.stdout or "").strip()
+            logger.error(
+                "Docker verifier 不可用，未发送任何 API 请求。请先启动 Docker Desktop：%s",
+                diagnostic,
+            )
+            sys.exit(1)
 
     try:
         from openai import AsyncOpenAI

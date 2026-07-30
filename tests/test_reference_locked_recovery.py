@@ -7,6 +7,7 @@ import scripts.build_sft_dataset as builder
 from scripts.build_sft_dataset import (
     Counter,
     CurrentRejectedStore,
+    classify_verification_failure,
     comments_only_equivalent,
     inject_reference_comments,
     is_fatal_distill_error,
@@ -156,6 +157,25 @@ def test_teacher_api_failure_remains_recoverable_after_current_version():
             "metadata": {"recovery_attempted": True, "recovery_version": 2},
         }
     )
+
+
+def test_historical_docker_connection_failure_is_resume_retryable():
+    assert is_recoverable_rejected_record(
+        {
+            "failure_type": "recovery_wrong_answer",
+            "error": "docker: error during connect: open //./pipe/docker_engine",
+            "metadata": {"recovery_attempted": True, "recovery_version": 2},
+        }
+    )
+
+
+def test_docker_connection_failure_has_infrastructure_failure_type():
+    result = SimpleNamespace(
+        unsupported=False,
+        error="docker: error during connect: open //./pipe/docker_engine",
+        first_failure=None,
+    )
+    assert classify_verification_failure(result) == "docker_unavailable"
 
 
 def test_insufficient_balance_is_a_fatal_batch_error():
