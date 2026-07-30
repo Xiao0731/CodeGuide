@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import scripts.build_sft_dataset as builder
 from scripts.build_sft_dataset import (
     Counter,
+    CurrentRejectedStore,
     comments_only_equivalent,
     inject_reference_comments,
     is_fatal_distill_error,
@@ -16,6 +17,17 @@ from scripts.build_sft_dataset import (
 )
 from src.data.loader import Problem
 from src.data.quality import DataQualityChecker
+
+
+class MemoryRejectedStore:
+    def __init__(self):
+        self.records = {}
+
+    def reject(self, record):
+        self.records[record["id"]] = record
+
+    def resolve(self, problem_id):
+        self.records.pop(problem_id, None)
 
 
 def test_comments_only_equivalent_accepts_comments_without_code_changes():
@@ -93,6 +105,25 @@ def test_load_latest_records_uses_last_record_and_ignores_bad_tail(tmp_path):
 
     assert records["a"]["failure_type"] == "recovery_llm_failed"
     assert records["a"]["metadata"]["recovery_attempted"] is True
+
+
+def test_current_rejected_store_removes_accepted_and_resolved_ids(tmp_path):
+    path = tmp_path / "rejected.jsonl"
+    records = {
+        "accepted": {"id": "accepted", "failure_type": "wrong_answer"},
+        "pending": {
+            "id": "pending",
+            "failure_type": "recovery_llm_failed",
+            "metadata": {"test_cases": [{"large": "payload"}]},
+        },
+    }
+
+    store = CurrentRejectedStore(path, records, {"accepted"})
+    assert set(load_latest_records(path)) == {"pending"}
+    assert "test_cases" not in load_latest_records(path)["pending"]["metadata"]
+
+    store.resolve("pending")
+    assert load_latest_records(path) == {}
 
 
 def test_rejected_recovery_records_are_versioned():
@@ -181,7 +212,7 @@ def test_process_one_falls_back_to_reference_locked_after_wrong_answer(monkeypat
     monkeypatch.setattr(builder, "call_distill_model_async", fake_call)
     monkeypatch.setattr(builder, "verify_code", fake_verify)
     accepted = io.StringIO()
-    rejected = io.StringIO()
+    rejected = MemoryRejectedStore()
     counter = Counter()
 
     asyncio.run(
@@ -204,13 +235,13 @@ def test_process_one_falls_back_to_reference_locked_after_wrong_answer(monkeypat
             container_image="",
             counter=counter,
             out_file=accepted,
-            rejected_file=rejected,
+            rejected_store=rejected,
             lock=asyncio.Lock(),
         )
     )
 
     record = json.loads(accepted.getvalue())
-    assert rejected.getvalue() == ""
+    assert rejected.records == {}
     assert record["metadata"]["label_strategy"] == "reference_locked"
     assert record["metadata"]["initial_failure"]["failure_type"] == "wrong_answer"
     assert record["metadata"]["comment_only_equivalent"] is True

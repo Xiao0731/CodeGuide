@@ -942,6 +942,75 @@ def load_latest_records(path: Path) -> dict[str, dict[str, Any]]:
     return records
 
 
+def compact_rejected_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Keep only fields needed to diagnose and resume a current rejection."""
+    metadata = record.get("metadata") or {}
+    metadata_keys = (
+        "source",
+        "difficulty",
+        "io_mode",
+        "fn_name",
+        "distill_mode",
+        "reference_guided",
+        "reference_verified",
+        "reference_pass_rate",
+        "selected_reference_index",
+        "recovery_attempted",
+        "recovery_version",
+        "initial_failure",
+    )
+    return {
+        "id": record.get("id"),
+        "failure_type": record.get("failure_type"),
+        "pass_rate": record.get("pass_rate", 0.0),
+        "error": record.get("error"),
+        "first_failure": record.get("first_failure"),
+        "metadata": {
+            key: metadata.get(key)
+            for key in metadata_keys
+            if key in metadata
+        },
+    }
+
+
+class CurrentRejectedStore:
+    """Atomic JSONL snapshot containing only currently unresolved problem IDs."""
+
+    def __init__(
+        self,
+        path: Path,
+        records: dict[str, dict[str, Any]],
+        accepted_ids: set[str],
+    ) -> None:
+        self.path = path
+        self.records = {
+            problem_id: compact_rejected_record(record)
+            for problem_id, record in records.items()
+            if problem_id not in accepted_ids
+        }
+        self.flush()
+
+    def reject(self, record: dict[str, Any]) -> None:
+        problem_id = str(record.get("id") or "")
+        if not problem_id:
+            return
+        self.records[problem_id] = compact_rejected_record(record)
+        self.flush()
+
+    def resolve(self, problem_id: str) -> None:
+        if self.records.pop(problem_id, None) is not None:
+            self.flush()
+
+    def flush(self) -> None:
+        temp_path = self.path.with_suffix(self.path.suffix + ".tmp")
+        with temp_path.open("w", encoding="utf-8", newline="\n") as fh:
+            for record in self.records.values():
+                fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(temp_path, self.path)
+
+
 def is_recoverable_rejected_record(record: dict[str, Any]) -> bool:
     """Allow external teacher/API failures to resume after service recovery."""
     if record.get("failure_type") == "recovery_llm_failed":
@@ -1275,7 +1344,7 @@ async def process_one(
     container_image: str,
     counter: Counter,
     out_file,
-    rejected_file,
+    rejected_store: CurrentRejectedStore,
     lock: asyncio.Lock,
     force_reference_locked: bool = False,
     previous_rejection: dict[str, Any] | None = None,
@@ -1356,6 +1425,7 @@ async def process_one(
             async with lock:
                 out_file.write(json.dumps(record, ensure_ascii=False) + "\n")
                 out_file.flush()
+                rejected_store.resolve(problem.id)
                 counter.saved += 1
                 counter.direct_saved += 1
             return
@@ -1395,8 +1465,7 @@ async def process_one(
             initial_failure=initial_failure,
         )
         async with lock:
-            rejected_file.write(json.dumps(reject, ensure_ascii=False) + "\n")
-            rejected_file.flush()
+            rejected_store.reject(reject)
             counter.final_rejected += 1
         return
 
@@ -1453,8 +1522,7 @@ async def process_one(
             initial_failure=initial_failure,
         )
         async with lock:
-            rejected_file.write(json.dumps(reject, ensure_ascii=False) + "\n")
-            rejected_file.flush()
+            rejected_store.reject(reject)
             counter.final_rejected += 1
         return
 
@@ -1476,6 +1544,7 @@ async def process_one(
     async with lock:
         out_file.write(json.dumps(record, ensure_ascii=False) + "\n")
         out_file.flush()
+        rejected_store.resolve(problem.id)
         counter.saved += 1
         counter.recovery_saved += 1
 
@@ -1647,6 +1716,12 @@ async def async_main(args: argparse.Namespace) -> None:
     rejected_path.parent.mkdir(parents=True, exist_ok=True)
     accepted_ids = load_done_ids(out_path)
     rejected_records = load_latest_records(rejected_path)
+    rejected_store = CurrentRejectedStore(
+        rejected_path,
+        rejected_records,
+        accepted_ids,
+    )
+    rejected_records = dict(rejected_store.records)
     recoverable_rejected_ids = {
         problem_id
         for problem_id, record in rejected_records.items()
@@ -1686,7 +1761,7 @@ async def async_main(args: argparse.Namespace) -> None:
     logger.info("质量过滤阈值：%.2f（低于此分数的样本触发重试或丢弃）",
                 args.quality_threshold)
 
-    with open(out_path, "a", encoding="utf-8") as out_file, open(rejected_path, "a", encoding="utf-8") as rejected_file:
+    with open(out_path, "a", encoding="utf-8") as out_file:
         recovery_pending = [
             problem for problem in pending if problem.id in recoverable_rejected_ids
         ]
@@ -1721,7 +1796,7 @@ async def async_main(args: argparse.Namespace) -> None:
                     args.container_image,
                     counter,
                     out_file,
-                    rejected_file,
+                    rejected_store,
                     lock,
                     problem.id in recoverable_rejected_ids,
                     rejected_records.get(problem.id),

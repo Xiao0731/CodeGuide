@@ -60,6 +60,16 @@
 - Follow-up: the first insufficient-balance response now trips a batch circuit
   breaker instead of exhausting the remaining queue with guaranteed failures.
 
+### DEC-013: rejected JSONL represents unresolved current state
+
+- Date: 2026-07-29.
+- The previous append-only file mixed historical failures with recovered IDs
+  and grew to about 375 MB.
+- Decision: keep one compact record per unresolved ID, remove an ID
+  atomically as soon as it is accepted, and compact accepted IDs at startup.
+- Historical request evidence remains in process logs; rejected is now a
+  current work queue/status artifact.
+
 ## 1. 记录规则
 
 每个有效步骤至少记录：

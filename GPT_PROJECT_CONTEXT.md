@@ -64,6 +64,18 @@
   condition: remaining tasks are cancelled immediately and the flushed JSONL
   checkpoint is retained.
 
+### 2026-07-29: rejected output becomes current-state snapshot
+
+- `sft_train_ref_label_rejected.jsonl` is no longer an append-only event log.
+  It contains one compact latest record for each currently unresolved ID.
+- IDs already present in accepted are removed during startup compaction. When
+  a recovery is accepted, the ID is atomically removed from rejected.
+- Rejected records no longer duplicate full test suites or assistant outputs;
+  they retain failure, error, interface, reference, and recovery fields needed
+  for diagnosis and resume.
+- Writes use a temporary file plus `os.replace`, so interruption leaves either
+  the previous or the new complete snapshot.
+
 This file is the entry point for reviewing the packaged CodeGuide source code.
 It describes the code that currently exists on disk and the evidence currently
 available for each project stage.
