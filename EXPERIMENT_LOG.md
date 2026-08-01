@@ -79,3 +79,12 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 本地单元测试：7 passed；配置 `validate-only` 得到 train=500、eval=100。
 - 首次发现并修复：冻结 split 是带 `ids` 字段的 manifest 对象，不是裸数组；loader 现同时支持两种格式并加入回归测试。
 - 未完成项：双4090真实QLoRA校准及Base/Adapter执行对照，状态为等待云端。
+# EXP-004：云端 CUDA 13 / bitsandbytes 兼容故障
+
+**日期**：2026-08-01
+
+- 云端：Python 3.12.4、PyTorch 2.9.0+cu130、双 RTX 4090、bitsandbytes 0.47.0。
+- 现象：缺少 `libbitsandbytes_cuda130.so`，但旧 preflight 继续完成并打印 passed。
+- 根因：项目依赖上限 `<0.48` 排除了首个正式支持CUDA 13的bitsandbytes版本；包导入过程内部记录异常但未让外层脚本失败。
+- 修复：依赖改为 `>=0.48.2,<0.49`，preflight 增加真实 NF4 backward 与8-bit optimizer step。
+- 未计为训练结果：本次尚未加载7B或执行校准 optimizer step。

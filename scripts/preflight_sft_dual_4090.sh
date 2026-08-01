@@ -25,6 +25,26 @@ for index in range(2):
         raise SystemExit(f"GPU {index} does not satisfy RTX 4090 24GB/bf16 contract: {gpus[-1]}")
 
 versions = {name: importlib.import_module(name).__version__ for name in ("transformers", "peft", "accelerate", "bitsandbytes")}
+import bitsandbytes as bnb
+from bitsandbytes.cextension import lib as bnb_lib
+if not getattr(bnb_lib, "compiled_with_cuda", False):
+    raise SystemExit("bitsandbytes CUDA native library is unavailable")
+
+# Import success is insufficient: older bitsandbytes catches native-library
+# errors internally. Exercise the exact NF4 and paged optimizer primitives
+# required by this QLoRA configuration.
+probe = bnb.nn.Linear4bit(
+    16, 16, bias=False, compute_dtype=torch.bfloat16,
+    compress_statistics=True, quant_type="nf4",
+).cuda(0)
+x = torch.randn(2, 16, device="cuda:0", dtype=torch.bfloat16, requires_grad=True)
+probe(x).float().sum().backward()
+parameter = torch.nn.Parameter(torch.ones(16, device="cuda:0"))
+optimizer = bnb.optim.PagedAdamW8bit([parameter], lr=1e-3)
+(parameter.square().sum()).backward()
+optimizer.step()
+del probe, x, parameter, optimizer
+torch.cuda.empty_cache()
 try:
     import flash_attn
     flash = {"available": True, "version": flash_attn.__version__}
@@ -40,7 +60,7 @@ output.mkdir(parents=True, exist_ok=True)
 
 report = {"python": sys.version, "torch": torch.__version__, "cuda": torch.version.cuda, "gpus": gpus,
           "dependencies": versions, "flash_attention": flash, "canonical_sha256": actual,
-          "disk_free_gib": round(free / 2**30, 2)}
+          "bitsandbytes_cuda_probe": "passed", "disk_free_gib": round(free / 2**30, 2)}
 Path("artifacts/sft").mkdir(parents=True, exist_ok=True)
 Path("artifacts/sft/preflight.json").write_text(json.dumps(report, indent=2) + "\n")
 print(json.dumps(report, indent=2))
@@ -56,4 +76,3 @@ PY
 
 python -m src.training.train_sft --validate-only --mode calibration
 echo "dual-4090 SFT preflight passed"
-

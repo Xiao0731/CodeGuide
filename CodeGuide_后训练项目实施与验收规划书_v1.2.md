@@ -1760,3 +1760,8 @@ Codex 必须先回答：
 - 全量10,306条按训练格式检查：通过10,306、截断0、最大8,173、监督 token 比例77.5844%。
 - 当前本地环境未下载完整7B模型，未执行500条真实训练，因此“正式 full SFT Gate”仍未通过。
 - 下一步唯一主线是在双RTX 4090服务器同步 canonical/source bank，执行 `bash scripts/run_sft_calibration_dual_4090.sh`，收集显存、吞吐、loss、checkpoint和adapter重载证据；通过后才启动full SFT。
+# 2026-08-01 云端校准预检补充
+
+- 云端实际环境为 PyTorch 2.9.0+cu130；bitsandbytes 0.47.0缺少CUDA 13原生库，首次preflight是假通过，未进入训练。
+- CUDA 13下bitsandbytes最低采用0.48系列；preflight新增NF4前后向和PagedAdamW8bit真实算子探针。
+- 只有原生算子探针、双rank绑定和数据校验均通过，才允许启动500条校准。

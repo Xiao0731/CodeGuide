@@ -64,6 +64,7 @@ artifacts/g0/*
 
 # 里程碑压缩包只做本地/外部快照，不进入 Git 历史
 *.zip
+*.tar.gz
 
 # macOS
 .DS_Store

@@ -591,3 +591,8 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - completion-only loss 通过 chat template 的 token 前缀关系确定边界，不使用字符串猜测；全量10,306条复审通过，截断0，最大8,173，监督 token 比例77.5844%。
 - 500条 calibration 仅从冻结 SFT train 确定性分层抽取，ID内容 hash 为 `6d6975dd2938257150ab7b297d7d39d5ef5c55481163ee7e0011ee07eccd4a11`。
 - 本地未下载7B、未执行训练；真实校准、显存、吞吐、checkpoint和adapter重载必须在双RTX 4090云端完成。
+# 2026-08-01 云端预检兼容修复
+
+- 双RTX 4090、CUDA、canonical hash和固定split已在云端确认。
+- 云镜像为 PyTorch 2.9.0+cu130；bitsandbytes 0.47.0不含CUDA 13原生库，因此QLoRA不可运行。
+- 依赖升级至bitsandbytes 0.48.2系列，并将 preflight 改为真实执行NF4前后向和PagedAdamW8bit更新，杜绝import假通过。

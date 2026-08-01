@@ -478,3 +478,9 @@
 - **训练栈**：Transformers + PEFT + bitsandbytes，普通双进程 DDP；每个 rank 显式加载一份4-bit模型到对应 GPU，不使用 `device_map=auto`，不允许CPU或全参数静默回退。
 - **校准**：固定500条 train 与100条 dev sanity subset，先完成1 epoch云端校准，未过门槛不得启动9,791条 full SFT。
 - **长度**：8192硬门槛，任何超长样本直接报错，不允许静默截断代码。
+# DEC-019：CUDA 13 环境要求 bitsandbytes 0.48+ 并执行原生算子预检
+
+- **日期**：2026-08-01
+- **故障**：云端 `torch 2.9.0+cu130` 搭配 bitsandbytes 0.47.0，缺少 `libbitsandbytes_cuda130.so`；旧 preflight 因包导入时内部吞掉异常而错误报告通过。
+- **决定**：CUDA 13 环境锁定 `bitsandbytes>=0.48.2,<0.49`，不为此重装 PyTorch；preflight 必须实际执行 NF4 Linear 前后向和 PagedAdamW8bit step。
+- **结果边界**：双卡、canonical hash、split 已通过；只有新版原生探针通过后才允许开始校准训练。

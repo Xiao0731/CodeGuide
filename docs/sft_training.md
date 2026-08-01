@@ -26,6 +26,10 @@ bash scripts/preflight_sft_dual_4090.sh
 bash scripts/run_sft_calibration_dual_4090.sh
 ```
 
+当前云镜像若使用 PyTorch CUDA 13，bitsandbytes 必须为0.48.0以上；项目锁定
+`bitsandbytes>=0.48.2,<0.49`。preflight 会真实执行一次 NF4 前后向与
+PagedAdamW8bit step，不能仅凭 Python 包可导入判定兼容。
+
 若 FlashAttention 2 不可用，`attention_backend: auto` 会显式记录并回退到 PyTorch SDPA。
 训练使用普通 DDP，每个进程绑定一张 GPU，不使用 `device_map="auto"`。输出仅包含 LoRA adapter、checkpoint、tokenizer/config 和 run manifest。
 
