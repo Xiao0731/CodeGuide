@@ -117,3 +117,11 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 吞吐：0.861 train samples/s，0.055 optimizer steps/s；约 18.14 秒/step（含一次约 29.9 秒 dev 评估）。
 - 稳定性：所有记录的 loss 与 grad norm 有限，无 OOM、timeout、NCCL rank failure；首步 0 learning rate 来自单 step warmup，第二步达到 2e-4，随后按 cosine 衰减。
 - 状态：训练执行通过；adapter 重载生成尚待云端执行。
+# EXP-008：SFT calibration adapter 重载 smoke
+
+**日期**：2026-08-02
+
+- adapter：`outputs/sft/qwen25_coder_7b_qlora_8k/calibration_seed20260728/adapter`。
+- 结果：`adapter_reloaded=true`；题目 `taco_616bc08bca`；生成 64 tokens；completion 非空。
+- 输出特征：以中文“理解题意”分步教学结构开头，并准确引用题目函数 `between(a, b)`。
+- 结论：adapter 保存、独立重载与真实推理通过；尚未完成 Base/Adapter 固定 dev 质量对照。

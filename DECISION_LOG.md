@@ -503,3 +503,9 @@
 - **结果**：双 4090 完成 32/32 optimizer steps；平均 train loss 0.7215665，dev loss 0.6630970，无 OOM/NaN，证明 8K QLoRA + Liger 训练配置可运行。
 - **判定**：训练执行子项通过；在 adapter 独立重载和真实生成成功前，完整校准 Gate 保持未关闭。
 - **下一步**：使用保存目录 `outputs/sft/qwen25_coder_7b_qlora_8k/calibration_seed20260728/adapter` 运行重载 smoke，再决定是否进入 Base/Adapter 对照与 full SFT。
+# DEC-023：adapter 重载通过后先做固定 dev 对照
+
+- **日期**：2026-08-02
+- **证据**：校准 adapter 已独立重载，并对固定样本生成 64 tokens 非空中文教学回答。
+- **决定**：保存/重载 Gate 通过；下一步先比较 Base 与 Adapter 在固定 dev 子集上的教学结构、接口遵循和代码正确性，再决定是否启动 full SFT。
+- **边界**：`do_sample=False` 时忽略 temperature/top-p/top-k 的提示不影响确定性重载结论。

@@ -614,3 +614,8 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 共完成 32/32 optimizer steps，无 OOM、NaN 或 rank 失败；训练 runtime 580.62 秒，平均 train loss 0.7215665，吞吐 0.861 samples/s、0.055 steps/s。
 - 第 25 step 的 100 条 dev 评估 loss 为 0.6630970；逐步 loss 与 grad norm 全部有限，末步 loss 0.6023、grad norm 0.27746。
 - 训练与评估执行已通过；完整 Gate 仍需执行刚保存 adapter 的独立重载生成，并核对产物 manifest。不能在该证据完成前宣称正式 full SFT 已启动。
+## 2026-08-02：SFT calibration adapter 独立重载通过
+
+- 云端从 `outputs/sft/qwen25_coder_7b_qlora_8k/calibration_seed20260728/adapter` 独立加载 4-bit 基座与 PEFT adapter 成功。
+- 固定 smoke 题 `taco_616bc08bca` 完成 64-token 确定性生成，输出非空并保持中文分步教学格式；`adapter_reloaded=true`。
+- adapter 保存、重载与真实推理子项通过。校准 Gate 仅剩固定 dev 的 Base/Adapter 对照；对照完成前不启动 9,791 条 full SFT。

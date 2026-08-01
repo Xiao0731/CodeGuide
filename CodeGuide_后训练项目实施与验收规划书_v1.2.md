@@ -1780,3 +1780,7 @@ Codex 必须先回答：
 - 双 RTX 4090 已使用 8K QLoRA + Liger 完成固定 500 条、32 optimizer steps 校准；平均 train loss 0.7215665，100 条 dev loss 0.6630970，无 OOM/NaN。
 - SFT 训练可运行性与数值稳定性子项通过。
 - 正式 full SFT 之前剩余硬验收为：保存产物存在、adapter 独立重载并真实生成、Base/Adapter 固定 dev 对照。完成前不启动 full SFT。
+## 2026-08-02 执行状态补充：校准 adapter 重载通过
+
+- 校准 adapter 已从 4-bit 基座独立重载并完成 64-token 真实生成，保存与推理链路通过。
+- 校准阶段剩余唯一门槛为固定 dev Base/Adapter 对照；通过后方可启动 9,791 条 full SFT。
