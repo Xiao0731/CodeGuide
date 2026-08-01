@@ -454,3 +454,11 @@
 - **证据**：410 条 B 类 `recovery_wrong_answer` 的错误文本全部为 Docker daemon 连接失败，Docker Desktop 服务处于 stopped。
 - **决定**：Docker 生成前必须预检；连接失败使用 `docker_unavailable`，不记作代码错误，并允许断点恢复。
 - **影响**：避免在 verifier 不可用时先付费生成讲解，也避免把基础设施故障错误计入模型代码失败率。
+### DEC-016：以 10,340 条 accepted 快照进入 SFT 下一阶段
+
+- **日期**：2026-08-01
+- **审计范围**：10,415 条 verified TACO reference-guided 候选。
+- **结果**：10,340 accepted，75 unresolved rejected，唯一 ID 全覆盖且无交叉；accepted 接纳率 99.28%。
+- **失败隔离**：40 条教师响应失败/截断、28 条 verifier 镜像缺少 numpy、7 条超时。它们不混入训练集，也不阻塞已通过样本定版。
+- **决定**：结束正式标签生成主线，以 accepted 快照进入数据冻结、划分和 SFT 训练准备。若后续回收 75 条，必须生成新版本 manifest，不静默修改当前快照。
+- **复现标识**：accepted SHA-256 `CBFA65F00AD635654431004D8C20AD4BCB1D64EF6CFE7DB984331DB5F9E7042D`。

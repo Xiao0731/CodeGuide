@@ -1739,3 +1739,11 @@ Codex 必须先回答：
 - accepted 数只统计 accepted JSONL 的唯一 ID；“已完成”不得混同 accepted 与终态 rejected。
 - Docker verifier 必须在教师 API 请求前通过可用性预检。
 - Docker 连接失败属于可恢复基础设施故障，不属于 wrong answer；历史误分类样本恢复后重新进入 B 类。
+## 2026-08-01 阶段状态：正式 SFT 标签数据已达到进入训练条件
+
+- 候选口径：24,237 道去重 TACO 题中，仅使用 reference 离线验证 pass rate 1.0 的 10,415 题。
+- 最终状态：10,340 accepted、75 unresolved rejected；覆盖全部候选且 accepted/rejected 无重叠。
+- 接纳率：99.28%。accepted 中 standard-input 7,889、call-based 2,451；所有样本记录执行 pass rate 1.0 且 student 输入不含 reference solution。
+- 未接纳原因：教师响应失败或输出截断 40、Docker Python 镜像缺少 numpy 28、执行超时 7。
+- Gate 判定：SFT 数据构造通过。下一阶段为冻结数据 manifest、划分训练/验证集、统计 tokenizer 长度并启动 SFT；不以回收剩余 75 条作为前置条件。
+- 当前 accepted 快照 SHA-256：`CBFA65F00AD635654431004D8C20AD4BCB1D64EF6CFE7DB984331DB5F9E7042D`。

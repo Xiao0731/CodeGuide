@@ -566,3 +566,12 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 410 条所谓 `recovery_wrong_answer` 的诊断文本全部是 Docker daemon 未运行，并非 reference 或 DeepSeek 代码错误；`pass_rate=0.0` 是验证器未执行任何测试时的默认失败值。
 - 正式生成增加 Docker API 前置预检。Docker 不可用时在调用教师 API 前退出。
 - Docker 连接失败新增 `docker_unavailable` 分类；历史误分类记录按错误文本重新视为可恢复。
+## 2026-08-01：TACO reference-guided SFT 数据阶段定版审计
+
+- 全量 TACO 去重后共 24,237 题，其中 10,415 题具有离线执行完全通过（pass rate 1.0）的 Python reference，构成本轮正式生成候选集；其余 13,822 题未进入该高置信主线。
+- 正式生成结果按唯一 ID 统计为：accepted 10,340，当前 unresolved rejected 75；二者无交集、无重复，合计精确覆盖 10,415 个候选，无缺失 ID。
+- accepted 接纳率为 99.28%；10,340 条均记录 `reference_verified=true`、`pass_rate=1.0`，无坏 JSON、无缺失 messages、无空 assistant，student user 中未发现 `reference_solution` 字段泄漏。
+- accepted I/O 分布：standard-input 7,889，call-based 2,451。难度分布：easy 5,041、medium 1,061、medium_hard 1,464、hard 961、very_hard 446、unknown 1,367。
+- rejected 75 条：教师响应失败/截断 40，缺少 numpy 的运行环境错误 28，超时 7。前者可恢复，后两类暂按环境/执行隔离，不阻塞主训练集。
+- accepted 文件 SHA-256：`CBFA65F00AD635654431004D8C20AD4BCB1D64EF6CFE7DB984331DB5F9E7042D`；rejected 文件 SHA-256：`AE9149D9FED92EB235F118DB3DFEC949E069271FD37ED3CC7BDAE4BFB350B594`。
+- 阶段判定：SFT 数据构造主线通过，可以进入数据冻结、训练/验证划分与 SFT 训练准备；75 条失败样本作为隔离集合处理，不再阻塞下一阶段。
