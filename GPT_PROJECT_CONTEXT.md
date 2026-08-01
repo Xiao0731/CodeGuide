@@ -601,3 +601,10 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 云端 bitsandbytes CUDA 13 原生探针已通过。
 - 直接调用 `torchrun` 会命中conda base而不是项目 `.venv`；训练与preflight现统一使用 `python -m torch.distributed.run`。
 - 双rank绑定探针会输出每个rank的 `sys.executable`、GPU和transformers版本，解释器漂移将提前失败。
+## 2026-08-01：双 4090 首个 8K batch 显存峰值修复
+
+- 云端已完成 4-bit 模型加载并进入第一个真实 forward/backward，但在 `0/32`、尚未完成 optimizer step 时 OOM；rank 0 在交叉熵处额外申请 4.32 GiB，rank 1 在反向传播处申请 3.73 GiB。
+- 数据、DDP rank 绑定、NF4 与 PagedAdamW8bit 预检均已通过。本次失败定位为 SDPA 下 8K 序列与约 15 万词表形成完整 logits 的瞬时显存峰值，不是 canonical 数据或分布式入口故障。
+- 保持冻结的 `max_seq_length=8192` 与最长样本压力测试不变；训练改用 Liger fused linear cross-entropy，避免显式保留完整 logits，并开启 CUDA expandable segments。
+- `requirements-sft.txt` 锁定 `liger-kernel==0.8.0`；训练 manifest 将记录 Liger 开关与配置；云端 preflight 新增真实 fused-loss forward/backward 探针。
+- 下一次云端先执行 `--max-steps 1` 的最长样本探针，成功后再执行 500 条、32 optimizer steps 的完整校准。本地仍未宣称 SFT 校准通过。

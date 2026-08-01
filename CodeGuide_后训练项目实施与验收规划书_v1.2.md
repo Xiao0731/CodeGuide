@@ -1769,3 +1769,9 @@ Codex 必须先回答：
 
 - 双卡启动不得依赖PATH中的裸 `torchrun`，统一使用当前环境的 `python -m torch.distributed.run`。
 - preflight必须确认两个rank均使用项目虚拟环境解释器、可导入训练依赖并分别绑定GPU 0/1。
+## 2026-08-01 执行状态补充：8K QLoRA 首步显存修复
+
+- 双 4090 已真实完成 7B 4-bit 模型加载，但首个 8K 长 batch 在 cross-entropy/backward 阶段 OOM，尚未产生 optimizer step。
+- 8192 是冻结数据完整性的硬要求，本次不通过降长或删除长样本规避问题。
+- SFT 训练栈增加 Liger fused linear cross-entropy 与 CUDA expandable segments；preflight 必须实际编译并反传 fused kernel。
+- 恢复顺序固定为：1 step 最长样本探针 -> 500 条完整校准 -> Base/Adapter 对照。只有三者完成后，正式 full SFT Gate 才能通过。

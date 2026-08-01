@@ -50,6 +50,9 @@ training:
   fp16: false
   gradient_checkpointing: true
   gradient_checkpointing_use_reentrant: false
+  use_liger_kernel: true
+  liger_kernel_config:
+    fused_linear_cross_entropy: true
   logging_steps: 1
   eval_steps: 25
   save_steps: 25
@@ -57,4 +60,3 @@ training:
   dataloader_num_workers: 2
   ddp_find_unused_parameters: false
   report_to: none
-

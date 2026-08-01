@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import yaml
+
 from src.training.sft_data import IGNORE_INDEX, load_id_list, pad_features, stratified_sample_ids, tokenize_assistant_only
 
 
@@ -52,3 +56,14 @@ def test_load_frozen_id_manifest(tmp_path):
     path = tmp_path / "ids.json"
     path.write_text('{"count": 2, "ids": ["a", "b"]}', encoding="utf-8")
     assert load_id_list(path) == ["a", "b"]
+
+
+def test_8k_training_config_uses_fused_liger_loss():
+    config = yaml.safe_load(
+        Path("configs/sft/qwen25_coder_7b_qlora_8k.yaml").read_text(encoding="utf-8")
+    )
+    assert config["model"]["max_seq_length"] == 8192
+    assert config["training"]["use_liger_kernel"] is True
+    assert config["training"]["liger_kernel_config"] == {
+        "fused_linear_cross_entropy": True,
+    }

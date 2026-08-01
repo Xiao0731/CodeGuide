@@ -25,6 +25,8 @@ for index in range(2):
         raise SystemExit(f"GPU {index} does not satisfy RTX 4090 24GB/bf16 contract: {gpus[-1]}")
 
 versions = {name: importlib.import_module(name).__version__ for name in ("transformers", "peft", "accelerate", "bitsandbytes")}
+liger = importlib.import_module("liger_kernel")
+versions["liger_kernel"] = getattr(liger, "__version__", "unknown")
 import bitsandbytes as bnb
 from bitsandbytes.cextension import lib as bnb_lib
 if not getattr(bnb_lib, "compiled_with_cuda", False):
@@ -45,6 +47,22 @@ optimizer = bnb.optim.PagedAdamW8bit([parameter], lr=1e-3)
 optimizer.step()
 del probe, x, parameter, optimizer
 torch.cuda.empty_cache()
+
+# The first 8K calibration batch previously exhausted VRAM while materializing
+# the full vocabulary logits. Compile and backpropagate through the exact fused
+# linear cross-entropy primitive before any model download or training starts.
+from liger_kernel.transformers import LigerFusedLinearCrossEntropyLoss
+hidden = torch.randn(64, 128, device="cuda:0", dtype=torch.bfloat16, requires_grad=True)
+weight = torch.randn(512, 128, device="cuda:0", dtype=torch.bfloat16, requires_grad=True)
+target = torch.randint(0, 512, (64,), device="cuda:0")
+liger_loss = LigerFusedLinearCrossEntropyLoss()(weight, hidden, target)
+if not torch.isfinite(liger_loss):
+    raise SystemExit(f"Liger fused loss is non-finite: {liger_loss.item()}")
+liger_loss.backward()
+if hidden.grad is None or weight.grad is None:
+    raise SystemExit("Liger fused loss backward did not produce gradients")
+del hidden, weight, target, liger_loss
+torch.cuda.empty_cache()
 try:
     import flash_attn
     flash = {"available": True, "version": flash_attn.__version__}
@@ -60,7 +78,8 @@ output.mkdir(parents=True, exist_ok=True)
 
 report = {"python": sys.version, "torch": torch.__version__, "cuda": torch.version.cuda, "gpus": gpus,
           "dependencies": versions, "flash_attention": flash, "canonical_sha256": actual,
-          "bitsandbytes_cuda_probe": "passed", "disk_free_gib": round(free / 2**30, 2)}
+          "bitsandbytes_cuda_probe": "passed", "liger_fused_loss_probe": "passed",
+          "disk_free_gib": round(free / 2**30, 2)}
 Path("artifacts/sft").mkdir(parents=True, exist_ok=True)
 Path("artifacts/sft/preflight.json").write_text(json.dumps(report, indent=2) + "\n")
 print(json.dumps(report, indent=2))

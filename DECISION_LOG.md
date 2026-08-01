@@ -490,3 +490,10 @@
 - **故障**：激活 `.venv` 后直接调用 `torchrun`，PATH 命中 `/opt/conda/bin/torchrun`，两个 rank 使用 base Python，导致找不到仅安装在 venv 的 transformers。
 - **决定**：所有入口统一使用 `python -m torch.distributed.run`；preflight 的双rank探针额外导入 transformers 并输出 `sys.executable`。
 - **收益**：解释器不一致会在模型下载前 fail closed，且单卡/双卡均沿用用户当前激活环境。
+# DEC-021：8K QLoRA 使用 Liger fused linear cross-entropy
+
+- **日期**：2026-08-01
+- **证据**：双 RTX 4090 在首个长 batch 的交叉熵/反向传播阶段 OOM；每卡模型已占约 18.6--18.9 GiB，额外需要约 3.7--4.3 GiB，且尚未完成 optimizer step。
+- **决定**：不降低 8192 长度、不删除冻结长样本；启用 Transformers 原生 `use_liger_kernel`，并显式启用 `fused_linear_cross_entropy`，同时设置 CUDA expandable segments。
+- **验证门槛**：preflight 必须实际完成 Liger fused loss backward；随后先完成一个最长样本 optimizer step，再运行完整 500 条校准。
+- **边界**：当前仅完成故障修复，不能将失败运行表述为校准通过；若 fused loss 后仍 OOM，再依据实测峰值讨论 activation offload 等下一层措施。

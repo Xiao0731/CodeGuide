@@ -50,7 +50,7 @@
 SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以进入数据冻结、训练/验证划分和 SFT 训练；75 条隔离失败不应继续阻塞主线。
 # EXP-002：SFT 数据冻结、长度审计与固定划分
 
-**日期**：2026-08-01  
+**日期**：2026-08-01
 **基座 tokenizer**：`Qwen/Qwen2.5-Coder-7B-Instruct`  
 **正式输入**：10,340 条 accepted，75 条 unresolved rejected。
 
@@ -97,3 +97,14 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 根因：使用 `venv --system-site-packages` 时 `.venv/bin` 未必生成独立 torchrun console script，PATH继续命中conda base入口。
 - 修复：改用 `.venv` 当前 `python -m torch.distributed.run`，并让双rank预检验证 transformers 与解释器路径。
 - 训练状态：尚未下载完整模型、未发生 optimizer step，本次不计为校准实验。
+# EXP-006：双 4090 首次 8K QLoRA 校准 OOM
+
+**日期**：2026-08-01
+**环境**：双 RTX 4090 24 GiB；Python 3.12.4；PyTorch 2.9.0+cu130；Transformers 4.53.3；bitsandbytes 0.48.2；SDPA。
+
+- preflight、双 rank 绑定、canonical hash、固定 500/100 数据、NF4 backward 和 PagedAdamW8bit step 均通过。
+- 4 个模型分片下载完成，两个 rank 均成功加载 4-bit Qwen2.5-Coder-7B-Instruct。
+- 在训练进度 `0/32` 的首个 batch 失败：rank 0 在 cross entropy 申请 4.32 GiB 时 OOM，rank 1 在 backward 申请 3.73 GiB 时 OOM。
+- 已完成 optimizer steps：0；adapter：未生成；因此该运行不计为校准实验结果。
+- 处理：接入 `liger-kernel==0.8.0` 的 fused linear cross-entropy，开启 `expandable_segments:True`，并增加云端真实 kernel backward 预检。
+- 待复验：先运行 1 step 长样本探针，记录峰值显存、loss 与参数更新；通过后再运行完整 32 steps。

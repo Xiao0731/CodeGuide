@@ -199,11 +199,14 @@ def main() -> None:
         optim=train_cfg["optimizer"], lr_scheduler_type=train_cfg["lr_scheduler_type"], warmup_ratio=train_cfg["warmup_ratio"],
         weight_decay=train_cfg["weight_decay"], max_grad_norm=train_cfg["max_grad_norm"], bf16=train_cfg["bf16"], fp16=train_cfg["fp16"],
         gradient_checkpointing=train_cfg["gradient_checkpointing"], gradient_checkpointing_kwargs={"use_reentrant": train_cfg["gradient_checkpointing_use_reentrant"]},
+        use_liger_kernel=train_cfg.get("use_liger_kernel", False),
+        liger_kernel_config=train_cfg.get("liger_kernel_config"),
         logging_steps=train_cfg["logging_steps"], eval_strategy="steps", eval_steps=train_cfg["eval_steps"],
         save_strategy="steps", save_steps=train_cfg["save_steps"], save_total_limit=train_cfg["save_total_limit"],
         dataloader_num_workers=train_cfg["dataloader_num_workers"], group_by_length=data_cfg["group_by_length"],
         ddp_find_unused_parameters=train_cfg["ddp_find_unused_parameters"], report_to=[] if train_cfg["report_to"] == "none" else [train_cfg["report_to"]],
         seed=cfg["seed"], data_seed=cfg["data_seed"], remove_unused_columns=False,
+        label_names=["labels"],
     )
     trainer = Trainer(
         model=model, args=training_args, train_dataset=TokenizedDataset(tokenized_train),
@@ -219,6 +222,8 @@ def main() -> None:
             "canonical_sha256": actual_hash, "train_count": len(selected_train), "eval_count": len(selected_eval),
             "attention_backend": attention_backend, "supervised_tokens": supervised, "total_unpadded_tokens": total,
             "supervised_token_ratio": supervised / total, "elapsed_seconds": time.time() - started,
+            "use_liger_kernel": train_cfg.get("use_liger_kernel", False),
+            "liger_kernel_config": train_cfg.get("liger_kernel_config"),
             "train_metrics": result.metrics, "git": _git_state(), "python": platform.python_version(),
             "torch": torch.__version__, "transformers": transformers.__version__, "world_size": int(os.environ.get("WORLD_SIZE", "1")),
         }
