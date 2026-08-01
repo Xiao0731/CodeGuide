@@ -1775,3 +1775,8 @@ Codex 必须先回答：
 - 8192 是冻结数据完整性的硬要求，本次不通过降长或删除长样本规避问题。
 - SFT 训练栈增加 Liger fused linear cross-entropy 与 CUDA expandable segments；preflight 必须实际编译并反传 fused kernel。
 - 恢复顺序固定为：1 step 最长样本探针 -> 500 条完整校准 -> Base/Adapter 对照。只有三者完成后，正式 full SFT Gate 才能通过。
+## 2026-08-02 执行状态补充：500 条 SFT 校准训练完成
+
+- 双 RTX 4090 已使用 8K QLoRA + Liger 完成固定 500 条、32 optimizer steps 校准；平均 train loss 0.7215665，100 条 dev loss 0.6630970，无 OOM/NaN。
+- SFT 训练可运行性与数值稳定性子项通过。
+- 正式 full SFT 之前剩余硬验收为：保存产物存在、adapter 独立重载并真实生成、Base/Adapter 固定 dev 对照。完成前不启动 full SFT。

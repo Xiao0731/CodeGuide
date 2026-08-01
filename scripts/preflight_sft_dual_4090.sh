@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 python - <<'PY'
-import hashlib, importlib, json, os, shutil, subprocess, sys
+import hashlib, importlib, importlib.metadata, json, os, shutil, subprocess, sys
 from pathlib import Path
 
 expected = "08ef448f4be6b6b34ee2b6b7af5748827feeba0a0f36cc393350374671c86a1b"
@@ -26,7 +26,7 @@ for index in range(2):
 
 versions = {name: importlib.import_module(name).__version__ for name in ("transformers", "peft", "accelerate", "bitsandbytes")}
 liger = importlib.import_module("liger_kernel")
-versions["liger_kernel"] = getattr(liger, "__version__", "unknown")
+versions["liger_kernel"] = importlib.metadata.version("liger-kernel")
 import bitsandbytes as bnb
 from bitsandbytes.cextension import lib as bnb_lib
 if not getattr(bnb_lib, "compiled_with_cuda", False):

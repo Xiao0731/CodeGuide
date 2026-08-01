@@ -497,3 +497,9 @@
 - **决定**：不降低 8192 长度、不删除冻结长样本；启用 Transformers 原生 `use_liger_kernel`，并显式启用 `fused_linear_cross_entropy`，同时设置 CUDA expandable segments。
 - **验证门槛**：preflight 必须实际完成 Liger fused loss backward；随后先完成一个最长样本 optimizer step，再运行完整 500 条校准。
 - **边界**：当前仅完成故障修复，不能将失败运行表述为校准通过；若 fused loss 后仍 OOM，再依据实测峰值讨论 activation offload 等下一层措施。
+# DEC-022：500 条 SFT 校准训练通过，进入 adapter 重载验收
+
+- **日期**：2026-08-02
+- **结果**：双 4090 完成 32/32 optimizer steps；平均 train loss 0.7215665，dev loss 0.6630970，无 OOM/NaN，证明 8K QLoRA + Liger 训练配置可运行。
+- **判定**：训练执行子项通过；在 adapter 独立重载和真实生成成功前，完整校准 Gate 保持未关闭。
+- **下一步**：使用保存目录 `outputs/sft/qwen25_coder_7b_qlora_8k/calibration_seed20260728/adapter` 运行重载 smoke，再决定是否进入 Base/Adapter 对照与 full SFT。

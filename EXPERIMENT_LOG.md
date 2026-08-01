@@ -108,3 +108,12 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 已完成 optimizer steps：0；adapter：未生成；因此该运行不计为校准实验结果。
 - 处理：接入 `liger-kernel==0.8.0` 的 fused linear cross-entropy，开启 `expandable_segments:True`，并增加云端真实 kernel backward 预检。
 - 待复验：先运行 1 step 长样本探针，记录峰值显存、loss 与参数更新；通过后再运行完整 32 steps。
+# EXP-007：双 4090、500 条 8K QLoRA 校准训练
+
+**日期**：2026-08-02
+
+- 配置：Qwen2.5-Coder-7B-Instruct；双 RTX 4090；4-bit NF4；LoRA r=32/alpha=64；8K；Liger fused linear CE；500 train / 100 dev。
+- 结果：32/32 optimizer steps；runtime 580.62 秒；train loss 0.7215665；第 25 step eval loss 0.6630970。
+- 吞吐：0.861 train samples/s，0.055 optimizer steps/s；约 18.14 秒/step（含一次约 29.9 秒 dev 评估）。
+- 稳定性：所有记录的 loss 与 grad norm 有限，无 OOM、timeout、NCCL rank failure；首步 0 learning rate 来自单 step warmup，第二步达到 2e-4，随后按 cosine 衰减。
+- 状态：训练执行通过；adapter 重载生成尚待云端执行。

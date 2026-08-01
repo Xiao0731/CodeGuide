@@ -608,3 +608,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 保持冻结的 `max_seq_length=8192` 与最长样本压力测试不变；训练改用 Liger fused linear cross-entropy，避免显式保留完整 logits，并开启 CUDA expandable segments。
 - `requirements-sft.txt` 锁定 `liger-kernel==0.8.0`；训练 manifest 将记录 Liger 开关与配置；云端 preflight 新增真实 fused-loss forward/backward 探针。
 - 下一次云端先执行 `--max-steps 1` 的最长样本探针，成功后再执行 500 条、32 optimizer steps 的完整校准。本地仍未宣称 SFT 校准通过。
+## 2026-08-02：500 条双 4090 SFT 校准训练完成
+
+- 云端使用双 RTX 4090、Qwen2.5-Coder-7B-Instruct、4-bit NF4 QLoRA、8K 序列与 Liger fused linear cross-entropy，完成固定 500 条训练和 100 条 dev 的完整校准。
+- 共完成 32/32 optimizer steps，无 OOM、NaN 或 rank 失败；训练 runtime 580.62 秒，平均 train loss 0.7215665，吞吐 0.861 samples/s、0.055 steps/s。
+- 第 25 step 的 100 条 dev 评估 loss 为 0.6630970；逐步 loss 与 grad norm 全部有限，末步 loss 0.6023、grad norm 0.27746。
+- 训练与评估执行已通过；完整 Gate 仍需执行刚保存 adapter 的独立重载生成，并核对产物 manifest。不能在该证据完成前宣称正式 full SFT 已启动。
