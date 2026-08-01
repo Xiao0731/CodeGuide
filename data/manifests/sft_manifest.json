@@ -1,0 +1,421 @@
+{
+  "schema_version": "codeguide-sft-freeze-v1",
+  "generated_at_utc": "2026-08-01T13:54:29.436820+00:00",
+  "canonical_sft": "data/final/sft_accepted.jsonl",
+  "source_bank": "data/final/taco_verified_source_bank.jsonl.zst",
+  "accepted_total": 10306,
+  "all_validated_accepted_total": 10340,
+  "canonical_stats": {
+    "records": 10306,
+    "input_duplicate_records": 0,
+    "conflicting_problem_ids": 0,
+    "conflict_rule": "retain last formal accepted record and report conflict",
+    "metadata_backfills": {
+      "label_strategy": 1323,
+      "code_source": 10340
+    },
+    "warnings": {
+      "standard_input_no_obvious_io_token": 14
+    },
+    "label_strategy": {
+      "pedagogical_rewrite": 6892,
+      "reference_locked": 3414
+    },
+    "io_mode": {
+      "call_based": 2450,
+      "standard_input": 7856
+    },
+    "difficulty": {
+      "easy": 5039,
+      "hard": 954,
+      "medium": 1055,
+      "medium_hard": 1457,
+      "unknown_difficulty": 1360,
+      "very_hard": 441
+    },
+    "source": {
+      "aizu": 878,
+      "atcoder": 968,
+      "codechef": 1649,
+      "codeforces": 3549,
+      "codewars": 2070,
+      "geeksforgeeks": 3,
+      "hackerearth": 166,
+      "hackerrank": 645,
+      "leetcode": 378
+    },
+    "assistant_char_length": {
+      "min": 631,
+      "p50": 3597,
+      "p90": 6416,
+      "p95": 7568,
+      "p99": 10732,
+      "max": 416398,
+      "mean": 4032.84
+    },
+    "code_char_length": {
+      "min": 56,
+      "p50": 634,
+      "p90": 1550,
+      "p95": 1954,
+      "p99": 3312,
+      "max": 412728,
+      "mean": 858.38
+    },
+    "all_validated_records": 10340,
+    "length_excluded_records": 34
+  },
+  "source_bank_stats": {
+    "records": 10415,
+    "duplicate_raw_rows_ignored": 110,
+    "duplicate_problem_ids": 94
+  },
+  "rejected": {
+    "records": 75,
+    "unique_ids": 75,
+    "failure_types": {
+      "recovery_llm_failed": 40,
+      "recovery_runtime_error": 28,
+      "recovery_timeout": 7
+    },
+    "io_mode": {
+      "call_based": 12,
+      "standard_input": 63
+    },
+    "difficulty": {
+      "easy": 26,
+      "hard": 8,
+      "medium": 9,
+      "medium_hard": 8,
+      "unknown_difficulty": 10,
+      "very_hard": 14
+    }
+  },
+  "verifier": {
+    "implementation": "src/reward/execution.py::verify_code",
+    "container_image": "python:3.11.9-slim-bookworm@sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317"
+  },
+  "verification_evidence": {
+    "cache_reused": 10340,
+    "actually_reverified_during_freeze": 20,
+    "source_bank_sample_report": "data/manifests/source_bank_verification.json"
+  },
+  "length_policy": {
+    "stats": "data/manifests/token_length_stats_all_validated.json",
+    "excluded": "data/manifests/sft_length_excluded.json",
+    "excluded_count": 34,
+    "rule": "no right truncation that can damage final code"
+  },
+  "data_sources": {
+    "accepted": "data/sft_train_ref_label_accepted.jsonl",
+    "rejected": "data/sft_train_ref_label_rejected.jsonl",
+    "reference_cache": "data/cache/taco_reference_verification_train_full.jsonl",
+    "taco_train": "data/raw/TACO/ALL/train-*.parquet"
+  },
+  "dedup_key": "problem_id",
+  "conflict_rule": "retain last formal accepted record and report conflict",
+  "seed": 20260728,
+  "git_commit_at_generation": "3411225ca7d4ca967377a46a57cc7459cb7a022d",
+  "splits": {
+    "sft_train": {
+      "path": "data/splits/sft_train_ids.json",
+      "count": 9791,
+      "sha256": "75edea00b2fbb169bcabd7ceb6d9476f716558ec84b03c427de655827fff71f7"
+    },
+    "sft_dev": {
+      "path": "data/splits/sft_dev_ids.json",
+      "count": 515,
+      "sha256": "170cfe18d37b08fb0f3342edaf60eeed1348905b2c893f2adec91280a4647c28"
+    },
+    "grpo_train": {
+      "path": "data/splits/grpo_train_ids.json",
+      "count": 900,
+      "sha256": "8e7d58f37d6834f4df543ce2eae8f939606ec55c42d714885a7a910ee0e1b642"
+    },
+    "grpo_validation": {
+      "path": "data/splits/grpo_validation_ids.json",
+      "count": 100,
+      "sha256": "e35c04d3ea5eb843c18775f57ba67120028663b5823a70b53b550fcb77e0ea97"
+    }
+  },
+  "files": {
+    "canonical_sft": {
+      "path": "data/final/sft_accepted.jsonl",
+      "bytes": 111154948,
+      "sha256": "08ef448f4be6b6b34ee2b6b7af5748827feeba0a0f36cc393350374671c86a1b"
+    },
+    "all_validated_sft": {
+      "path": "data/final/sft_accepted_all_validated.jsonl",
+      "bytes": 112539164,
+      "sha256": "6ad8467e350f7052ae073aac3ec567f6c3ac3a9daf21532f030035415b572d9f"
+    },
+    "source_bank": {
+      "path": "data/final/taco_verified_source_bank.jsonl.zst",
+      "bytes": 229156905,
+      "sha256": "b74eae83bb538f1a1fb3af24425da8f5f14305dc89a291cf37498e7f590ebda5"
+    },
+    "length_excluded": {
+      "path": "data/manifests/sft_length_excluded.json",
+      "bytes": 4105,
+      "sha256": "2b74cba61db9dcffc030f5e01cbf163129c69d9bd19cf0bc3b2db27736d45d21"
+    },
+    "accepted_input": {
+      "path": "data/sft_train_ref_label_accepted.jsonl",
+      "bytes": 950109123,
+      "sha256": "cbfa65f00ad635654431004d8c20ad4bcb1d64ef6cfe7db984331db5f9e7042d"
+    },
+    "rejected_input": {
+      "path": "data/sft_train_ref_label_rejected.jsonl",
+      "bytes": 50647,
+      "sha256": "ae9149d9fed92eb235f118db3dfec949e069271fd37ed3cc7bdae4bfb350b594"
+    },
+    "reference_cache": {
+      "path": "data/cache/taco_reference_verification_train_full.jsonl",
+      "bytes": 445348429,
+      "sha256": "cb0168dd541c051c6857409d5cdb472edeb3002b67cacd95ca19650d043c3ecd"
+    },
+    "token_length_stats": {
+      "path": "data/manifests/token_length_stats.json",
+      "bytes": 1142928,
+      "sha256": "b9a8e22d7b2f694a8b3ed4fa4cab1dba7272e1154059f579d0a86d2cbe1896ac"
+    },
+    "source_bank_verification": {
+      "path": "data/manifests/source_bank_verification.json",
+      "bytes": 7173,
+      "sha256": "3027a7930f1a06a73845dc9d7c773b134a883503aee4a8f0f441ccf4790fa96f"
+    }
+  },
+  "token_length_audit": {
+    "path": "data/manifests/token_length_stats.json",
+    "sha256": "b9a8e22d7b2f694a8b3ed4fa4cab1dba7272e1154059f579d0a86d2cbe1896ac",
+    "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+    "chat_template_sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f",
+    "recommended_max_seq_length": 8192,
+    "overall": {
+      "count": 10306,
+      "prompt_tokens": {
+        "count": 10306,
+        "p50": 600,
+        "p75": 774,
+        "p90": 948,
+        "p95": 1088,
+        "p99": 1453,
+        "max": 4208,
+        "mean": 634.97
+      },
+      "completion_tokens": {
+        "count": 10306,
+        "p50": 1956,
+        "p75": 2694,
+        "p90": 3608,
+        "p95": 4231,
+        "p99": 5952,
+        "max": 7549,
+        "mean": 2197.74
+      },
+      "full_tokens": {
+        "count": 10306,
+        "p50": 2603,
+        "p75": 3427,
+        "p90": 4398,
+        "p95": 5062,
+        "p99": 6728,
+        "max": 8173,
+        "mean": 2832.71
+      },
+      "thresholds": {
+        "2048": {
+          "over_count": 7389,
+          "over_ratio": 0.716961,
+          "code_harmed_count": 6842,
+          "code_harmed_ratio": 0.663885,
+          "code_missing_count": 5694,
+          "code_partial_count": 1148
+        },
+        "4096": {
+          "over_count": 1350,
+          "over_ratio": 0.130992,
+          "code_harmed_count": 1276,
+          "code_harmed_ratio": 0.123811,
+          "code_missing_count": 758,
+          "code_partial_count": 518
+        },
+        "6144": {
+          "over_count": 172,
+          "over_ratio": 0.016689,
+          "code_harmed_count": 168,
+          "code_harmed_ratio": 0.016301,
+          "code_missing_count": 98,
+          "code_partial_count": 70
+        },
+        "8192": {
+          "over_count": 0,
+          "over_ratio": 0.0,
+          "code_harmed_count": 0,
+          "code_harmed_ratio": 0.0,
+          "code_missing_count": 0,
+          "code_partial_count": 0
+        }
+      }
+    },
+    "all_validated_path": "data/manifests/token_length_stats_all_validated.json",
+    "all_validated_sha256": "7b7e42f945a810e713e92c4d112d4af0e1d48482329ee716634cbefe4e513454"
+  },
+  "source_bank_verification": {
+    "path": "data/manifests/source_bank_verification.json",
+    "sha256": "3027a7930f1a06a73845dc9d7c773b134a883503aee4a8f0f441ccf4790fa96f",
+    "sample_size": 20,
+    "passed": 20,
+    "failed": 0,
+    "container_image": "python:3.11.9-slim-bookworm@sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317"
+  },
+  "split_audit": {
+    "sft_train": {
+      "count": 9791,
+      "sha256": "75edea00b2fbb169bcabd7ceb6d9476f716558ec84b03c427de655827fff71f7",
+      "distribution": {
+        "difficulty": {
+          "easy": 4788,
+          "hard": 906,
+          "medium": 1003,
+          "medium_hard": 1382,
+          "unknown_difficulty": 1292,
+          "very_hard": 420
+        },
+        "io_mode": {
+          "call_based": 2328,
+          "standard_input": 7463
+        },
+        "label_strategy": {
+          "pedagogical_rewrite": 6548,
+          "reference_locked": 3243
+        },
+        "source": {
+          "aizu": 834,
+          "atcoder": 920,
+          "codechef": 1567,
+          "codeforces": 3371,
+          "codewars": 1967,
+          "geeksforgeeks": 3,
+          "hackerearth": 158,
+          "hackerrank": 612,
+          "leetcode": 359
+        }
+      }
+    },
+    "sft_dev": {
+      "count": 515,
+      "sha256": "170cfe18d37b08fb0f3342edaf60eeed1348905b2c893f2adec91280a4647c28",
+      "distribution": {
+        "difficulty": {
+          "easy": 251,
+          "hard": 48,
+          "medium": 52,
+          "medium_hard": 75,
+          "unknown_difficulty": 68,
+          "very_hard": 21
+        },
+        "io_mode": {
+          "call_based": 122,
+          "standard_input": 393
+        },
+        "label_strategy": {
+          "pedagogical_rewrite": 344,
+          "reference_locked": 171
+        },
+        "source": {
+          "aizu": 44,
+          "atcoder": 48,
+          "codechef": 82,
+          "codeforces": 178,
+          "codewars": 103,
+          "hackerearth": 8,
+          "hackerrank": 33,
+          "leetcode": 19
+        }
+      }
+    },
+    "grpo_train": {
+      "count": 900,
+      "sha256": "8e7d58f37d6834f4df543ce2eae8f939606ec55c42d714885a7a910ee0e1b642",
+      "distribution": {
+        "difficulty": {
+          "easy": 439,
+          "hard": 83,
+          "medium": 93,
+          "medium_hard": 128,
+          "unknown_difficulty": 118,
+          "very_hard": 39
+        },
+        "io_mode": {
+          "call_based": 215,
+          "standard_input": 685
+        },
+        "label_strategy": {
+          "pedagogical_rewrite": 602,
+          "reference_locked": 298
+        },
+        "source": {
+          "aizu": 76,
+          "atcoder": 86,
+          "codechef": 143,
+          "codeforces": 310,
+          "codewars": 182,
+          "hackerearth": 14,
+          "hackerrank": 56,
+          "leetcode": 33
+        }
+      }
+    },
+    "grpo_validation": {
+      "count": 100,
+      "sha256": "e35c04d3ea5eb843c18775f57ba67120028663b5823a70b53b550fcb77e0ea97",
+      "distribution": {
+        "difficulty": {
+          "easy": 48,
+          "hard": 9,
+          "medium": 10,
+          "medium_hard": 15,
+          "unknown_difficulty": 13,
+          "very_hard": 5
+        },
+        "io_mode": {
+          "call_based": 23,
+          "standard_input": 77
+        },
+        "label_strategy": {
+          "pedagogical_rewrite": 68,
+          "reference_locked": 32
+        },
+        "source": {
+          "aizu": 8,
+          "atcoder": 10,
+          "codechef": 16,
+          "codeforces": 35,
+          "codewars": 19,
+          "hackerearth": 1,
+          "hackerrank": 7,
+          "leetcode": 4
+        }
+      }
+    },
+    "checks": {
+      "sft_train_dev_overlap": 0,
+      "sft_coverage": 10306,
+      "grpo_train_outside_sft_train": 0,
+      "grpo_validation_outside_sft_dev": 0,
+      "deterministic_rerun_hash_match": true,
+      "taco_test_overlap": 0
+    }
+  },
+  "taco_train_test_overlap": {
+    "taco_test_rows": 1000,
+    "taco_test_unique_problem_ids": 997,
+    "canonical_overlap_count": 0,
+    "overlap_ids": []
+  },
+  "asset_inventory": {
+    "path": "data/manifests/data_asset_inventory.json",
+    "sha256": "0f4e05f5dbe51b0da0363c8c02de0c2bcdfc707cf3afd060f4e759c1f9648a62"
+  }
+}

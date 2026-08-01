@@ -21,9 +21,13 @@ from pathlib import Path
 from typing import List, Optional
 
 # 匹配 ```python ... ``` 或 ``` ... ```（宽松）
-_CODE_FENCE_RE = re.compile(
-    r"```(?:python3?|py)?\s*\n(.*?)```",
-    re.DOTALL | re.IGNORECASE,
+_PYTHON_FENCE_RE = re.compile(
+    r"^[ \t]*```(?:python3?|py)[ \t]*\r?\n(.*?)^[ \t]*```[ \t]*$",
+    re.DOTALL | re.IGNORECASE | re.MULTILINE,
+)
+_UNTAGGED_FENCE_RE = re.compile(
+    r"^[ \t]*```[ \t]*\r?\n(.*?)^[ \t]*```[ \t]*$",
+    re.DOTALL | re.MULTILINE,
 )
 
 # 执行超时（秒）
@@ -48,7 +52,12 @@ def extract_code(text: str) -> Optional[str]:
     优先找 ```python```，其次找任意 ``` 块。
     返回代码字符串（已去首尾空行），找不到返回 None。
     """
-    matches = _CODE_FENCE_RE.findall(text)
+    # Prefer explicit Python fences. Keeping this separate from the untagged
+    # fallback prevents a non-Python block's closing fence from being treated
+    # as the opening fence of pseudocode.
+    matches = _PYTHON_FENCE_RE.findall(text)
+    if not matches:
+        matches = _UNTAGGED_FENCE_RE.findall(text)
     if not matches:
         return None
     return matches[-1].strip()

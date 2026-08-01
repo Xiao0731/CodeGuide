@@ -462,3 +462,12 @@
 - **失败隔离**：40 条教师响应失败/截断、28 条 verifier 镜像缺少 numpy、7 条超时。它们不混入训练集，也不阻塞已通过样本定版。
 - **决定**：结束正式标签生成主线，以 accepted 快照进入数据冻结、划分和 SFT 训练准备。若后续回收 75 条，必须生成新版本 manifest，不静默修改当前快照。
 - **复现标识**：accepted SHA-256 `CBFA65F00AD635654431004D8C20AD4BCB1D64EF6CFE7DB984331DB5F9E7042D`。
+# DEC-017：冻结 10,306 条 canonical SFT 并采用 8K 正式训练长度
+
+- **日期**：2026-08-01
+- **输入**：10,340 条已接纳且具有执行通过证据的教学样本。
+- **决定**：保留完整质量通过快照，同时将 34 条超过 8192 tokens 的极端样本隔离；正式 canonical 固定为 10,306 条，不对最终代码做右截断。
+- **依据**：Qwen2.5-Coder-7B-Instruct 正式 chat template 下 canonical 最大长度 8,173；4096 会影响 13.10% 样本并主要伤及代码块，8192 下截断数为 0。
+- **划分**：固定种子 20260728，SFT train/dev=9,791/515；未来 GRPO prompt ID=900/100，所有集合通过无泄漏与可复现 hash 检查。
+- **溯源**：建立 10,415 条独立 verified source bank，抽样 20 条从压缩母库读取 reference/tests 后用固定 Docker verifier 复验，20/20 通过。
+- **发布边界**：代码、manifest、报告与固定 ID 可进入 Git；canonical、source bank、原始 TACO、验证缓存及密钥不得进入 Git。

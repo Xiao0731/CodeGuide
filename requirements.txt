@@ -35,6 +35,9 @@ numpy>=1.26.0
 pandas>=2.2.0
 tqdm>=4.66.0
 jsonlines>=4.0.0
+zstandard>=0.23.0       # verified source bank (.jsonl.zst)
+transformers>=4.47.0    # tokenizer audit and training chat template
+jinja2>=3.1.0           # render the model's official chat template
 
 # --- 代码执行（在线 judge 奖励） ---
 pytest>=8.0.0

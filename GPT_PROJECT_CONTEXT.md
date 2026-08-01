@@ -575,3 +575,12 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - rejected 75 条：教师响应失败/截断 40，缺少 numpy 的运行环境错误 28，超时 7。前者可恢复，后两类暂按环境/执行隔离，不阻塞主训练集。
 - accepted 文件 SHA-256：`CBFA65F00AD635654431004D8C20AD4BCB1D64EF6CFE7DB984331DB5F9E7042D`；rejected 文件 SHA-256：`AE9149D9FED92EB235F118DB3DFEC949E069271FD37ED3CC7BDAE4BFB350B594`。
 - 阶段判定：SFT 数据构造主线通过，可以进入数据冻结、训练/验证划分与 SFT 训练准备；75 条失败样本作为隔离集合处理，不再阻塞下一阶段。
+# 2026-08-01 数据冻结与训练前审计
+
+- 冻结后的 canonical SFT 为 `data/final/sft_accepted.jsonl`，共 10,306 条，SHA256 为 `08ef448f4be6b6b34ee2b6b7af5748827feeba0a0f36cc393350374671c86a1b`。
+- 完整质量通过快照有 10,340 条；其中 34 条因正式 Qwen chat template 长度超过 8192 被隔离，未截断后混入 canonical。
+- A 类 `pedagogical_rewrite` 6,892 条，B 类 `reference_locked` 3,414 条；standard-input 7,856 条，call-based 2,450 条。
+- 独立 verified source bank 共 10,415 条，保存题面、完整测试、选中 reference、hash 与原始行溯源；固定 Docker 抽样复验 20/20 通过。
+- 使用 `Qwen/Qwen2.5-Coder-7B-Instruct` 正式 chat template 审计：完整序列 P50=2,603、P95=5,062、P99=6,728、max=8,173，正式 SFT 推荐 `max_seq_length=8192`。
+- 固定种子 20260728：SFT train/dev 为 9,791/515；预留 GRPO train/validation 为 900/100。划分无交叉、覆盖全部 canonical，且与 TACO test 重叠为 0。
+- canonical 和 source bank 属于大数据产物，不进入 Git；通过 `data/manifests/sft_manifest.json` 的路径与 SHA256 管理，云端需单独同步并校验。

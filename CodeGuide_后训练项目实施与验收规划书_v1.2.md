@@ -1747,3 +1747,10 @@ Codex 必须先回答：
 - 未接纳原因：教师响应失败或输出截断 40、Docker Python 镜像缺少 numpy 28、执行超时 7。
 - Gate 判定：SFT 数据构造通过。下一阶段为冻结数据 manifest、划分训练/验证集、统计 tokenizer 长度并启动 SFT；不以回收剩余 75 条作为前置条件。
 - 当前 accepted 快照 SHA-256：`CBFA65F00AD635654431004D8C20AD4BCB1D64EF6CFE7DB984331DB5F9E7042D`。
+# 2026-08-01 执行状态补充：数据冻结完成
+
+- canonical SFT 已固定为 10,306 条，SHA256：`08ef448f4be6b6b34ee2b6b7af5748827feeba0a0f36cc393350374671c86a1b`。
+- 固定 SFT train/dev ID 为 9,791/515，随机种子 20260728，不允许训练脚本重新随机切分。
+- 正式基座为 `Qwen/Qwen2.5-Coder-7B-Instruct`，正式 chat template 下最大序列长度 8,173，SFT `max_seq_length` 固定为 8192。
+- 34 条超过 8K 的质量通过样本保留在隔离清单，不进入当前 canonical，也不得通过截断重新混入。
+- 下一有效阶段调整为“QLoRA SFT 训练管线落地与500条云端校准”；本地只完成数据、collator、配置、preflight 和入口验证，不下载完整7B权重。

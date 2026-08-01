@@ -48,3 +48,23 @@
 ### 结论
 
 SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以进入数据冻结、训练/验证划分和 SFT 训练；75 条隔离失败不应继续阻塞主线。
+# EXP-002：SFT 数据冻结、长度审计与固定划分
+
+**日期**：2026-08-01  
+**基座 tokenizer**：`Qwen/Qwen2.5-Coder-7B-Instruct`  
+**正式输入**：10,340 条 accepted，75 条 unresolved rejected。
+
+## 结果
+
+- canonical 10,306 条；34 条超过 8K 的极端长样本隔离，不截断代码。
+- canonical SHA256：`08ef448f4be6b6b34ee2b6b7af5748827feeba0a0f36cc393350374671c86a1b`。
+- 长度 P50/P95/P99/max：2,603 / 5,062 / 6,728 / 8,173 tokens。
+- 4096 截断 1,350 条（13.10%），8192 截断 0 条，因此选择 8192。
+- source bank 10,415 条，SHA256：`b74eae83bb538f1a1fb3af24425da8f5f14305dc89a291cf37498e7f590ebda5`；Docker 抽样复验 20/20。
+- 固定 SFT train/dev=9,791/515；重复划分 hash 完全一致，train/dev 与 TACO test 均无泄漏。
+
+## 风险与应对
+
+- 14 条 standard-input 没有明显 I/O 关键词，但具有执行通过证据，保留并记录警告。
+- 1,360 条难度为 unknown，训练可用，难度消融时单独报告。
+- 旧代码提取器可能把非 Python 代码围栏识别成最终代码；已改为优先提取最后一个显式 Python 围栏并加入回归测试。

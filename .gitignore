@@ -22,14 +22,22 @@ models/
 data/raw/
 data/distilled/
 data/cache/
+data/final/
 data/processed/
 data/splits/
+!data/splits/
+data/splits/*
+!data/splits/sft_train_ids.json
+!data/splits/sft_dev_ids.json
+!data/splits/grpo_train_ids.json
+!data/splits/grpo_validation_ids.json
 data/*.parquet
 data/*.arrow
 data/tmp_*.py
 # 只提交小规模 smoke；正式生成数据通过 manifest/hash 追踪。
 data/sft_train*.jsonl
 !data/sft_train_smoke*.jsonl
+data/*.jsonl.tmp
 
 # 实验日志
 logs/

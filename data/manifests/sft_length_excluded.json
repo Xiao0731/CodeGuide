@@ -1,0 +1,177 @@
+{
+  "schema_version": "codeguide-sft-freeze-v1",
+  "policy": "exclude samples exceeding recommended max_seq_length; never truncate final code",
+  "count": 34,
+  "samples": [
+    {
+      "problem_id": "taco_0894e167e8",
+      "full_tokens": 9222,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_0eb4f5ee41",
+      "full_tokens": 15970,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_137064792c",
+      "full_tokens": 9133,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_15bc28097b",
+      "full_tokens": 8653,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_19a55acbd1",
+      "full_tokens": 18737,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_2244aa1a5c",
+      "full_tokens": 8474,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_24cdf4a577",
+      "full_tokens": 8576,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_2b0161772a",
+      "full_tokens": 9240,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_2e74ec6330",
+      "full_tokens": 405806,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_39cf6ad908",
+      "full_tokens": 8590,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_3c26ae22c0",
+      "full_tokens": 8518,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_3ca5ada95b",
+      "full_tokens": 10064,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_3fd14e7831",
+      "full_tokens": 9103,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_42be1c5e7e",
+      "full_tokens": 8714,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_51662df545",
+      "full_tokens": 8871,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_5233caf3a3",
+      "full_tokens": 8919,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_605a69ef21",
+      "full_tokens": 8363,
+      "code_status": "preserved"
+    },
+    {
+      "problem_id": "taco_749b168fa2",
+      "full_tokens": 9774,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_86eb2dd327",
+      "full_tokens": 8474,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_9bcf592c2a",
+      "full_tokens": 8791,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_9cccb4d945",
+      "full_tokens": 9000,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_aa4dde235d",
+      "full_tokens": 9847,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_ad3331354c",
+      "full_tokens": 8893,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_b17fd79163",
+      "full_tokens": 47643,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_bdf4665fce",
+      "full_tokens": 8250,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_c2511121ad",
+      "full_tokens": 8261,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_c8487e0607",
+      "full_tokens": 8466,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_d360bfeffb",
+      "full_tokens": 15189,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_d66bde4192",
+      "full_tokens": 8329,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_d9c026378d",
+      "full_tokens": 8560,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_dbf1906caa",
+      "full_tokens": 8829,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_e3312bedc5",
+      "full_tokens": 8887,
+      "code_status": "missing"
+    },
+    {
+      "problem_id": "taco_e442275e42",
+      "full_tokens": 8404,
+      "code_status": "partial"
+    },
+    {
+      "problem_id": "taco_ed0c2935dc",
+      "full_tokens": 8777,
+      "code_status": "partial"
+    }
+  ]
+}
