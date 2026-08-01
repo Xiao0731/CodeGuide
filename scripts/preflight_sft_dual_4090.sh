@@ -66,13 +66,9 @@ Path("artifacts/sft/preflight.json").write_text(json.dumps(report, indent=2) + "
 print(json.dumps(report, indent=2))
 PY
 
-torchrun --standalone --nproc_per_node=2 - <<'PY'
-import os, torch
-rank = int(os.environ["LOCAL_RANK"])
-torch.cuda.set_device(rank)
-assert torch.cuda.current_device() == rank
-print(f"rank={rank} device={torch.cuda.get_device_name(rank)}")
-PY
+echo "active_python=$(python -c 'import sys; print(sys.executable)')"
+python -m torch.distributed.run --standalone --nproc_per_node=2 \
+  scripts/check_distributed_binding.py
 
 python -m src.training.train_sft --validate-only --mode calibration
 echo "dual-4090 SFT preflight passed"

@@ -88,3 +88,12 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 根因：项目依赖上限 `<0.48` 排除了首个正式支持CUDA 13的bitsandbytes版本；包导入过程内部记录异常但未让外层脚本失败。
 - 修复：依赖改为 `>=0.48.2,<0.49`，preflight 增加真实 NF4 backward 与8-bit optimizer step。
 - 未计为训练结果：本次尚未加载7B或执行校准 optimizer step。
+# EXP-005：云端 torchrun 解释器漂移
+
+**日期**：2026-08-01
+
+- preflight 原生算子通过：bitsandbytes 0.48.2、NF4和PagedAdamW8bit正常。
+- 校准启动失败：`/opt/conda/bin/torchrun` 拉起 base Python，两个rank均报 `ModuleNotFoundError: transformers`。
+- 根因：使用 `venv --system-site-packages` 时 `.venv/bin` 未必生成独立 torchrun console script，PATH继续命中conda base入口。
+- 修复：改用 `.venv` 当前 `python -m torch.distributed.run`，并让双rank预检验证 transformers 与解释器路径。
+- 训练状态：尚未下载完整模型、未发生 optimizer step，本次不计为校准实验。

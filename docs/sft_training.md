@@ -31,7 +31,9 @@ bash scripts/run_sft_calibration_dual_4090.sh
 PagedAdamW8bit step，不能仅凭 Python 包可导入判定兼容。
 
 若 FlashAttention 2 不可用，`attention_backend: auto` 会显式记录并回退到 PyTorch SDPA。
-训练使用普通 DDP，每个进程绑定一张 GPU，不使用 `device_map="auto"`。输出仅包含 LoRA adapter、checkpoint、tokenizer/config 和 run manifest。
+训练使用普通 DDP，每个进程绑定一张 GPU，不使用 `device_map="auto"`。分布式入口固定为
+`python -m torch.distributed.run`，确保继承当前激活虚拟环境；不能直接调用 PATH 中可能来自
+base conda 的 `torchrun`。输出仅包含 LoRA adapter、checkpoint、tokenizer/config 和 run manifest。
 
 恢复校准训练：
 
@@ -51,7 +53,7 @@ bash scripts/eval_sft_calibration.sh \
 正式全量入口已经准备，但只有500条校准达到验收门槛后才可执行：
 
 ```bash
-torchrun --standalone --nproc_per_node=2 -m src.training.train_sft \
+python -m torch.distributed.run --standalone --nproc_per_node=2 -m src.training.train_sft \
   --config configs/sft/qwen25_coder_7b_qlora_8k.yaml --mode full \
   --output-dir outputs/sft/qwen25_coder_7b_qlora_8k/full_seed20260728
 ```

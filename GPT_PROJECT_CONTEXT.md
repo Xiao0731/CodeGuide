@@ -596,3 +596,8 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 双RTX 4090、CUDA、canonical hash和固定split已在云端确认。
 - 云镜像为 PyTorch 2.9.0+cu130；bitsandbytes 0.47.0不含CUDA 13原生库，因此QLoRA不可运行。
 - 依赖升级至bitsandbytes 0.48.2系列，并将 preflight 改为真实执行NF4前后向和PagedAdamW8bit更新，杜绝import假通过。
+# 2026-08-01 云端分布式解释器修复
+
+- 云端 bitsandbytes CUDA 13 原生探针已通过。
+- 直接调用 `torchrun` 会命中conda base而不是项目 `.venv`；训练与preflight现统一使用 `python -m torch.distributed.run`。
+- 双rank绑定探针会输出每个rank的 `sys.executable`、GPU和transformers版本，解释器漂移将提前失败。

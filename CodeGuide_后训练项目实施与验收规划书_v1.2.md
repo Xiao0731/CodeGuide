@@ -1765,3 +1765,7 @@ Codex 必须先回答：
 - 云端实际环境为 PyTorch 2.9.0+cu130；bitsandbytes 0.47.0缺少CUDA 13原生库，首次preflight是假通过，未进入训练。
 - CUDA 13下bitsandbytes最低采用0.48系列；preflight新增NF4前后向和PagedAdamW8bit真实算子探针。
 - 只有原生算子探针、双rank绑定和数据校验均通过，才允许启动500条校准。
+# 2026-08-01 云端分布式入口补充
+
+- 双卡启动不得依赖PATH中的裸 `torchrun`，统一使用当前环境的 `python -m torch.distributed.run`。
+- preflight必须确认两个rank均使用项目虚拟环境解释器、可导入训练依赖并分别绑定GPU 0/1。

@@ -484,3 +484,9 @@
 - **故障**：云端 `torch 2.9.0+cu130` 搭配 bitsandbytes 0.47.0，缺少 `libbitsandbytes_cuda130.so`；旧 preflight 因包导入时内部吞掉异常而错误报告通过。
 - **决定**：CUDA 13 环境锁定 `bitsandbytes>=0.48.2,<0.49`，不为此重装 PyTorch；preflight 必须实际执行 NF4 Linear 前后向和 PagedAdamW8bit step。
 - **结果边界**：双卡、canonical hash、split 已通过；只有新版原生探针通过后才允许开始校准训练。
+# DEC-020：分布式启动器必须继承当前虚拟环境解释器
+
+- **日期**：2026-08-01
+- **故障**：激活 `.venv` 后直接调用 `torchrun`，PATH 命中 `/opt/conda/bin/torchrun`，两个 rank 使用 base Python，导致找不到仅安装在 venv 的 transformers。
+- **决定**：所有入口统一使用 `python -m torch.distributed.run`；preflight 的双rank探针额外导入 transformers 并输出 `sys.executable`。
+- **收益**：解释器不一致会在模型下载前 fail closed，且单卡/双卡均沿用用户当前激活环境。
