@@ -471,3 +471,10 @@
 - **划分**：固定种子 20260728，SFT train/dev=9,791/515；未来 GRPO prompt ID=900/100，所有集合通过无泄漏与可复现 hash 检查。
 - **溯源**：建立 10,415 条独立 verified source bank，抽样 20 条从压缩母库读取 reference/tests 后用固定 Docker verifier 复验，20/20 通过。
 - **发布边界**：代码、manifest、报告与固定 ID 可进入 Git；canonical、source bank、原始 TACO、验证缓存及密钥不得进入 Git。
+# DEC-018：SFT 使用显式 assistant-only labels 与标准 PEFT DDP
+
+- **日期**：2026-08-01
+- **决定**：废弃旧入口中随机切分和 `train_on_responses_only` 字符串模板猜测，改用冻结 ID、正式 chat template token 前缀边界和显式 labels。
+- **训练栈**：Transformers + PEFT + bitsandbytes，普通双进程 DDP；每个 rank 显式加载一份4-bit模型到对应 GPU，不使用 `device_map=auto`，不允许CPU或全参数静默回退。
+- **校准**：固定500条 train 与100条 dev sanity subset，先完成1 epoch云端校准，未过门槛不得启动9,791条 full SFT。
+- **长度**：8192硬门槛，任何超长样本直接报错，不允许静默截断代码。

@@ -14,6 +14,7 @@ build/
 # 模型权重（体积大，用 Git LFS 或外部存储）
 checkpoints/
 models/
+outputs/
 *.bin
 *.safetensors
 *.gguf
@@ -31,6 +32,7 @@ data/splits/*
 !data/splits/sft_dev_ids.json
 !data/splits/grpo_train_ids.json
 !data/splits/grpo_validation_ids.json
+!data/splits/sft_calibration_500_ids.json
 data/*.parquet
 data/*.arrow
 data/tmp_*.py

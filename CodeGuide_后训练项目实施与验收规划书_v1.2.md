@@ -1754,3 +1754,9 @@ Codex 必须先回答：
 - 正式基座为 `Qwen/Qwen2.5-Coder-7B-Instruct`，正式 chat template 下最大序列长度 8,173，SFT `max_seq_length` 固定为 8192。
 - 34 条超过 8K 的质量通过样本保留在隔离清单，不进入当前 canonical，也不得通过截断重新混入。
 - 下一有效阶段调整为“QLoRA SFT 训练管线落地与500条云端校准”；本地只完成数据、collator、配置、preflight 和入口验证，不下载完整7B权重。
+# 2026-08-01 执行状态补充：SFT训练管线已落地，等待云端校准
+
+- assistant-only label、固定 split、动态 padding、500条确定性 calibration、QLoRA配置、双4090 preflight、校准启动与Base/Adapter评估入口已实现。
+- 全量10,306条按训练格式检查：通过10,306、截断0、最大8,173、监督 token 比例77.5844%。
+- 当前本地环境未下载完整7B模型，未执行500条真实训练，因此“正式 full SFT Gate”仍未通过。
+- 下一步唯一主线是在双RTX 4090服务器同步 canonical/source bank，执行 `bash scripts/run_sft_calibration_dual_4090.sh`，收集显存、吞吐、loss、checkpoint和adapter重载证据；通过后才启动full SFT。

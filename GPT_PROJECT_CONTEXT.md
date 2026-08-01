@@ -584,3 +584,10 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 使用 `Qwen/Qwen2.5-Coder-7B-Instruct` 正式 chat template 审计：完整序列 P50=2,603、P95=5,062、P99=6,728、max=8,173，正式 SFT 推荐 `max_seq_length=8192`。
 - 固定种子 20260728：SFT train/dev 为 9,791/515；预留 GRPO train/validation 为 900/100。划分无交叉、覆盖全部 canonical，且与 TACO test 重叠为 0。
 - canonical 和 source bank 属于大数据产物，不进入 Git；通过 `data/manifests/sft_manifest.json` 的路径与 SHA256 管理，云端需单独同步并校验。
+# 2026-08-01 QLoRA SFT 管线与500条校准准备
+
+- 新统一入口：`python -m src.training.train_sft --config configs/sft/qwen25_coder_7b_qlora_8k.yaml`，支持 calibration/full、CLI路径覆盖、resume、单卡与 torchrun DDP。
+- 训练采用原生 Transformers + PEFT + bitsandbytes：4-bit NF4、LoRA r=32/alpha=64、8K、bf16；不使用 `device_map=auto`，每个 rank 显式绑定本地 GPU。
+- completion-only loss 通过 chat template 的 token 前缀关系确定边界，不使用字符串猜测；全量10,306条复审通过，截断0，最大8,173，监督 token 比例77.5844%。
+- 500条 calibration 仅从冻结 SFT train 确定性分层抽取，ID内容 hash 为 `6d6975dd2938257150ab7b297d7d39d5ef5c55481163ee7e0011ee07eccd4a11`。
+- 本地未下载7B、未执行训练；真实校准、显存、吞吐、checkpoint和adapter重载必须在双RTX 4090云端完成。

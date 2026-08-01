@@ -4,7 +4,7 @@
 
 ## EXP-001：TACO reference-guided SFT 全量标签生成
 
-**日期**：2026-08-01  
+**日期**：2026-08-01
 **输入**：10,415 条 reference 离线验证完全通过的 TACO 候选。  
 **教师模式**：`reference_guided_label`；教师可见 reference，student user 不可见 reference。  
 **验证**：语法检查加统一 Docker `verify_code()` 执行硬门槛。
@@ -68,3 +68,14 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 14 条 standard-input 没有明显 I/O 关键词，但具有执行通过证据，保留并记录警告。
 - 1,360 条难度为 unknown，训练可用，难度消融时单独报告。
 - 旧代码提取器可能把非 Python 代码围栏识别成最终代码；已改为优先提取最后一个显式 Python 围栏并加入回归测试。
+# EXP-003：SFT训练格式全量校验与500条校准集冻结
+
+**日期**：2026-08-01
+**环境**：本地 tokenizer-only；未加载7B模型、未训练。
+
+- 训练共用格式审计：10,306/10,306通过，截断0，最大8,173 tokens。
+- supervised token ratio：77.5844%；prompt和动态padding labels均为-100，assistant教学内容与代码均受监督。
+- calibration：500条，重复生成文件 hash 一致；ID内容 SHA256 `6d6975dd2938257150ab7b297d7d39d5ef5c55481163ee7e0011ee07eccd4a11`。
+- 本地单元测试：7 passed；配置 `validate-only` 得到 train=500、eval=100。
+- 首次发现并修复：冻结 split 是带 `ids` 字段的 manifest 对象，不是裸数组；loader 现同时支持两种格式并加入回归测试。
+- 未完成项：双4090真实QLoRA校准及Base/Adapter执行对照，状态为等待云端。

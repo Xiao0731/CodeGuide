@@ -1,0 +1,18 @@
+{
+  "schema_version": "codeguide-sft-training-format-audit-v1",
+  "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+  "max_seq_length": 8192,
+  "records": 10306,
+  "passed": 10306,
+  "failed": 0,
+  "truncated": 0,
+  "max_length": 8173,
+  "supervised_tokens": 22649881,
+  "total_tokens": 29193878,
+  "supervised_token_ratio": 0.7758435176032454,
+  "io_modes": {
+    "call_based": 2450,
+    "standard_input": 7856
+  },
+  "failures": []
+}

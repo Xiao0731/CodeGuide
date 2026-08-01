@@ -1,0 +1,9 @@
+# Cloud-only QLoRA SFT dependencies. Install against the CUDA-enabled PyTorch image.
+transformers==4.53.3
+peft>=0.15,<0.18
+accelerate>=1.7,<2
+bitsandbytes>=0.45,<0.48
+datasets>=3.6,<5
+PyYAML>=6.0,<7
+safetensors>=0.5,<1
+
