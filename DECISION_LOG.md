@@ -509,3 +509,9 @@
 - **证据**：校准 adapter 已独立重载，并对固定样本生成 64 tokens 非空中文教学回答。
 - **决定**：保存/重载 Gate 通过；下一步先比较 Base 与 Adapter 在固定 dev 子集上的教学结构、接口遵循和代码正确性，再决定是否启动 full SFT。
 - **边界**：`do_sample=False` 时忽略 temperature/top-p/top-k 的提示不影响确定性重载结论。
+# DEC-024：模型生成和 Docker 执行验证跨环境解耦
+
+- **日期**：2026-08-02
+- **背景**：双 4090 云端没有 Docker，也没有 source bank；强行安装会污染训练环境并重复传输大文件。
+- **决定**：云端只运行 `stage=generate`，输出固定 Base/Adapter generations；本地运行 `stage=verify`，复用既有 source bank 和固定 Docker verifier。
+- **一致性**：两个阶段由同一个 `selection.json` 和 problem ID 关联；验证只消费已落盘文本，不重新生成、不调用 API。

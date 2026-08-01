@@ -1784,3 +1784,8 @@ Codex 必须先回答：
 
 - 校准 adapter 已从 4-bit 基座独立重载并完成 64-token 真实生成，保存与推理链路通过。
 - 校准阶段剩余唯一门槛为固定 dev Base/Adapter 对照；通过后方可启动 9,791 条 full SFT。
+## 2026-08-02 执行状态补充：校准对照采用跨环境两阶段评测
+
+- 双 4090 训练节点不要求 Docker 或 verified source bank；训练环境保持最小化。
+- 固定 dev 的 Base/Adapter 回答在云端生成并落盘，随后下载到本地，以冻结 source bank 和 Docker digest 执行统一代码验证。
+- 两阶段必须共享固定 selection manifest；本地不得重新生成模型回答，云端不得改用非隔离执行器。

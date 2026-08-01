@@ -619,3 +619,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 云端从 `outputs/sft/qwen25_coder_7b_qlora_8k/calibration_seed20260728/adapter` 独立加载 4-bit 基座与 PEFT adapter 成功。
 - 固定 smoke 题 `taco_616bc08bca` 完成 64-token 确定性生成，输出非空并保持中文分步教学格式；`adapter_reloaded=true`。
 - adapter 保存、重载与真实推理子项通过。校准 Gate 仅剩固定 dev 的 Base/Adapter 对照；对照完成前不启动 9,791 条 full SFT。
+## 2026-08-02：SFT 校准评测拆分为云端生成与本地验证
+
+- 云端训练节点没有 Docker，且未同步 219 MiB verified source bank；它们不再作为训练环境依赖。
+- Base/Adapter 对照改为两阶段：云端 GPU 仅对固定 dev ID 做确定性生成并逐条落盘；本地读取 generation、独立 source bank 和固定 Docker digest 执行 `verify_code()`。
+- `selection.json` 固定 seed、ID、模型和最大生成长度；已有 generation 可按 problem ID 断点跳过，配置变化会 fail closed。
+- 修复旧评测脚本乱码章节关键词，generation 与 verification 分文件保存，避免本地执行结果覆盖云端原始输出。

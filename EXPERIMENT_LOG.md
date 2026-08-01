@@ -125,3 +125,13 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 结果：`adapter_reloaded=true`；题目 `taco_616bc08bca`；生成 64 tokens；completion 非空。
 - 输出特征：以中文“理解题意”分步教学结构开头，并准确引用题目函数 `between(a, b)`。
 - 结论：adapter 保存、独立重载与真实推理通过；尚未完成 Base/Adapter 固定 dev 质量对照。
+# EXP-009：SFT calibration 跨环境评测准备
+
+**日期**：2026-08-02
+
+- 云端检查：`taco_verified_source_bank.jsonl.zst` 不存在，`docker` 命令不存在。
+- 处理：将原一体化评测改为云端生成、本地 Docker 验证；不在训练节点安装 Docker，也不上传 source bank。
+- 生成契约：固定 dev seed 20260728，默认 40 题，Base/Adapter 均 `do_sample=false`、最大 2048 tokens，逐题 flush 并支持断点续跑。
+- 本地验证契约：固定镜像 digest，分别输出 generation、verification 和汇总 comparison report。
+- 状态：代码与离线合约测试完成；等待云端生成产物。
+- 回归检查额外发现旧评测入口导入了不存在的 `iter_jsonl`；已改为 source bank 模块真实导出的 `iter_source_bank`，避免本地验证启动即失败。

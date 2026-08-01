@@ -9,5 +9,5 @@ adapter="$1"
 shift
 : "${CODEGUIDE_EXECUTION_IMAGE:?set CODEGUIDE_EXECUTION_IMAGE to the fixed Docker image digest}"
 python scripts/evaluate_sft_adapter.py "$adapter" \
+  --stage all \
   --container-image "$CODEGUIDE_EXECUTION_IMAGE" "$@"
-
