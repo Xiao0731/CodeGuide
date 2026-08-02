@@ -1807,3 +1807,4 @@ Codex 必须先回答：
 
 - 多代码块提取器已修复，离线重放后 Base/Adapter Pass@1 为 4/40 和 8/40。
 - full 入口 validate-only 已确认固定 9,791 train / 515 dev，训练配置不变；本地不启动 7B 训练。
+- 云容器首次 full 启动在 NCCL `/dev/shm` attach 阶段失败；双卡入口已默认禁用 NCCL SHM 通道，待保持其余配置不变重启。

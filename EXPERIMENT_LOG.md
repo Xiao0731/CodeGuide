@@ -165,3 +165,9 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - Base 保持 4/40；Adapter 从 7/40 升至 8/40。
 - Adapter 变更提取的题为 `taco_c9bd8772b5` 和 `taco_ee517dace9`；前者解除 NameError 但仅通过 1/15，后者恢复为 100% 通过。
 - 原报告与新报告分开保留，差异见 `reports/sft_calibration_extractor_v2_replay.json`。
+
+# EXP-013：full SFT 首次启动的 NCCL SHM 失败
+
+- 两个 rank 均完成 7B checkpoint 加载，失败点为 DDP `_verify_param_shape_across_processes`。
+- NCCL 报错为无法 attach `/dev/shm/nccl-*`，属于云容器 IPC/共享内存限制，不是 OOM 或数据错误。
+- 处理：双卡入口默认设置 `NCCL_SHM_DISABLE=1`，待云端原配置重启复验。

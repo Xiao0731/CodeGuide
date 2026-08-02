@@ -646,3 +646,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 多代码块改为按语法、I/O 完整性和 call-based 目标接口选择；最后一块已完整时保持旧行为。
 - 复用已保存 40 题 4096-token 输出重放：Base 4/40 不变，Adapter 7/40 提升为 8/40；`michael_pays` 由接口错误恢复为全测试通过。
 - full validate-only 已确认固定 train/dev=9,791/515；新增双 4090 正式启动脚本，但本地未启动训练。
+
+## 2026-08-02：云实例 NCCL 共享内存兼容修复
+
+- full SFT 在模型加载后的 DDP 参数校验阶段失败，NCCL 无法 attach 当前容器 `/dev/shm` 中的共享内存段。
+- 双 4090 calibration/full 入口默认 `NCCL_SHM_DISABLE=1`，保留环境变量覆盖；该修复不改变数据、模型、LoRA 或优化参数。
+- 后续命令日志统一写入 `logs/`；云端增量 ZIP 排除 Markdown 文档。
