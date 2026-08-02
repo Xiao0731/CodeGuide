@@ -515,3 +515,9 @@
 - **背景**：双 4090 云端没有 Docker，也没有 source bank；强行安装会污染训练环境并重复传输大文件。
 - **决定**：云端只运行 `stage=generate`，输出固定 Base/Adapter generations；本地运行 `stage=verify`，复用既有 source bank 和固定 Docker verifier。
 - **一致性**：两个阶段由同一个 `selection.json` 和 problem ID 关联；验证只消费已落盘文本，不重新生成、不调用 API。
+# DEC-025：对撞限回答做 4096-token 定向复验
+
+- **日期**：2026-08-02
+- **证据**：Adapter Pass@1 相对 Base 提升 7.5 个百分点，但 Adapter 有 8/40 回答恰好生成 2048 tokens、全部失败；Base 无撞限。
+- **决定**：不重跑全部 80 份回答。复用所有低于旧上限、已自然结束的 generation，只对撞限回答以 4096 上限重生成，再执行相同 Docker 验证。
+- **Gate**：定向复验完成前不启动 full SFT；最终报告同时保留 2048 首轮与 4096 恢复轮，禁止覆盖原始证据。

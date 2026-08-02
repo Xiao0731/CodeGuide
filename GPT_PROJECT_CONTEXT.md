@@ -625,3 +625,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - Base/Adapter 对照改为两阶段：云端 GPU 仅对固定 dev ID 做确定性生成并逐条落盘；本地读取 generation、独立 source bank 和固定 Docker digest 执行 `verify_code()`。
 - `selection.json` 固定 seed、ID、模型和最大生成长度；已有 generation 可按 problem ID 断点跳过，配置变化会 fail closed。
 - 修复旧评测脚本乱码章节关键词，generation 与 verification 分文件保存，避免本地执行结果覆盖云端原始输出。
+## 2026-08-02：40 条 Base/Adapter 首轮对照与截断归因
+
+- 固定 40 条 dev 的 Docker 严格 Pass@1：Base 4/40（10%），Adapter 7/40（17.5%）；Adapter 净提升 3 题，教学结构完整数从 0 提升到 18。
+- 两者代码块与接口匹配均为 40/40，说明 SFT 没有造成集中接口退化。
+- Adapter 平均生成长度 1727.3，约为 Base 841.6 的两倍；8 条 Adapter 回答撞到 2048 上限且全部失败，4 条代码围栏未闭合。
+- 评测增加自然结束回答复用机制：4096 恢复轮复用旧轮 72 份未撞限回答，只重生成 8 条 Adapter 截断项，不调用 API。

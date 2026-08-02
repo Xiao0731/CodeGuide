@@ -58,6 +58,44 @@ def persist_selection(output_dir: Path, selected: list[str], args: argparse.Name
     path.write_text(json.dumps(selection, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def reuse_natural_completions(
+    source_dir: Path,
+    output_dir: Path,
+    selected: list[str],
+    args: argparse.Namespace,
+) -> None:
+    source_selection_path = source_dir / "selection.json"
+    if not source_selection_path.exists():
+        raise RuntimeError(f"reuse source has no selection.json: {source_dir}")
+    source_selection = json.loads(source_selection_path.read_text(encoding="utf-8"))
+    for key, expected in (("problem_ids", selected), ("seed", args.seed), ("model", args.model)):
+        if source_selection.get(key) != expected:
+            raise RuntimeError(f"reuse source selection mismatch for {key}")
+    source_limit = int(source_selection["max_new_tokens"])
+    if source_limit > args.max_new_tokens:
+        raise RuntimeError("cannot reuse generations produced with a larger token limit")
+
+    for variant in VARIANTS:
+        target_path = output_dir / f"{variant}_generations.jsonl"
+        target = read_jsonl(target_path)
+        reusable = read_jsonl(source_dir / f"{variant}_generations.jsonl")
+        count = 0
+        with target_path.open("a", encoding="utf-8") as handle:
+            for problem_id in selected:
+                item = reusable.get(problem_id)
+                if problem_id in target or not item:
+                    continue
+                if int(item["generated_tokens"]) >= source_limit:
+                    continue
+                copied = dict(item)
+                copied["reused_from"] = str(source_dir)
+                handle.write(json.dumps(copied, ensure_ascii=False) + "\n")
+                handle.flush()
+                target[problem_id] = copied
+                count += 1
+        print(f"[{variant}] reused {count} natural completions from {source_dir}", flush=True)
+
+
 def generate_answers(args: argparse.Namespace, output_dir: Path) -> list[str]:
     if not args.adapter_path:
         raise RuntimeError("adapter_path is required for generate/all stage")
@@ -71,6 +109,10 @@ def generate_answers(args: argparse.Namespace, output_dir: Path) -> list[str]:
     records = load_canonical(ROOT / args.canonical)
     selected = select_dev_ids(ROOT / args.dev_ids, args.samples, args.seed)
     persist_selection(output_dir, selected, args)
+    if args.reuse_generations_from:
+        reuse_natural_completions(
+            ROOT / args.reuse_generations_from, output_dir, selected, args
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(args.model, cache_dir=args.cache_dir)
     if tokenizer.pad_token_id is None:
@@ -206,6 +248,21 @@ def verify_answers(args: argparse.Namespace, output_dir: Path) -> dict:
             "interface_match": interface_matches,
             "pass_at_1": passed / len(selected),
             "passed": passed,
+            "average_generated_tokens": sum(
+                int(generations[problem_id]["generated_tokens"]) for problem_id in selected
+            ) / len(selected),
+            "max_generated_tokens": max(
+                int(generations[problem_id]["generated_tokens"]) for problem_id in selected
+            ),
+            "hit_generation_limit": sum(
+                int(generations[problem_id]["generated_tokens"])
+                >= int(selection["max_new_tokens"])
+                for problem_id in selected
+            ),
+            "unclosed_code_fence": sum(
+                generations[problem_id]["text"].count("```") % 2 != 0
+                for problem_id in selected
+            ),
             "failure_types": dict(failures),
         }
     report_path = output_dir / "comparison_report.json"
@@ -227,6 +284,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=20260728)
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--cache-dir")
+    parser.add_argument("--reuse-generations-from")
     parser.add_argument("--container-image")
     args = parser.parse_args()
 
