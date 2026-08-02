@@ -1,8 +1,30 @@
-# QLoRA SFT 500条校准准备报告
+# QLoRA SFT 500条校准执行报告
 
 ## 当前结论
 
-本地训练前管线已落地并通过数据与 tokenization 验收；当前机器不是双 RTX 4090，未下载完整7B模型，也未执行真实500条校准。当前停止点是“等待云端执行 calibration”，不能宣称正式 SFT 门槛已经通过。
+500 条真实双 RTX 4090 QLoRA 校准、adapter 独立重载以及固定 40 条 dev 的 Base/Adapter Docker 对照已完成。校准训练无 OOM/NaN，Adapter 在 4096-token 无截断条件下同时提升了教学结构完整率和严格代码 Pass@1。
+
+## 云端校准结果
+
+- 模型：Qwen/Qwen2.5-Coder-7B-Instruct，4-bit NF4 QLoRA，LoRA r=32/alpha=64，8K，Liger fused linear CE。
+- 环境：双 RTX 4090 24 GiB，PyTorch 2.9.0+cu130，bitsandbytes 0.48.2。
+- 数据：500 train / 100 dev，固定 seed=20260728。
+- 训练：32/32 optimizer steps，runtime 580.62 s，平均 train loss 0.7215665，step 25 eval loss 0.6630970，无 OOM/NaN。
+- adapter：保存、独立重载和真实生成通过。
+
+## 4096-token 固定 dev 对照
+
+| 指标 | Base | Adapter |
+|---|---:|---:|
+| Docker Pass@1 | 4/40 (10.0%) | 7/40 (17.5%) |
+| 教学模板完整 | 0/40 | 21/40 |
+| 存在 Python 代码块 | 40/40 | 40/40 |
+| 接口匹配 | 40/40 | 40/40 |
+| 平均生成 tokens | 841.6 | 1856.55 |
+| 撞上生成上限 | 0 | 0 |
+| 未闭合代码围栏 | 0 | 0 |
+
+Adapter 相对 Base 严格 Pass@1 净提升 7.5 个百分点，教学模板完整率净提升 52.5 个百分点。Adapter 剩余 33 条失败为 30 条 wrong answer 和 3 条 runtime/timeout。本轮已排除 2048 截断偏差，因此剩余失败按小规模校准后的能力不足记录。
 
 ## 冻结输入
 
@@ -47,4 +69,3 @@
 已通过：canonical hash、固定 split、500条确定性抽样、配置解析、assistant-only mask、全量零截断、动态 padding 纯逻辑、CLI help/validate-only、Shell语法。
 
 必须在双4090云端验证：CUDA与依赖、两 rank GPU 绑定、实际4-bit模型加载、只有LoRA参数可训练、8K forward/backward、显存峰值、吞吐、loss/grad、checkpoint恢复、adapter重载推理、Base/Adapter Docker执行对照。
-
