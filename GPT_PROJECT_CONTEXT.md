@@ -697,3 +697,12 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 两条真正撞 4096 上限的回答均未进入代码；提高上限避免了机械截断，却没有修复模型 explanation-first、代码出现过晚的问题。
 - calibration 从 2048 恢复到 4096 后 Pass@1 仍为 7/40（提取器修复后 8/40），说明此前较高指标不是 2048 上限带来的能力增益。
 - 标准 SFT 对所有 assistant token 等权；长篇、可预测的教学措辞可以持续降低 loss，而不保证关键算法与代码 token 更正确。这是当前 loss 下降和执行指标不升之间的重要目标错配。
+
+## 2026-08-03：外部 CodeGuide-LLM 原型审查
+
+- 用户提供的外部项目压缩包没有 SFT 数据、adapter/checkpoint、W&B 日志或评测结果；`evals/results` 仅有 `.gitkeep`。README 中课程阶段 Pass@1≈0.3、过滤率 15--20% 等没有随包证据，无法与本项目实测指标比较。
+- 外部 TACO loader 将 `public_tests` 固定为空，只取第一份 solution 且不用于 teacher prompt；SFT 默认不启用 `--run_code`，即使启用也无法执行验证 TACO。
+- 其 validator 以测试通过率 >=0.5 判定 ok，并且除语法错误外，execution failure 仍继续写入 SFT；因此 metadata `pass_rate` 不能作为正确代码硬证据。
+- 外部 SFT 使用 `max_seq_length=2048`、3 epochs、LR 2e-4，并允许 SFTTrainer 静默截断；teacher 输出上限为 3072 且代码位于末尾，存在截断代码风险，未见 tokenizer 长度审计。
+- 外部 ablation 只是对同一批已有 completion 使用四套 reward 公式重新计分，不训练四个模型；blind eval 虽有完整框架，但包内没有生成、judge、Pass@1 或 bootstrap 报告。
+- 该项目可作为架构原型和叙事参考，不能作为“GPT-4o 数据或其训练效果优于当前数据”的实验证据。本项目代码更复杂主要来自真实执行闭环、失败恢复与可复现审计。

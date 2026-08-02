@@ -218,3 +218,12 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - >=1536 tokens 的 27 条已无完全通过样本；真正达到 4096 上限的 2 条均无 Python 代码块。
 - 该结果证明“长回答是风险信号”，但不证明 4096 上限诱导冗长：greedy 解码看不到 `max_new_tokens`，不同上限共享相同前缀。
 - calibration 的 2048 与 4096 轮严格 Pass@1 未提升，排除“仅提高 generation budget 即可恢复算法正确率”。
+
+# EXP-020：外部 CodeGuide-LLM 项目证据审查
+
+- 输入：用户提供 `CodeGuide-LLM-main.zip` 与 README。
+- 可验证产物：无 SFT JSONL、模型权重、训练日志、W&B 导出、blind eval 输出或 ablation report；`evals/results` 为空。
+- 数据正确性风险：TACO tests 为空；默认只做语法检查；execution failure 不一定丢弃；通过一半测试即可 `ok`；不支持 call-based。
+- 训练风险：GPT-4o 最多生成 3072 tokens，但 SFT 序列上限 2048 且无超长隔离，代码在回答末尾；3 epochs、LR 2e-4 的效果没有日志。
+- 评测口径：ablation 是 reward-function rescoring，不是模型训练消融；blind eval 是未附结果的可执行框架。README 的性能叙述不能视为复现实验数据。
+- 对比结论：无法证明外部 GPT-4o 蒸馏更优；当前项目暴露出的 4/40 结果虽不理想，但具备固定题集、原始 generation、Docker verification 和完整训练日志，证据等级更高。
