@@ -674,3 +674,11 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 当前训练执行已完成；正式产物仍需独立检查 adapter、run manifest 并完成 adapter 重载生成，之后再进入 full SFT 质量评测。
 - full Adapter 目录约 324 MiB，其中 `adapter_model.safetensors` 约 309 MiB；`run_manifest.json` 记录 train/dev=9,791/515、world_size=2 和完整训练指标。
 - 独立 4-bit 基座 + PEFT adapter 重载成功，对固定题 `taco_616bc08bca` 生成 64 tokens 非空中文教学回答，`adapter_reloaded=true`；训练、保存、重载闭环通过。
+
+## 2026-08-02：full Adapter 固定 40 题评测
+
+- 使用与 calibration 相同的 40 个 dev ID、seed 20260728、4096-token 确定性生成，固定 Docker 镜像完成离线复验。
+- Base Pass@1=4/40；full Adapter Pass@1=4/40。共同通过 3 题，full 新救回 `taco_cc94dfa6d5`，但丢失 Base 通过的 `taco_6709566aed`，净提升为 0。
+- full Adapter 教学模板完整 9/40、代码块 39/40、接口匹配 40/40；2 条撞 4096 上限且未进入代码，另有 1 条 Docker 5 秒资源超时。
+- 当前证据说明 full SFT 完成了教学风格和接口学习，但未在固定小样本上提升算法 Pass@1；不能直接把训练 loss 下降解释为代码求解能力提升。
+- Windows 离线验证修复：显式 `OutputDir` 不存在时 fail closed，不再误回退旧 calibration 目录；Docker subprocess 固定 UTF-8 解码并替换非法字节。

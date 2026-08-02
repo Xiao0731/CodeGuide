@@ -194,3 +194,12 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 状态：训练完成，等待 adapter/manifest 文件检查和独立重载生成；尚未完成 full Adapter 的 Docker Pass@1 质量评测。
 - 产物验收：adapter 文件齐全，权重约 309 MiB；独立重载对 `taco_616bc08bca` 生成 64 tokens，输出正确进入题意理解结构，`adapter_reloaded=true`。
 - 下一步：复用固定 40 题、seed 20260728、4096-token 确定性生成协议，生成 Base/full Adapter 回答后在本地 Docker 离线验证。
+
+# EXP-017：full Adapter 固定 40 题 Docker 对照
+
+- Base：Pass@1 4/40，模板完整 0/40，代码块/接口匹配 40/40，无撞限。
+- full Adapter：Pass@1 4/40，模板完整 9/40，代码块 39/40，接口匹配 40/40；wrong answer 35，runtime/timeout 1。
+- 通过集合：共同 3 题；full 独有 `taco_cc94dfa6d5`；Base 独有 `taco_6709566aed`。因此算法正确率净提升 0。
+- 长度：full 平均 2,187.6 tokens，最大 4,096；`taco_24ea55cd42`、`taco_4b5c54b35a` 撞限且未输出代码。
+- 唯一资源失败：`taco_3bd853140f` 在固定 Docker 5 秒 CPU 限制下超时。高部分通过样本包括 `taco_b967c24088` 0.9913、`taco_ecffe57a6b` 0.9444，属于边界错误而非整体接口失败。
+- 结论：full SFT 工程闭环通过，但固定 40 题未证明算法能力提升；进入 GRPO 或发布前应把“教学结构提升”和“代码正确率”分开判断。
