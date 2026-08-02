@@ -72,6 +72,19 @@ class TokenizedDataset:
         return {key: item[key] for key in ("input_ids", "attention_mask", "labels")}
 
 
+class LossOnlyPredictionMixin:
+    """Evaluate causal-LM loss without retaining vocabulary-sized logits."""
+
+    def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys=None):
+        import torch
+
+        del prediction_loss_only, ignore_keys
+        inputs = self._prepare_inputs(inputs)
+        with torch.no_grad(), self.compute_loss_context_manager():
+            loss = self.compute_loss(model, inputs, return_outputs=False)
+        return loss.detach().mean(), None, None
+
+
 def _git_state() -> dict[str, Any]:
     def run(*args: str) -> str:
         return subprocess.check_output(args, cwd=ROOT, text=True).strip()
@@ -208,7 +221,10 @@ def main() -> None:
         seed=cfg["seed"], data_seed=cfg["data_seed"], remove_unused_columns=False,
         label_names=["labels"], prediction_loss_only=True,
     )
-    trainer = Trainer(
+    class LossOnlyTrainer(LossOnlyPredictionMixin, Trainer):
+        pass
+
+    trainer = LossOnlyTrainer(
         model=model, args=training_args, train_dataset=TokenizedDataset(tokenized_train),
         eval_dataset=TokenizedDataset(tokenized_eval), data_collator=AssistantOnlyDataCollator(tokenizer),
     )

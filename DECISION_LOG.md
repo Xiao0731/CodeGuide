@@ -546,3 +546,10 @@
 - **证据**：Adapter Pass@1 相对 Base 提升 7.5 个百分点，但 Adapter 有 8/40 回答恰好生成 2048 tokens、全部失败；Base 无撞限。
 - **决定**：不重跑全部 80 份回答。复用所有低于旧上限、已自然结束的 generation，只对撞限回答以 4096 上限重生成，再执行相同 Docker 验证。
 - **Gate**：定向复验完成前不启动 full SFT；最终报告同时保留 2048 首轮与 4096 恢复轮，禁止覆盖原始证据。
+
+# DEC-026：SFT dev 评估使用显式 loss-only prediction_step
+
+- **日期**：2026-08-02
+- **证据**：`TrainingArguments(prediction_loss_only=True)` 后，云端 traceback 仍显示 Trainer 请求 `return_outputs=True` 并在完整 logits 交叉熵处 OOM。
+- **决定**：不缩减 dev、不降低 8K 长度、不改变评估频率；通过 Trainer 子类在评估阶段强制 `return_outputs=False`，只聚合 loss。
+- **验收**：同一 full 启动入口必须越过 step 25、产出 eval loss 并继续训练，方可确认该故障关闭。

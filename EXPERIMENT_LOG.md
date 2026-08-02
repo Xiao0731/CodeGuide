@@ -177,3 +177,9 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - NCCL 修复通过，full SFT 运行到 25/612 steps，loss/grad norm 全部有限。
 - 首次 full-dev 评估在 rank 0 申请 4.54 GiB 完整 logits 时 OOM；非训练 forward/backward OOM。
 - 修复：`TrainingArguments(prediction_loss_only=True)`，评估仅聚合 loss，不改变 515 条 dev、eval 间隔或训练超参数。
+
+# EXP-015：prediction_loss_only 配置未生效的二次 OOM
+
+- full SFT 再次完成 25/612 steps，训练 loss 从 0.8963 降至 0.5932，随后在首次 dev 评估申请 4.54 GiB 并 OOM。
+- traceback 明确显示评估仍调用 `compute_loss(return_outputs=True)`，所以 EXP-014 的配置级修复在当前 Transformers 4.53.3 + Liger 0.8.0 环境中无效。
+- 改为显式 loss-only `prediction_step`，从运行路径上禁止评估保留词表维度 logits；待云端同一 full 入口越过 step 25 复验。

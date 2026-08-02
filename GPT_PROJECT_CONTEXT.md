@@ -658,3 +658,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - NCCL SHM 修复后 full SFT 已真实完成 25 optimizer steps，loss 由约 0.90 下降到 0.59，证明双卡训练主路正常。
 - 第 25 step 首次 515 条 full-dev 评估在长样本上 OOM；调用栈显示 Trainer `return_outputs=True` 使 Liger 评估路径回退到完整 logits cross entropy。
 - SFT 评估只需 eval loss，因此固定 `prediction_loss_only=True`，仍覆盖全部 515 条 dev，不保留无用 logits。
+
+## 2026-08-02：full dev 强制 loss-only 评估修复
+
+- 云端复跑再次在 step 25 评估 OOM，调用栈仍进入 `Trainer.prediction_step(... return_outputs=True)`，证明当前 Transformers 4.53.3 与 Liger 组合未落实仅靠配置声明的 `prediction_loss_only`。
+- 训练入口改用最小 `LossOnlyTrainer` 覆盖：评估时显式调用 `compute_loss(..., return_outputs=False)`，只返回标量 loss，不返回 logits 或 labels。
+- 数据、515 条 dev、评估间隔、LoRA、学习率和其余 full SFT 超参数均未改变。
