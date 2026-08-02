@@ -561,3 +561,4 @@
 - **证据**：固定 9,791/515 数据完成 612/612 steps，train loss 0.5693143，dev loss 0.5323175，训练与评估均无 OOM/NaN。
 - **决定**：不重复训练；先检查 `full_seed20260728/adapter` 与 `run_manifest.json`，独立重载 adapter 完成确定性生成，再沿用校准阶段的云端生成、本地 Docker 验证流程评估 full Adapter。
 - **边界**：在 adapter 重载成功前只宣称“full SFT 训练执行完成”，不宣称正式模型质量 Gate 已通过。
+- **验收更新**：full Adapter 已独立重载并完成非空确定性生成，训练保存/重载 Gate 关闭；模型质量仍以固定 40 题本地 Docker Pass@1 为准。

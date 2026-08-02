@@ -192,3 +192,5 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - dev：末段 515 条评估 `eval_loss=0.5323174596`，runtime 182.406 秒，2.823 samples/s；评估后继续训练至 epoch 1.0。
 - 稳定性：无 OOM、NaN、NCCL rank failure；末段 grad norm 约 0.10--0.20，学习率按 cosine 正常衰减至接近 0。
 - 状态：训练完成，等待 adapter/manifest 文件检查和独立重载生成；尚未完成 full Adapter 的 Docker Pass@1 质量评测。
+- 产物验收：adapter 文件齐全，权重约 309 MiB；独立重载对 `taco_616bc08bca` 生成 64 tokens，输出正确进入题意理解结构，`adapter_reloaded=true`。
+- 下一步：复用固定 40 题、seed 20260728、4096-token 确定性生成协议，生成 Base/full Adapter 回答后在本地 Docker 离线验证。

@@ -672,3 +672,5 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 总 runtime 15,032.64 秒（约 4 小时 10 分），平均 train loss 0.5693143；末段 loss 与 grad norm 均有限，无 OOM、NaN 或 rank failure。
 - step 600 附近完整 dev 评估成功，`eval_loss=0.5323175`，runtime 182.406 秒；证明显式 `skip_logits=True` 修复有效。
 - 当前训练执行已完成；正式产物仍需独立检查 adapter、run manifest 并完成 adapter 重载生成，之后再进入 full SFT 质量评测。
+- full Adapter 目录约 324 MiB，其中 `adapter_model.safetensors` 约 309 MiB；`run_manifest.json` 记录 train/dev=9,791/515、world_size=2 和完整训练指标。
+- 独立 4-bit 基座 + PEFT adapter 重载成功，对固定题 `taco_616bc08bca` 生成 64 tokens 非空中文教学回答，`adapter_reloaded=true`；训练、保存、重载闭环通过。
