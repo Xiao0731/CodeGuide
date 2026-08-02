@@ -682,3 +682,10 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - full Adapter 教学模板完整 9/40、代码块 39/40、接口匹配 40/40；2 条撞 4096 上限且未进入代码，另有 1 条 Docker 5 秒资源超时。
 - 当前证据说明 full SFT 完成了教学风格和接口学习，但未在固定小样本上提升算法 Pass@1；不能直接把训练 loss 下降解释为代码求解能力提升。
 - Windows 离线验证修复：显式 `OutputDir` 不存在时 fail closed，不再误回退旧 calibration 目录；Docker subprocess 固定 UTF-8 解码并替换非法字节。
+
+## 2026-08-03：500 条校准与 full SFT 数据顺序复查
+
+- 500 条 calibration 不是按 canonical 或原始 accepted 顺序截取，而是从冻结 train 按 `label_strategy/io_mode/difficulty/source` 分层抽样：A 类 337、B 类 163；其中仅 65 条来自原始 accepted 的前 1,300 条。
+- 原始 accepted 前 1,300 条确实全部是早期 A 类；但 canonical 冻结和 train ID 已稳定重排，且 Transformers DDP 训练使用随机采样与 `group_by_length=true`，训练进度不对应原始生成顺序。
+- 原始前 1,300 条中 1,235 条进入 SFT train；按 train-ID 文件前后 65% 粗分为 821/414，实际 epoch 内还会再次随机分组，因此 65% loss 平台不能归因为“此后开始训练 B 类”。
+- calibration 与 full 的 A/B 比例基本一致。更显著的差异是相同峰值学习率下 optimizer steps 从 32 增至 612，以及全量标签教学表达风格异质；这两点比数据物理顺序更可能解释固定 40 题回落。

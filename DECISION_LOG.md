@@ -569,3 +569,10 @@
 - **证据**：固定 40 题 Base/full Adapter Pass@1 均为 4/40；full 输出更长且具教学结构，但出现 2 条 4096-token 撞限。
 - **决定**：保留 full Adapter 作为已完成的 SFT 产物，但不将 loss 下降或教学格式学习等同于算法正确率提升；后续决策需分别报告 pedagogical metrics 与 execution Pass@1。
 - **评测完整性**：保留本次原始 generation、verification 与 comparison report，不重新生成或覆盖以追求更高分数。
+
+# DEC-029：不按训练进度推断 A/B 数据阶段
+
+- **日期**：2026-08-03
+- **证据**：calibration 500 本身含 163 条 B 类；full 数据经固定 ID 重排、DDP 随机采样和长度分桶，epoch 百分比不对应原始 accepted 行号。
+- **决定**：不将 65% loss 平台归因于后段 B 类；后续若验证“早期 A 类质量更高”，必须做 A-only 与 matched mixed 的等样本、等 optimizer-step、等评测集消融。
+- **优先控制变量**：固定样本数、更新步数和学习率日程后再比较 label strategy，避免把 32 对 612 steps 的训练剂量差异误认为数据类别效应。
