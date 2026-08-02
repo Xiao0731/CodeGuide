@@ -664,3 +664,4 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 云端复跑再次在 step 25 评估 OOM，调用栈仍进入 `Trainer.prediction_step(... return_outputs=True)`，证明当前 Transformers 4.53.3 与 Liger 组合未落实仅靠配置声明的 `prediction_loss_only`。
 - 训练入口改用最小 `LossOnlyTrainer` 覆盖：评估时显式调用 `compute_loss(..., return_outputs=False)`，只返回标量 loss，不返回 logits 或 labels。
 - 数据、515 条 dev、评估间隔、LoRA、学习率和其余 full SFT 超参数均未改变。
+- 二次云端复验表明 `return_outputs=False` 本身仍不足：Liger 0.8.0 在 eval mode 默认 `skip_logits=False`。最终修复在 Liger 评估输入中显式设置 `skip_logits=True`，保持 dropout 关闭并启用 fused loss。

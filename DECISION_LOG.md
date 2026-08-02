@@ -553,3 +553,4 @@
 - **证据**：`TrainingArguments(prediction_loss_only=True)` 后，云端 traceback 仍显示 Trainer 请求 `return_outputs=True` 并在完整 logits 交叉熵处 OOM。
 - **决定**：不缩减 dev、不降低 8K 长度、不改变评估频率；通过 Trainer 子类在评估阶段强制 `return_outputs=False`，只聚合 loss。
 - **验收**：同一 full 启动入口必须越过 step 25、产出 eval loss 并继续训练，方可确认该故障关闭。
+- **实现修正**：Liger 评估前向显式传入 `skip_logits=True`；不通过递归 `model.train()` 激活 fused loss，以免 LoRA dropout 0.05 污染 dev loss。

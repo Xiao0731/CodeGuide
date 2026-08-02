@@ -79,7 +79,11 @@ class LossOnlyPredictionMixin:
         import torch
 
         del prediction_loss_only, ignore_keys
-        inputs = self._prepare_inputs(inputs)
+        inputs = dict(self._prepare_inputs(inputs))
+        if getattr(self.args, "use_liger_kernel", False):
+            # Liger only enables this automatically in train mode. Evaluation
+            # must request it explicitly or the full vocabulary logits are built.
+            inputs["skip_logits"] = True
         with torch.no_grad(), self.compute_loss_context_manager():
             loss = self.compute_loss(model, inputs, return_outputs=False)
         return loss.detach().mean(), None, None
