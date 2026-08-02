@@ -171,3 +171,9 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 两个 rank 均完成 7B checkpoint 加载，失败点为 DDP `_verify_param_shape_across_processes`。
 - NCCL 报错为无法 attach `/dev/shm/nccl-*`，属于云容器 IPC/共享内存限制，不是 OOM 或数据错误。
 - 处理：双卡入口默认设置 `NCCL_SHM_DISABLE=1`，待云端原配置重启复验。
+
+# EXP-014：full SFT step 25 dev 评估 OOM
+
+- NCCL 修复通过，full SFT 运行到 25/612 steps，loss/grad norm 全部有限。
+- 首次 full-dev 评估在 rank 0 申请 4.54 GiB 完整 logits 时 OOM；非训练 forward/backward OOM。
+- 修复：`TrainingArguments(prediction_loss_only=True)`，评估仅聚合 loss，不改变 515 条 dev、eval 间隔或训练超参数。

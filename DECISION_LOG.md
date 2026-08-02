@@ -481,6 +481,12 @@
 - **日期**：2026-08-02
 - **证据**：full SFT 在 DDP 包装阶段因 `/dev/shm/nccl-*` attach 失败退出，模型加载和双 rank GPU 绑定已通过。
 - **决定**：双 4090 入口默认 `NCCL_SHM_DISABLE=1`，使 NCCL 避开故障共享内存通道；不同时禁用 P2P，避免无证据地扩大性能损失。
+
+### DEC-028：SFT dev 评估只保留 loss
+
+- **日期**：2026-08-02
+- **证据**：full 训练前 25 steps 稳定，但 Trainer 评估的 `return_outputs=True` 在长样本上实体化全量 vocabulary logits 并 OOM。
+- **决定**：设置 `prediction_loss_only=True`，保留全量 dev loss 而不收集 logits/predictions；不缩减 dev 或序列长度。
 # DEC-017：冻结 10,306 条 canonical SFT 并采用 8K 正式训练长度
 
 - **日期**：2026-08-01

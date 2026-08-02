@@ -652,3 +652,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - full SFT 在模型加载后的 DDP 参数校验阶段失败，NCCL 无法 attach 当前容器 `/dev/shm` 中的共享内存段。
 - 双 4090 calibration/full 入口默认 `NCCL_SHM_DISABLE=1`，保留环境变量覆盖；该修复不改变数据、模型、LoRA 或优化参数。
 - 后续命令日志统一写入 `logs/`；云端增量 ZIP 排除 Markdown 文档。
+
+## 2026-08-02：full dev 评估 logits OOM 修复
+
+- NCCL SHM 修复后 full SFT 已真实完成 25 optimizer steps，loss 由约 0.90 下降到 0.59，证明双卡训练主路正常。
+- 第 25 step 首次 515 条 full-dev 评估在长样本上 OOM；调用栈显示 Trainer `return_outputs=True` 使 Liger 评估路径回退到完整 logits cross entropy。
+- SFT 评估只需 eval loss，因此固定 `prediction_loss_only=True`，仍覆盖全部 515 条 dev，不保留无用 logits。

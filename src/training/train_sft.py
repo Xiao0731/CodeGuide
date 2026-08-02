@@ -206,7 +206,7 @@ def main() -> None:
         dataloader_num_workers=train_cfg["dataloader_num_workers"], group_by_length=data_cfg["group_by_length"],
         ddp_find_unused_parameters=train_cfg["ddp_find_unused_parameters"], report_to=[] if train_cfg["report_to"] == "none" else [train_cfg["report_to"]],
         seed=cfg["seed"], data_seed=cfg["data_seed"], remove_unused_columns=False,
-        label_names=["labels"],
+        label_names=["labels"], prediction_loss_only=True,
     )
     trainer = Trainer(
         model=model, args=training_args, train_dataset=TokenizedDataset(tokenized_train),
