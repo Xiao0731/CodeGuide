@@ -689,3 +689,11 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 原始 accepted 前 1,300 条确实全部是早期 A 类；但 canonical 冻结和 train ID 已稳定重排，且 Transformers DDP 训练使用随机采样与 `group_by_length=true`，训练进度不对应原始生成顺序。
 - 原始前 1,300 条中 1,235 条进入 SFT train；按 train-ID 文件前后 65% 粗分为 821/414，实际 epoch 内还会再次随机分组，因此 65% loss 平台不能归因为“此后开始训练 B 类”。
 - calibration 与 full 的 A/B 比例基本一致。更显著的差异是相同峰值学习率下 optimizer steps 从 32 增至 612，以及全量标签教学表达风格异质；这两点比数据物理顺序更可能解释固定 40 题回落。
+
+## 2026-08-03：生成上限与 full Adapter 长回答复查
+
+- Hugging Face `max_new_tokens` 是解码器外部停止条件，不进入 Qwen prompt/token 序列；确定性 greedy decoding 在 2048/4096 配置下的前 2048 tokens 相同，模型不会因看到 4096 而主动重新分配解释与代码预算。
+- full Adapter 40 题中有 21 条生成长度 >=2048，完全通过 0 条；其余 19 条通过 4 条。长度与失败强相关，但不能据此认定上限造成失败，难题本身也更容易生成更长且答错。
+- 两条真正撞 4096 上限的回答均未进入代码；提高上限避免了机械截断，却没有修复模型 explanation-first、代码出现过晚的问题。
+- calibration 从 2048 恢复到 4096 后 Pass@1 仍为 7/40（提取器修复后 8/40），说明此前较高指标不是 2048 上限带来的能力增益。
+- 标准 SFT 对所有 assistant token 等权；长篇、可预测的教学措辞可以持续降低 loss，而不保证关键算法与代码 token 更正确。这是当前 loss 下降和执行指标不升之间的重要目标错配。
