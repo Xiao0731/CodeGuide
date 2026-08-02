@@ -1,0 +1,139 @@
+{
+  "schema_version": "codeguide-extractor-replay-v1",
+  "original_report": "comparison_report.json",
+  "replay_report": "comparison_report_extractor_v2.json",
+  "variants": {
+    "base": {
+      "original_passed": 4,
+      "replay_passed": 4,
+      "changed_extractions": [
+        {
+          "problem_id": "taco_16ed939480",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_1cd0586ba8",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_20d7a796e9",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_28f576f34a",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_3bd853140f",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_634dad7463",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.3333333333333333,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_65a1e1b377",
+          "old_pass_rate": 0.6666666666666666,
+          "new_pass_rate": 0.6666666666666666,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_6d08ac23ef",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_9dd853243f",
+          "old_pass_rate": 0.007936507936507936,
+          "new_pass_rate": 0.023809523809523808,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_b5216c81cf",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_b967c24088",
+          "old_pass_rate": 0.09565217391304348,
+          "new_pass_rate": 0.09565217391304348,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_c79d5d89fb",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_cc94dfa6d5",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.0,
+          "new_verified": false,
+          "old_error": null,
+          "new_error": null
+        }
+      ]
+    },
+    "adapter": {
+      "original_passed": 7,
+      "replay_passed": 8,
+      "changed_extractions": [
+        {
+          "problem_id": "taco_c9bd8772b5",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 0.06666666666666667,
+          "new_verified": false,
+          "old_error": "exec NameError: name 'find' is not defined",
+          "new_error": null
+        },
+        {
+          "problem_id": "taco_ee517dace9",
+          "old_pass_rate": 0.0,
+          "new_pass_rate": 1.0,
+          "new_verified": true,
+          "old_error": "exec NameError: name 'michael_pays' is not defined",
+          "new_error": null
+        }
+      ]
+    }
+  }
+}

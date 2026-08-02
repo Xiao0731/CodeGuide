@@ -204,15 +204,21 @@ def verify_answers(args: argparse.Namespace, output_dir: Path) -> dict:
             raise RuntimeError(f"{variant} generation is incomplete: {missing[:5]}")
         failures = Counter()
         passed = code_blocks = interface_matches = complete = 0
-        verification_path = output_dir / f"{variant}_verification.jsonl"
+        suffix = args.verification_suffix
+        verification_path = output_dir / f"{variant}_verification{suffix}.jsonl"
         with verification_path.open("w", encoding="utf-8") as handle:
             for problem_id in selected:
                 text = generations[problem_id]["text"]
-                code = extract_code(text)
-                code_blocks += bool(code)
-                complete += all(section.lower() in text.lower() for section in SECTIONS)
                 item = source[problem_id]
                 fn_name = item.get("fn_name")
+                code = extract_code(
+                    text,
+                    io_mode=item["io_mode"],
+                    fn_name=fn_name,
+                    starter_code=item.get("starter_code"),
+                )
+                code_blocks += bool(code)
+                complete += all(section.lower() in text.lower() for section in SECTIONS)
                 interface_ok = not fn_name or bool(code and fn_name in code)
                 interface_matches += interface_ok
                 result = verify_code(
@@ -265,7 +271,7 @@ def verify_answers(args: argparse.Namespace, output_dir: Path) -> dict:
             ),
             "failure_types": dict(failures),
         }
-    report_path = output_dir / "comparison_report.json"
+    report_path = output_dir / f"comparison_report{args.verification_suffix}.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return report
@@ -286,6 +292,11 @@ def main() -> None:
     parser.add_argument("--cache-dir")
     parser.add_argument("--reuse-generations-from")
     parser.add_argument("--container-image")
+    parser.add_argument(
+        "--verification-suffix",
+        default="",
+        help="suffix for replay outputs, e.g. _extractor_v2; keeps original reports intact",
+    )
     args = parser.parse_args()
 
     output_dir = ROOT / args.output_dir

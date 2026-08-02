@@ -158,3 +158,10 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - Adapter 剩余失败为 wrong_answer 30 条、runtime_or_timeout 3 条。由于截断已消失，这些失败主要归因于 500 条、1 epoch 校准后的算法能力与运行时鲁棒性，不再归因于 completion budget。
 - 结论：校准实验的质量方向为正，且无代码提取或接口退化；17.5% 是小样本校准模型的诊断结果，不是全量 SFT 的最终指标。
 - 33 条失败细分：题意/核心算法 19，边界/状态 5，I/O 4，代码块提取 2，实现异常 2，资源超限 1。详见 `reports/sft_calibration_failure_analysis_4096.md`。
+
+# EXP-012：多代码块提取器离线重放
+
+- 不重新生成，直接重放已保存 40 题 Base/Adapter 输出。
+- Base 保持 4/40；Adapter 从 7/40 升至 8/40。
+- Adapter 变更提取的题为 `taco_c9bd8772b5` 和 `taco_ee517dace9`；前者解除 NameError 但仅通过 1/15，后者恢复为 100% 通过。
+- 原报告与新报告分开保留，差异见 `reports/sft_calibration_extractor_v2_replay.json`。

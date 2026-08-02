@@ -2,7 +2,7 @@
 代码提取与校验
 
 功能：
-1. extract_code()       — 从 LLM 输出中抽取最后一个 ```python ... ``` 块
+1. extract_code()       — 从 LLM 输出中选择最符合题目接口的 Python 代码块
 2. validate_syntax()    — ast.parse() 语法检查（快，无副作用）
 3. validate_execution() — 沙箱子进程执行 + 测试用例比对（可选）
 4. validate()           — 组合校验，返回 ValidationResult
@@ -46,21 +46,132 @@ class ValidationResult:
 
 # ── 代码提取 ─────────────────────────────────────────────────
 
-def extract_code(text: str) -> Optional[str]:
+def _code_candidates(text: str) -> list[tuple[str, bool]]:
+    candidates: list[tuple[str, bool]] = []
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        opening = re.fullmatch(r"[ \t]*```([^`]*)[ \t]*", lines[index])
+        if not opening:
+            index += 1
+            continue
+        language = opening.group(1).strip().lower()
+        end = index + 1
+        while end < len(lines) and not re.fullmatch(r"[ \t]*```[ \t]*", lines[end]):
+            end += 1
+        if end >= len(lines):
+            break
+        if language in ("", "python", "python3", "py"):
+            candidates.append(("\n".join(lines[index + 1:end]).strip(), bool(language)))
+        index = end + 1
+    return candidates
+
+
+def _defined_functions(tree: ast.AST) -> tuple[set[str], set[str]]:
+    top_level: set[str] = set()
+    solution_methods: set[str] = set()
+    for node in getattr(tree, "body", []):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            top_level.add(node.name)
+        elif isinstance(node, ast.ClassDef) and node.name == "Solution":
+            solution_methods.update(
+                child.name
+                for child in node.body
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+            )
+    return top_level, solution_methods
+
+
+def _is_example_only(tree: ast.AST) -> bool:
+    body = getattr(tree, "body", [])
+    if not body:
+        return True
+    meaningful = [node for node in body if not isinstance(node, (ast.Import, ast.ImportFrom))]
+    return bool(meaningful) and all(
+        isinstance(node, ast.Expr)
+        or (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, (ast.Constant, ast.List, ast.Tuple, ast.Dict, ast.Set))
+        )
+        for node in meaningful
+    )
+
+
+def _candidate_score(
+    code: str,
+    *,
+    tagged_python: bool,
+    io_mode: Optional[str],
+    fn_name: Optional[str],
+) -> int:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return -10_000
+
+    score = 5 + int(tagged_python)
+    top_level, solution_methods = _defined_functions(tree)
+    example_only = _is_example_only(tree)
+    if io_mode == "call_based":
+        score += 200 * int(bool(fn_name and fn_name in top_level))
+        score += 190 * int(bool(fn_name and fn_name in solution_methods))
+        score += 30 * int(bool(top_level or solution_methods))
+        score -= 150 * int(example_only)
+    elif io_mode == "standard_input":
+        calls = {
+            node.func.id
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        has_input = "input" in calls or bool(re.search(r"\bsys\.stdin\b", code))
+        has_output = "print" in calls or bool(re.search(r"\bsys\.stdout\b", code))
+        score += 80 * int(has_input) + 80 * int(has_output)
+        score += 15 * int(bool(top_level))
+        score += 10 * int('__name__' in code and '__main__' in code)
+        score -= 100 * int(example_only or (has_output and not has_input and not top_level))
+    else:
+        score += 10 * int(bool(top_level or solution_methods))
+        score -= 10 * int(example_only)
+    return score
+
+
+def extract_code(
+    text: str,
+    *,
+    io_mode: Optional[str] = None,
+    fn_name: Optional[str] = None,
+    starter_code: Optional[str] = None,
+) -> Optional[str]:
     """
-    提取 LLM 输出中最后一个代码块。
-    优先找 ```python```，其次找任意 ``` 块。
-    返回代码字符串（已去首尾空行），找不到返回 None。
+    单代码块保持原有行为。多代码块时，根据语法、I/O 完整性和
+    call-based 目标函数/`Solution` 方法匹配选择，避免抽到示例调用。
     """
-    # Prefer explicit Python fences. Keeping this separate from the untagged
-    # fallback prevents a non-Python block's closing fence from being treated
-    # as the opening fence of pseudocode.
-    matches = _PYTHON_FENCE_RE.findall(text)
-    if not matches:
-        matches = _UNTAGGED_FENCE_RE.findall(text)
-    if not matches:
+    del starter_code  # Reserved for future contract-aware ranking.
+    candidates = _code_candidates(text)
+    if not candidates:
         return None
-    return matches[-1].strip()
+    if len(candidates) == 1:
+        return candidates[0][0]
+    if io_mode is None and fn_name is None:
+        explicit_python = [code for code, tagged in candidates if tagged]
+        return (explicit_python or [code for code, _ in candidates])[-1]
+    last_code, last_tagged = candidates[-1]
+    last_score = _candidate_score(
+        last_code, tagged_python=last_tagged, io_mode=io_mode, fn_name=fn_name
+    )
+    # Preserve the established final-block convention when that block is a
+    # syntactically valid, contract-complete solution. Rank alternatives only
+    # when the final block is an example, incomplete snippet, or wrong interface.
+    if (io_mode == "call_based" and last_score >= 190) or (
+        io_mode == "standard_input" and last_score >= 160
+    ):
+        return last_code
+    return max(
+        candidates,
+        key=lambda item: _candidate_score(
+            item[0], tagged_python=item[1], io_mode=io_mode, fn_name=fn_name
+        ),
+    )[0]
 
 
 # ── 语法校验 ─────────────────────────────────────────────────
