@@ -665,3 +665,10 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 训练入口改用最小 `LossOnlyTrainer` 覆盖：评估时显式调用 `compute_loss(..., return_outputs=False)`，只返回标量 loss，不返回 logits 或 labels。
 - 数据、515 条 dev、评估间隔、LoRA、学习率和其余 full SFT 超参数均未改变。
 - 二次云端复验表明 `return_outputs=False` 本身仍不足：Liger 0.8.0 在 eval mode 默认 `skip_logits=False`。最终修复在 Liger 评估输入中显式设置 `skip_logits=True`，保持 dropout 关闭并启用 fused loss。
+
+## 2026-08-02：9,791 条 full SFT 训练完成
+
+- 双 RTX 4090 完成固定 9,791 train / 515 dev、1 epoch、612/612 optimizer steps 的 Qwen2.5-Coder-7B-Instruct 4-bit NF4 QLoRA SFT。
+- 总 runtime 15,032.64 秒（约 4 小时 10 分），平均 train loss 0.5693143；末段 loss 与 grad norm 均有限，无 OOM、NaN 或 rank failure。
+- step 600 附近完整 dev 评估成功，`eval_loss=0.5323175`，runtime 182.406 秒；证明显式 `skip_logits=True` 修复有效。
+- 当前训练执行已完成；正式产物仍需独立检查 adapter、run manifest 并完成 adapter 重载生成，之后再进入 full SFT 质量评测。

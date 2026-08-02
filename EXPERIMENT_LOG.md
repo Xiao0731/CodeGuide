@@ -184,3 +184,11 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - traceback 明确显示评估仍调用 `compute_loss(return_outputs=True)`，所以 EXP-014 的配置级修复在当前 Transformers 4.53.3 + Liger 0.8.0 环境中无效。
 - 改为显式 loss-only `prediction_step`，从运行路径上禁止评估保留词表维度 logits；待云端同一 full 入口越过 step 25 复验。
 - 二次复验仍 OOM，且自定义 `prediction_step` 已实际命中；官方 Liger 0.8.0 `lce_forward` 显示 eval mode 不会自动启用 `skip_logits`。现进一步显式传入 `skip_logits=True`，待第三次云端复验。
+
+# EXP-016：9,791 条 full SFT 正式训练
+
+- 配置：Qwen2.5-Coder-7B-Instruct，双 RTX 4090，4-bit NF4，LoRA r=32/alpha=64，8K，completion-only loss，1 epoch。
+- 结果：612/612 optimizer steps；runtime 15,032.6429 秒；train loss 0.5693142565；吞吐 0.651 samples/s、0.041 steps/s。
+- dev：末段 515 条评估 `eval_loss=0.5323174596`，runtime 182.406 秒，2.823 samples/s；评估后继续训练至 epoch 1.0。
+- 稳定性：无 OOM、NaN、NCCL rank failure；末段 grad norm 约 0.10--0.20，学习率按 cosine 正常衰减至接近 0。
+- 状态：训练完成，等待 adapter/manifest 文件检查和独立重载生成；尚未完成 full Adapter 的 Docker Pass@1 质量评测。

@@ -554,3 +554,10 @@
 - **决定**：不缩减 dev、不降低 8K 长度、不改变评估频率；通过 Trainer 子类在评估阶段强制 `return_outputs=False`，只聚合 loss。
 - **验收**：同一 full 启动入口必须越过 step 25、产出 eval loss 并继续训练，方可确认该故障关闭。
 - **实现修正**：Liger 评估前向显式传入 `skip_logits=True`；不通过递归 `model.train()` 激活 fused loss，以免 LoRA dropout 0.05 污染 dev loss。
+
+# DEC-027：full SFT 训练完成后先做产物重载再进入质量评测
+
+- **日期**：2026-08-02
+- **证据**：固定 9,791/515 数据完成 612/612 steps，train loss 0.5693143，dev loss 0.5323175，训练与评估均无 OOM/NaN。
+- **决定**：不重复训练；先检查 `full_seed20260728/adapter` 与 `run_manifest.json`，独立重载 adapter 完成确定性生成，再沿用校准阶段的云端生成、本地 Docker 验证流程评估 full Adapter。
+- **边界**：在 adapter 重载成功前只宣称“full SFT 训练执行完成”，不宣称正式模型质量 Gate 已通过。
