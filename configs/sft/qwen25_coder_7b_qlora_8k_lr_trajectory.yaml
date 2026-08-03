@@ -59,11 +59,12 @@ training:
   logging_steps: 1
   eval_steps: 25
 
-  # 禁止普通周期保存。真正保存由 checkpoint_milestones callback 触发，
-  # 避免 checkpoint-25、50、75……之外的额外快照挤占 save_total_limit。
+  # 禁止普通周期保存。真正保存由 checkpoint_milestones callback 触发。
+  # 1e-4 的能力变化更缓，因此在 200--400 step 区间补充 250/350；
+  # 两组学习率使用完全相同的里程碑，保证逐点可比。
   save_steps: 1000000
   save_total_limit: 20
-  checkpoint_milestones: [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 300, 400, 500, 600, 612]
+  checkpoint_milestones: [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 350, 400, 500, 600, 612]
 
   dataloader_num_workers: 2
   ddp_find_unused_parameters: false
