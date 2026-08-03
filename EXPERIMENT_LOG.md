@@ -227,3 +227,16 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 训练风险：GPT-4o 最多生成 3072 tokens，但 SFT 序列上限 2048 且无超长隔离，代码在回答末尾；3 epochs、LR 2e-4 的效果没有日志。
 - 评测口径：ablation 是 reward-function rescoring，不是模型训练消融；blind eval 是未附结果的可执行框架。README 的性能叙述不能视为复现实验数据。
 - 对比结论：无法证明外部 GPT-4o 蒸馏更优；当前项目暴露出的 4/40 结果虽不理想，但具备固定题集、原始 generation、Docker verification 和完整训练日志，证据等级更高。
+
+# EXP-021：外部 CodeGuide-LLM 实现级对照
+
+- 审查对象：`D:\Downloads\CodeGuide-LLM-main.zip`，SHA256 `B5F21B9EFEAEAF2DADCA624BF2BB5BB9796CE63603C0BCC97F491E6830C4FA01`；仅解压到临时目录，未写入当前代码树。
+- QLoRA/warm-start：外部 SFT 为 4-bit 新 LoRA；warm-start 是 GRPO 加载 SFT adapter。当前项目正式 SFT 同样完成 NF4 QLoRA，GRPO 热启动入口存在但正式 7B GRPO 尚未运行。
+- 外部主训练 reward：accuracy 0.6 + format 0.4；teaching 是监控项。README 的“三路奖励”组件存在，但未接入主 GRPO 梯度。
+- 外部 LocalTeachingReward：结构关键词、TTR、注释率、连接词四维启发式；包内没有 API 对齐结果。当前项目仅保留为 surface diagnostic，权重为 0。
+- 外部 reward normalization：对 combined reward 整批 Z-score；不是三路分别归一化，且 TRL 后续仍做组相对归一化。当前项目默认关闭。
+- 外部 collapse/curriculum/best-checkpoint：代码均存在；curriculum 默认关闭，best checkpoint 只评前 20 个 public-test 样本且用平均 pass rate。当前项目已把 checkpoint 口径改为独立 heldout tests + strict Pass@1，但三个功能都尚未进入正式 GRPO 实测。
+- 外部静态运行检查：`python -m compileall` 发现 3 个用户入口脚本存在未转义中文引号语法错误；`tests/test_rewards.py` 为 28 passed / 1 failed，失败原因是实现已把无测试评分改为 AST 代理分而测试仍断言 1.0。
+- SFT 对照：外部 GPT-4o scratch prompt 不含 reference/tests/interface，TACO tests 为空，默认不执行代码；当前 DeepSeek reference-guided 流程以 10,415 个 verified source 为母库，A/B 两路都以统一 verifier 为接纳硬门槛。
+- Benchmark 归因：HumanEval 88.4% 来自 Qwen2.5-Coder-7B-Instruct 官方技术报告，不是外部项目训练结果；本项目也不得直接占用该数字作为训练收益。
+- 值得迁移并实测的设计：独立验证集 best checkpoint、zero-advantage 监控、curriculum 消融、Bootstrap 教学评测。暂不迁移：无测试 AST correctness、整批 reward Z-score、未经对齐的 teaching heuristic 入梯度。

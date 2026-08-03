@@ -1809,3 +1809,12 @@ Codex 必须先回答：
 - full 入口 validate-only 已确认固定 9,791 train / 515 dev，训练配置不变；本地不启动 7B 训练。
 - 云容器首次 full 启动在 NCCL `/dev/shm` attach 阶段失败；双卡入口已默认禁用 NCCL SHM 通道，待保持其余配置不变重启。
 - NCCL 修复后 full 已完成 25 steps，但全量 dev 评估因完整 logits OOM；评估已改为 loss-only，不缩减 515 条 dev 或 8K 长度。
+
+## 2026-08-03 外部实现复核后的执行口径补充
+
+1. 正式 GRPO 从已完成的 full SFT adapter 暖启动；“warm-start”专指该阶段，不把从官方 Instruct 基座开始的 QLoRA SFT表述为 adapter 暖启动。
+2. 正确性奖励继续要求可执行测试和统一 verifier；无测试样本不得以 AST/格式代理分冒充 correctness。
+3. TeachingCritic 准入前，LocalTeachingReward 只作表面教学特征监控，不进入梯度；主奖励保持 correctness 0.9 + contract 0.1。
+4. GRPO 自带组相对优势归一化，额外 batch Z-score 默认关闭，只能作为命名消融。
+5. 候选增强按优先级验证：独立 heldout strict Pass@1 best checkpoint、zero-advantage 监控、curriculum 消融、Bootstrap 教学评测。任何 README 声明均须以本项目冻结数据、Docker 口径和落盘结果重新验证。
+6. HumanEval 88.4% 是 Qwen2.5-Coder-7B-Instruct 官方基座结果，不是 CodeGuide 训练收益；正式报告需要单独运行 HumanEval+/MBPP+ 等保持性评测。

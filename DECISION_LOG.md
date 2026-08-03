@@ -590,3 +590,12 @@
 - **决定**：保留外部项目作为设计参考，不据其 README 宣称 GPT-4o SFT 数据或 GRPO 效果优于本项目，也不回退到其简化验证逻辑。
 - **依据**：外部包缺少数据、模型和结果产物；TACO 无执行测试，SFT 接纳条件允许失败代码，训练存在 2048 静默截断风险。
 - **可借鉴项**：统一且简洁的教学模板、对回答篇幅的显式约束、最佳 checkpoint 与课程学习概念；引入前必须在当前 verified source bank 和 Docker 口径下重新验证。
+
+# DEC-032：选择性吸收外部 GRPO 设计，不回退正确性口径
+
+- **日期**：2026-08-03
+- **决定**：正式 GRPO 继续从 full SFT adapter 暖启动；保留并验证 zero-advantage 监控、独立 heldout strict Pass@1 选优和 curriculum 消融，不采用无测试 AST 分替代 correctness。
+- **奖励主线**：TeachingCritic 准入前保持 Docker correctness 0.9 + contract 0.1；LocalTeachingReward 只能记录为表面诊断，不能称为真实教学质量，也不进入梯度。
+- **归一化**：默认关闭 reward 函数中的 batch Z-score。GRPO 已做 prompt 组内相对优势标准化；如研究额外预标准化，必须作为独立消融并同时报告组内方差和 reward 排序变化。
+- **框架选择**：不因外部项目使用 Unsloth 而重写已在双 4090、8K 上通过的 Transformers/PEFT/bitsandbytes/Liger SFT 管线。Unsloth 仅在同配置显存与吞吐基准证明收益后考虑用于后续入口。
+- **评测补齐**：后续需要执行 HumanEval+/MBPP+ 等代码保持评测和带技术正确性门控的教学评测；官方 HumanEval 88.4% 只作为基座来源数据，不作为 CodeGuide 训练后结果。

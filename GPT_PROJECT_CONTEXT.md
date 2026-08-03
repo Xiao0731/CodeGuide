@@ -706,3 +706,21 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 外部 SFT 使用 `max_seq_length=2048`、3 epochs、LR 2e-4，并允许 SFTTrainer 静默截断；teacher 输出上限为 3072 且代码位于末尾，存在截断代码风险，未见 tokenizer 长度审计。
 - 外部 ablation 只是对同一批已有 completion 使用四套 reward 公式重新计分，不训练四个模型；blind eval 虽有完整框架，但包内没有生成、judge、Pass@1 或 bootstrap 报告。
 - 该项目可作为架构原型和叙事参考，不能作为“GPT-4o 数据或其训练效果优于当前数据”的实验证据。本项目代码更复杂主要来自真实执行闭环、失败恢复与可复现审计。
+
+## 2026-08-03：外部 CodeGuide-LLM 训练与奖励实现逐项复核
+
+- 复核输入为 `D:\Downloads\CodeGuide-LLM-main.zip`，SHA256 `B5F21B9EFEAEAF2DADCA624BF2BB5BB9796CE63603C0BCC97F491E6830C4FA01`；压缩包未复制、覆盖或修改当前仓库，只解压到系统临时目录审查。
+- 外部项目的 “QLoRA + warm-start” 实际包含两个动作：SFT 从 `Qwen/Qwen2.5-Coder-7B-Instruct` 以 4-bit + 新 LoRA 开始；GRPO 再优先从 `models/sft_adapter` 加载 SFT adapter。warm-start 指 GRPO，不是 SFT 从旧 adapter 继续训练。
+- 本项目正式 SFT 同样是 4-bit NF4 QLoRA，并已完成 9,791 条双 4090 训练、adapter 保存和重载；`src/training/grpo_train.py` 也有 SFT adapter 热启动分支，但正式 7B GRPO 尚未运行，实际 adapter 路径仍需在 GRPO 配置冻结时指向 full 产物。
+- 外部项目使用 Unsloth 的 `FastLanguageModel.from_pretrained(load_in_4bit=True)`、`get_peft_model(... use_gradient_checkpointing="unsloth")` 和 `train_on_responses_only`。本项目正式云端入口没有使用 Unsloth，而是 Transformers + PEFT + bitsandbytes + 双卡 DDP + gradient checkpointing + Liger fused linear cross entropy + SDPA；两者都是 QLoRA，区别是运行时优化栈。
+- 外部主 GRPO 梯度实际仍为 `0.6*accuracy + 0.4*format`；LocalTeachingReward 只进入监控。虽然另有 `CompositeReward` 三路类，但主训练入口没有使用它，且该类固定实例化 API TeachingReward。
+- 外部 LocalTeachingReward 的四维是：暴力/优化/代码关键词结构、文本 TTR、代码注释密度、教学连接词数量。它衡量表面教学特征，不检查算法讲解是否正确，也没有随包 Spearman 对齐报告。本项目保留相同启发式作为 `diagnostic/teaching_surface`，正式配置教学权重为 0，等待 TeachingCritic 准入。
+- 外部 batch Z-score 是在 reward 函数返回前对 combined reward 做整批标准化，不是逐路标准化，也不是 GRPO 核心公式；TRL 之后仍会做组相对优势计算。本项目因此默认 `normalize_rewards=false`，只保留为命名消融。
+- 外部 Generation Collapse 代码按每个 prompt 的 4 个 completion 统计 raw combined reward 方差，并对低方差比例告警。低 reward 方差只能证明组内优势接近零，不能单独证明文本完全趋同；本项目将指标改名为 `zero_advantage_ratio`，仍需联合文本、代码和 AST 多样性。
+- 外部 Curriculum Learning 确实按 easy/medium/hard 顺序分别构建数据集和 trainer，并调整 max generation tokens；配置默认关闭。本项目也保留该入口且默认关闭，后续只能作为 GRPO 消融，在固定 strict correctness reward 和独立验证集后启用。
+- 外部 BestCheckpointCallback 确实可定期生成并保存更高分 adapter，但只取前 20 个带 public tests 的样本，记录的是平均测试通过率而非严格全测试 Pass@1，且 TACO loader 把 tests 置空。本项目版本改用独立冻结 `heldout_tests`、Docker verifier，并把全测试通过二值化为 Pass@1，但当前 `save_best=false`、尚未实训。
+- 外部 `evals/ablation.py` 是固定 completion 的 reward 公式重评分，不训练四个模型；`test_teaching_alignment.py --local_only` 只输出本地分布，只有带 API 的模式才会计算 Spearman rho；`blind_eval.py` 实现了随机顺序 judge、Bootstrap CI 和配对 Bootstrap，但压缩包没有结果产物。
+- 外部 ZIP 静态检查还发现 `scripts/train_grpo.py`、`scripts/inference_demo.py`、`scripts/gradio_demo.py` 因中文引号未转义而无法编译；奖励单测为 28 passed / 1 failed，失败来自“无测试 AST 代理分”修改后测试仍期待 1.0。可运行 GRPO 主体是 `src/training/grpo_train.py`，不是 README 同时列出的所有入口。
+- 外部 README 的 HumanEval 88.4% 是 Qwen2.5-Coder-7B-Instruct 官方基座成绩，不是该项目 SFT/GRPO 后实测。当前项目同样继承该基座，但尚未运行 HumanEval+/MBPP+/LiveCodeBench，不能把官方基座数字写成本项目结果。
+- 数据构造方面，外部 teacher 只看到题面、难度和标签；reference 虽被 loader 取出但没有进入 prompt。TACO tests 被置空，`--run_code` 默认关闭，质量分主要检查结构、闭合代码块、复杂度和长度。默认 source=`both` 还会先加载 CodeContests 到 `max_items`，并不保证 10,000 条中确实包含 TACO。
+- 本项目 teacher 使用 verified reference、接口元数据、测试摘要和可选 seed teaching examples；student prompt 不泄漏 reference；A 类输出必须通过统一 Docker verifier，B 类锁定 reference 并只生成讲解/安全注释；最终 canonical 为 10,306 条。外部 `build_seed.py` 的 50 条 seed 是独立生成供人工查看，没有作为 few-shot 示例注入全量蒸馏 prompt。
