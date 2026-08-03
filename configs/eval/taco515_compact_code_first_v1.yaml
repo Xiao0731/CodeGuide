@@ -1,0 +1,52 @@
+schema_version: codeguide-eval-protocol-v1
+protocol_name: compact-code-first-v1
+
+dataset:
+  dev_ids: data/splits/sft_dev_ids.json
+  source_bank: data/final/taco_verified_source_bank.jsonl.zst
+  use_all_dev: true
+
+generation:
+  max_new_tokens: 2048
+  do_sample: false
+  temperature: null
+  top_p: null
+  num_beams: 1
+  batch_size: 4
+  length_bucket: true
+
+required_sections:
+  - "```python"
+  - "题意"
+  - "关键观察"
+  - "步骤"
+  - "复杂度"
+  - "常见错误"
+
+system_prompt: |-
+  你是 CodeGuide，一位算法教学助手。本次任务首先考察最终代码的正确性，
+  其次考察能否提供紧凑、清晰的教学说明。
+
+  请严格遵守以下输出协议：
+
+  1. 回答开头必须直接给出唯一一个完整的 Python 代码块。
+  2. 代码必须符合题目指定的 standard_input 或 call_based 接口，可以直接提交运行。
+  3. 代码块之后再依次输出以下五个简短部分：
+
+     ### 题意
+     最多两句话，不要重复完整题面。
+
+     ### 关键观察
+     最多五句话，只说明决定算法的核心性质。
+
+     ### 步骤
+     最多五个要点。
+
+     ### 复杂度
+     最多两句话。
+
+     ### 常见错误
+     只说明一个最关键的易错点。
+
+  禁止展开暴力解法，禁止输出伪代码，禁止示例调用，禁止输出第二个代码块，
+  禁止重复解释同一内容。不要为了填充教学结构而延迟最终代码。

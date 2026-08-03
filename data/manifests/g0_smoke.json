@@ -1,8 +1,0 @@
-{
-  "schema_version": 1,
-  "split_name": "g0_reference_guided_smoke",
-  "records_path": "../sft_train_smoke_ref_label.jsonl",
-  "records_sha256": "d1d48b89eeda11405934d9863ce5dedf131e33a2c248a8081688c5186c390dd0",
-  "record_count": 5,
-  "frozen_for": "G0 manifest reader smoke only; not a model benchmark"
-}
