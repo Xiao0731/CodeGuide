@@ -1,10 +1,19 @@
 schema_version: codeguide-eval-protocol-v1
 protocol_name: compact-code-first-v1
 
+model:
+  name: Qwen/Qwen2.5-Coder-7B-Instruct
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+  dtype: bfloat16
+
 dataset:
+  canonical: data/final/sft_accepted.jsonl
   dev_ids: data/splits/sft_dev_ids.json
   source_bank: data/final/taco_verified_source_bank.jsonl.zst
   use_all_dev: true
+  seed: 20260728
 
 generation:
   max_new_tokens: 2048
@@ -12,8 +21,12 @@ generation:
   temperature: null
   top_p: null
   num_beams: 1
-  batch_size: 4
+  batch_size: 8
   length_bucket: true
+
+verification:
+  workers: 4
+  timeout_seconds: 5.0
 
 required_sections:
   - "```python"
@@ -23,6 +36,8 @@ required_sections:
   - "复杂度"
   - "常见错误"
 
+# 【改动 1】评测时替换训练阶段的长教学 system prompt。
+# 这样不会继续要求“先暴力解、再伪代码、最后才给代码”。
 system_prompt: |-
   你是 CodeGuide，一位算法教学助手。本次任务首先考察最终代码的正确性，
   其次考察能否提供紧凑、清晰的教学说明。
@@ -50,3 +65,10 @@ system_prompt: |-
 
   禁止展开暴力解法，禁止输出伪代码，禁止示例调用，禁止输出第二个代码块，
   禁止重复解释同一内容。不要为了填充教学结构而延迟最终代码。
+
+# 【改动 2】在原 user 题面末尾追加一次短提醒。
+# system prompt 是主约束；这里是为了减弱模型沿用旧训练模板的惯性。
+user_suffix: |-
+
+  【本次评测再次提醒】
+  请先输出唯一的完整 Python 代码块，再给紧凑说明；不要展开暴力解法或伪代码，讲解必须简洁有效，不要铺张过度。

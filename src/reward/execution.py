@@ -183,8 +183,6 @@ def _run_harness_subprocess(harness_path: Path, timeout: float) -> VerificationR
             [sys.executable, "-I", str(harness_path)],
             capture_output=True,
             text=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=timeout,
             cwd=harness_path.parent,
             env={
@@ -305,8 +303,6 @@ def _run_harness_docker(
                 [docker, "rm", "--force", container_name],
                 capture_output=True,
                 text=True,
-                encoding="utf-8",
-                errors="replace",
                 timeout=10.0,
                 env={"PATH": os.environ.get("PATH", "")},
             )
@@ -318,8 +314,6 @@ def _run_harness_docker(
             command,
             capture_output=True,
             text=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=timeout + 2.0,
             env={"PATH": os.environ.get("PATH", "")},
         )
