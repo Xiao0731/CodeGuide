@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Run resumable strict-Docker verification for the 35-variant TACO-100 trajectory.
 
-The cloud run was prepared from an unpacked repository and therefore froze
-``git_commit: null`` in its manifest. A normal local Git checkout has a commit,
-which would make the original evaluator reject the frozen run. This wrapper
-preserves the manifest and masks Git discovery only inside evaluator subprocesses.
+The downloaded cloud run freezes both the protocol bytes and the original
+protocol path. This wrapper validates the bytes first, temporarily exposes the
+frozen file under that original path, masks local Git discovery when the cloud
+manifest recorded ``git_commit: null``, and restores every local file afterward.
 """
 
 from __future__ import annotations
@@ -15,12 +15,13 @@ import json
 import os
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUN_DIR = "outputs/eval/taco100_lr_trajectory_bs16"
-DEFAULT_PROTOCOL = "configs/eval/taco100_balanced_code_first_v1.yaml"
+DEFAULT_PROTOCOL = "configs/eval/taco100_balanced_code_first_v1_cloud_b3714792.yaml"
 DEFAULT_IMAGE = (
     "python:3.11.9-slim-bookworm@sha256:"
     "8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317"
@@ -90,6 +91,8 @@ def run_checked(
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
         )
         assert process.stdout is not None
@@ -145,7 +148,7 @@ def validate_frozen_inputs(run_dir: Path, protocol_path: Path) -> tuple[list[str
             "local protocol config differs from the cloud-frozen config:\n"
             f"  local : {actual_config_hash}\n"
             f"  frozen: {frozen_config_hash}\n"
-            "Restore configs/eval/taco100_balanced_code_first_v1.yaml from the generation commit."
+            "Use the cloud-frozen protocol file supplied for this run."
         )
 
     variants = expected_variants()
@@ -179,6 +182,7 @@ def validate_frozen_inputs(run_dir: Path, protocol_path: Path) -> tuple[list[str
                 "variants": len(variants),
                 "answers": len(variants) * len(selected),
                 "protocol_sha256": actual_config_hash,
+                "manifest_protocol_config": manifest.get("protocol_config"),
                 "manifest_git_commit": manifest.get("git_commit"),
             },
             ensure_ascii=False,
@@ -191,9 +195,52 @@ def validate_frozen_inputs(run_dir: Path, protocol_path: Path) -> tuple[list[str
 def evaluator_env(manifest: dict[str, Any]) -> dict[str, str]:
     env = os.environ.copy()
     if manifest.get("git_commit") is None:
-        env["GIT_DIR"] = str(ROOT / ".codeguide_no_git_for_frozen_eval")
+        # Avoid an error message containing the non-ASCII checkout path. The
+        # evaluator catches git's nonzero exit and reproduces cloud null.
+        env["GIT_DIR"] = "NUL" if os.name == "nt" else "/dev/null"
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     return env
+
+
+@contextmanager
+def expose_manifest_protocol(
+    frozen_protocol: Path,
+    manifest: dict[str, Any],
+) -> Iterator[Path]:
+    """Expose frozen bytes under the exact path recorded by the cloud manifest."""
+    identity = manifest.get("protocol_config")
+    if not isinstance(identity, str) or not identity:
+        raise RuntimeError("manifest has no protocol_config identity")
+    manifest_path = resolve(identity)
+
+    try:
+        same_file = manifest_path.resolve() == frozen_protocol.resolve()
+    except FileNotFoundError:
+        same_file = False
+    if same_file:
+        yield manifest_path
+        return
+
+    original_exists = manifest_path.exists()
+    original_bytes = manifest_path.read_bytes() if original_exists else None
+    frozen_bytes = frozen_protocol.read_bytes()
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_bytes(frozen_bytes)
+    print(
+        f"[frozen-protocol] temporarily mapped {frozen_protocol} -> {manifest_path}",
+        flush=True,
+    )
+    try:
+        yield manifest_path
+    finally:
+        if original_exists:
+            assert original_bytes is not None
+            manifest_path.write_bytes(original_bytes)
+        else:
+            manifest_path.unlink(missing_ok=True)
+        print(f"[frozen-protocol] restored {manifest_path}", flush=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -247,59 +294,69 @@ def main() -> None:
 
     env = evaluator_env(manifest)
     batch_size = int(manifest["generation"]["batch_size"])
-    for index, variant in enumerate(targets, 1):
-        print(f"\n=== [{index}/{len(targets)}] verify {variant} ===", flush=True)
-        command = [
-            sys.executable,
-            "scripts/evaluate_sft_matrix.py",
-            "--stage",
-            "verify",
-            "--protocol-config",
-            str(protocol_path),
-            "--run-dir",
-            str(run_dir),
-            "--variant",
-            variant,
-            "--batch-size",
-            str(batch_size),
-            "--container-image",
-            args.container_image,
-            "--verify-workers",
-            str(args.verify_workers),
-        ]
-        run_checked(
-            command,
-            env=env,
-            log_path=run_dir / "logs" / f"local_verify_{variant}.log",
-        )
-
-    if not args.smoke and not args.variant:
-        run_checked(
-            [
+    with expose_manifest_protocol(protocol_path, manifest) as evaluator_protocol_path:
+        for index, variant in enumerate(targets, 1):
+            print(f"\n=== [{index}/{len(targets)}] verify {variant} ===", flush=True)
+            command = [
                 sys.executable,
                 "scripts/evaluate_sft_matrix.py",
                 "--stage",
-                "summarize",
+                "verify",
                 "--protocol-config",
-                str(protocol_path),
+                str(evaluator_protocol_path),
                 "--run-dir",
                 str(run_dir),
+                "--variant",
+                variant,
                 "--batch-size",
                 str(batch_size),
-            ],
-            env=env,
-            log_path=run_dir / "logs" / "local_summarize.log",
-        )
-        run_checked(
-            [
-                sys.executable,
-                "scripts/summarize_taco100_lr_trajectory.py",
-                "--run-dir",
-                str(run_dir),
-            ],
-            env=env,
-            log_path=run_dir / "logs" / "local_trajectory_summary.log",
-        )
+                "--container-image",
+                args.container_image,
+                "--verify-workers",
+                str(args.verify_workers),
+            ]
+            run_checked(
+                command,
+                env=env,
+                log_path=run_dir / "logs" / f"local_verify_{variant}.log",
+            )
+
+        if not args.smoke and not args.variant:
+            run_checked(
+                [
+                    sys.executable,
+                    "scripts/evaluate_sft_matrix.py",
+                    "--stage",
+                    "summarize",
+                    "--protocol-config",
+                    str(evaluator_protocol_path),
+                    "--run-dir",
+                    str(run_dir),
+                    "--batch-size",
+                    str(batch_size),
+                ],
+                env=env,
+                log_path=run_dir / "logs" / "local_summarize.log",
+            )
+
+    if not args.smoke and not args.variant:
+        trajectory_script = ROOT / "scripts/summarize_taco100_lr_trajectory.py"
+        if trajectory_script.is_file():
+            run_checked(
+                [
+                    sys.executable,
+                    str(trajectory_script),
+                    "--run-dir",
+                    str(run_dir),
+                ],
+                env=env,
+                log_path=run_dir / "logs" / "local_trajectory_summary.log",
+            )
+        else:
+            print(
+                "[warning] trajectory summary script is absent; checkpoint_matrix.json was still created",
+                flush=True,
+            )
 
         selected = set(read_json(run_dir / "selection.json")["problem_ids"])
         acceptance: dict[str, Any] = {
