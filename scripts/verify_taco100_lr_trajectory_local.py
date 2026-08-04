@@ -3,8 +3,8 @@
 
 The downloaded cloud run freezes both the protocol bytes and the original
 protocol path. This wrapper validates the bytes first, temporarily exposes the
-frozen file under that original path, masks local Git discovery when the cloud
-manifest recorded ``git_commit: null``, and restores every local file afterward.
+frozen file under that original path, fixes evaluator Git provenance to the
+value recorded by the manifest, and restores every local file afterward.
 """
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 DEFAULT_RUN_DIR = "outputs/eval/taco100_lr_trajectory_bs16"
 DEFAULT_PROTOCOL = "configs/eval/taco100_balanced_code_first_v1_cloud_b3714792.yaml"
 DEFAULT_IMAGE = (
@@ -192,18 +194,6 @@ def validate_frozen_inputs(run_dir: Path, protocol_path: Path) -> tuple[list[str
     return variants, manifest
 
 
-def evaluator_env(manifest: dict[str, Any]) -> dict[str, str]:
-    env = os.environ.copy()
-    if manifest.get("git_commit") is None:
-        # Avoid an error message containing the non-ASCII checkout path. The
-        # evaluator catches git's nonzero exit and reproduces cloud null.
-        env["GIT_DIR"] = "NUL" if os.name == "nt" else "/dev/null"
-    env["PYTHONUNBUFFERED"] = "1"
-    env["PYTHONUTF8"] = "1"
-    env["PYTHONIOENCODING"] = "utf-8"
-    return env
-
-
 @contextmanager
 def expose_manifest_protocol(
     frozen_protocol: Path,
@@ -241,6 +231,55 @@ def expose_manifest_protocol(
         else:
             manifest_path.unlink(missing_ok=True)
         print(f"[frozen-protocol] restored {manifest_path}", flush=True)
+
+
+def run_evaluator_in_process(
+    *,
+    variant: str,
+    manifest: dict[str, Any],
+    protocol_path: Path,
+    run_dir: Path,
+    container_image: str,
+    verify_workers: int,
+) -> None:
+    """Call the frozen evaluator directly with manifest-controlled provenance."""
+    from scripts import evaluate_sft_matrix as matrix
+
+    original_get_git_commit = matrix.get_git_commit
+    matrix.get_git_commit = lambda: manifest.get("git_commit")
+    try:
+        protocol = matrix.load_protocol(protocol_path)
+        args = argparse.Namespace(
+            variant=variant,
+            batch_size=int(manifest["generation"]["batch_size"]),
+            container_image=container_image,
+            verify_workers=verify_workers,
+        )
+        matrix.verify_variant(args, protocol, protocol_path, run_dir)
+    finally:
+        matrix.get_git_commit = original_get_git_commit
+
+
+def summarize_evaluator_in_process(
+    *,
+    manifest: dict[str, Any],
+    protocol_path: Path,
+    run_dir: Path,
+) -> None:
+    from scripts import evaluate_sft_matrix as matrix
+
+    original_get_git_commit = matrix.get_git_commit
+    matrix.get_git_commit = lambda: manifest.get("git_commit")
+    try:
+        protocol = matrix.load_protocol(protocol_path)
+        matrix.summarize_matrix(
+            protocol,
+            protocol_path,
+            run_dir,
+            int(manifest["generation"]["batch_size"]),
+        )
+    finally:
+        matrix.get_git_commit = original_get_git_commit
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -292,56 +331,31 @@ def main() -> None:
     else:
         targets = variants
 
-    env = evaluator_env(manifest)
-    batch_size = int(manifest["generation"]["batch_size"])
     with expose_manifest_protocol(protocol_path, manifest) as evaluator_protocol_path:
         for index, variant in enumerate(targets, 1):
             print(f"\n=== [{index}/{len(targets)}] verify {variant} ===", flush=True)
-            command = [
-                sys.executable,
-                "scripts/evaluate_sft_matrix.py",
-                "--stage",
-                "verify",
-                "--protocol-config",
-                str(evaluator_protocol_path),
-                "--run-dir",
-                str(run_dir),
-                "--variant",
-                variant,
-                "--batch-size",
-                str(batch_size),
-                "--container-image",
-                args.container_image,
-                "--verify-workers",
-                str(args.verify_workers),
-            ]
-            run_checked(
-                command,
-                env=env,
-                log_path=run_dir / "logs" / f"local_verify_{variant}.log",
+            run_evaluator_in_process(
+                variant=variant,
+                manifest=manifest,
+                protocol_path=evaluator_protocol_path,
+                run_dir=run_dir,
+                container_image=args.container_image,
+                verify_workers=args.verify_workers,
             )
 
         if not args.smoke and not args.variant:
-            run_checked(
-                [
-                    sys.executable,
-                    "scripts/evaluate_sft_matrix.py",
-                    "--stage",
-                    "summarize",
-                    "--protocol-config",
-                    str(evaluator_protocol_path),
-                    "--run-dir",
-                    str(run_dir),
-                    "--batch-size",
-                    str(batch_size),
-                ],
-                env=env,
-                log_path=run_dir / "logs" / "local_summarize.log",
+            summarize_evaluator_in_process(
+                manifest=manifest,
+                protocol_path=evaluator_protocol_path,
+                run_dir=run_dir,
             )
 
     if not args.smoke and not args.variant:
         trajectory_script = ROOT / "scripts/summarize_taco100_lr_trajectory.py"
         if trajectory_script.is_file():
+            env = os.environ.copy()
+            env["PYTHONUTF8"] = "1"
+            env["PYTHONIOENCODING"] = "utf-8"
             run_checked(
                 [
                     sys.executable,
