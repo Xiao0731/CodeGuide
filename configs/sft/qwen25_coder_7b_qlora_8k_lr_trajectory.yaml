@@ -36,7 +36,7 @@ qlora:
 
 training:
   # 两个学习率实验分别占用一张 4090。单进程 gradient accumulation=16，
-  # 与原双卡训练的全局有效 batch 1×8×2=16 保持一致，因此仍约 612 steps。
+  # 与原双卡训练的全局有效 batch 1×8×2=16 保持一致。
   output_dir: outputs/sft/qwen25_coder_7b_qlora_8k/lr_trajectory_default
   expected_world_size: 1
   num_train_epochs: 1.0
@@ -59,12 +59,11 @@ training:
   logging_steps: 1
   eval_steps: 25
 
-  # 禁止普通周期保存。真正保存由 checkpoint_milestones callback 触发。
-  # 1e-4 的能力变化更缓，因此在 200--400 step 区间补充 250/350；
-  # 两组学习率使用完全相同的里程碑，保证逐点可比。
+  # 9791 条样本、有效 batch=16 时，Trainer 实际执行 611 个 optimizer step。
+  # 禁止普通周期保存，里程碑 callback 负责保存；final adapter 也是 step 611。
   save_steps: 1000000
   save_total_limit: 20
-  checkpoint_milestones: [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 350, 400, 500, 600, 612]
+  checkpoint_milestones: [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 350, 400, 500, 600, 611]
 
   dataloader_num_workers: 2
   ddp_find_unused_parameters: false
