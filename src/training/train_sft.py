@@ -9,7 +9,6 @@ import os
 import platform
 import subprocess
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -85,8 +84,6 @@ class LossOnlyPredictionMixin:
         del prediction_loss_only, ignore_keys
         inputs = dict(self._prepare_inputs(inputs))
         if getattr(self.args, "use_liger_kernel", False):
-            # Liger only enables this automatically in train mode. Evaluation
-            # must request it explicitly or the full vocabulary logits are built.
             inputs["skip_logits"] = True
         with torch.no_grad(), self.compute_loss_context_manager():
             loss = self.compute_loss(model, inputs, return_outputs=False)
@@ -129,6 +126,23 @@ def make_milestone_save_callback(TrainerCallback, milestones: list[int]):
     return MilestoneSaveCallback()
 
 
+def make_stop_after_step_callback(TrainerCallback, stop_after_step: int):
+    """Pause at one milestone without redefining the planned LR schedule."""
+
+    class StopAfterStepCallback(TrainerCallback):
+        def on_step_end(self, args, state, control, **kwargs):
+            del args, kwargs
+            if state.global_step >= stop_after_step:
+                control.should_training_stop = True
+                print(
+                    f"[phase-stop] pause training at optimizer step {state.global_step}",
+                    flush=True,
+                )
+            return control
+
+    return StopAfterStepCallback()
+
+
 def _git_state() -> dict[str, Any]:
     def run(*args: str) -> str:
         return subprocess.check_output(args, cwd=ROOT, text=True).strip()
@@ -152,6 +166,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tokenizer-name-or-path")
     parser.add_argument("--resume-from-checkpoint")
     parser.add_argument("--max-steps", type=int)
+    parser.add_argument(
+        "--stop-after-step",
+        type=int,
+        help="pause at this optimizer step while keeping the full LR schedule",
+    )
     parser.add_argument("--learning-rate", type=float)
     parser.add_argument("--gradient-accumulation-steps", type=int)
     parser.add_argument(
@@ -164,6 +183,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
+    if args.stop_after_step is not None and args.stop_after_step <= 0:
+        raise ValueError("--stop-after-step must be positive")
+
     config_path = resolve_path(args.config)
     assert config_path is not None
     cfg = load_config(config_path)
@@ -171,8 +193,6 @@ def main() -> None:
     model_cfg, data_cfg, qlora_cfg = cfg["model"], cfg["data"], cfg["qlora"]
     train_cfg = dict(cfg["training"])
 
-    # CLI overrides are written back into the frozen manifest config so that the
-    # actual run, rather than only the source YAML, remains auditable.
     if args.learning_rate is not None:
         train_cfg["learning_rate"] = args.learning_rate
     if args.gradient_accumulation_steps is not None:
@@ -191,6 +211,11 @@ def main() -> None:
         raise RuntimeError(
             "save_total_limit would delete frozen trajectory checkpoints: "
             f"limit={save_total_limit}, milestones={len(milestones)}"
+        )
+    if args.stop_after_step is not None and args.stop_after_step not in milestones:
+        raise RuntimeError(
+            "stop-after-step must be one of checkpoint_milestones so the phase is resumable: "
+            f"stop={args.stop_after_step}, milestones={milestones}"
         )
 
     canonical = resolve_path(data_cfg["canonical"])
@@ -245,6 +270,7 @@ def main() -> None:
                         train_cfg["gradient_accumulation_steps"]
                     ),
                     "checkpoint_milestones": milestones,
+                    "stop_after_step": args.stop_after_step,
                     "expected_world_size": train_cfg.get("expected_world_size"),
                 },
                 ensure_ascii=False,
@@ -407,8 +433,10 @@ def main() -> None:
         data_collator=AssistantOnlyDataCollator(tokenizer),
     )
     if milestones:
+        trainer.add_callback(make_milestone_save_callback(TrainerCallback, milestones))
+    if args.stop_after_step is not None:
         trainer.add_callback(
-            make_milestone_save_callback(TrainerCallback, milestones)
+            make_stop_after_step_callback(TrainerCallback, args.stop_after_step)
         )
 
     started = time.time()
@@ -429,6 +457,7 @@ def main() -> None:
             "supervised_token_ratio": supervised / total,
             "elapsed_seconds": time.time() - started,
             "checkpoint_milestones": milestones,
+            "stop_after_step": args.stop_after_step,
             "use_liger_kernel": train_cfg.get("use_liger_kernel", False),
             "liger_kernel_config": train_cfg.get("liger_kernel_config"),
             "train_metrics": result.metrics,
