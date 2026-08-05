@@ -11,6 +11,7 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 CONFIG="${CONFIG:-configs/eval/evalplus_code_capability_v1.yaml}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/eval/evalplus_code_capability_v1}"
 EVALPLUS_DATA_ROOT="${EVALPLUS_DATA_ROOT:-data/external/evalplus}"
+EVALPLUS_GITHUB_MIRROR="${EVALPLUS_GITHUB_MIRROR:-https://gh.llkk.cc/}"
 GPU_IDS="${GPU_IDS:-1}"
 BATCH_SIZE="${BATCH_SIZE:-4}"
 
@@ -55,16 +56,15 @@ if version != "0.3.1":
 print("[验收] evalplus", version)
 PY
 
-# EvalPlus 默认从 GitHub Release 下载数据。云环境无法稳定访问 GitHub，
-# 因此先经 Hugging Face 下载固定版本，并强制后续生成过程离线读取。
-if [[ ! -s "$HUMANEVAL_DATA" || ! -s "$MBPP_DATA" ]]; then
-  echo "[准备] 缺少 EvalPlus 离线数据，开始从 Hugging Face 获取"
-  "$PYTHON_BIN" scripts/prepare_evalplus_datasets_offline.py \
-    --output-dir "$EVALPLUS_DATA_ROOT"
-fi
+# 每次启动都执行数据验收。有效文件会被直接复用；旧的 Hugging Face
+# Parquet 转换文件因缺少 contract 字段，会被自动识别并替换。
+"$PYTHON_BIN" scripts/prepare_evalplus_datasets_offline.py \
+  --output-dir "$EVALPLUS_DATA_ROOT" \
+  --github-mirror "$EVALPLUS_GITHUB_MIRROR"
 
 require_file "$HUMANEVAL_DATA"
 require_file "$MBPP_DATA"
+require_file "$EVALPLUS_DATA_ROOT/manifest.json"
 export HUMANEVAL_OVERRIDE_PATH="$(realpath "$HUMANEVAL_DATA")"
 export MBPP_OVERRIDE_PATH="$(realpath "$MBPP_DATA")"
 
