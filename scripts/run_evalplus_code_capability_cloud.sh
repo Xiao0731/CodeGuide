@@ -45,7 +45,9 @@ print("[accept] evalplus", version)
 PY
 
 run_variant() {
-  local gpu="$1" variant="$2" log="$OUTPUT_ROOT/logs/generate_${variant}.log"
+  local gpu="$1"
+  local variant="$2"
+  local log="$OUTPUT_ROOT/logs/generate_${variant}.log"
   echo "[$(date '+%F %T')] GPU${gpu} start ${variant}" | tee "$log"
   CUDA_VISIBLE_DEVICES="$gpu" "$PYTHON_BIN" scripts/generate_evalplus_code_capability.py \
     --config "$CONFIG" --variant "$variant" --batch-size "$BATCH_SIZE" \
