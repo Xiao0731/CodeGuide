@@ -2,8 +2,9 @@
 """冻结最小版 GRPO 数据：train、dev 与 TeachingEval-50。
 
 目标是尽快完成项目，而不是扩展成新的数据工程分支：
-- GRPO train 直接来自既有 SFT train 中 reward-compatible 的样本；
-- GRPO dev 与 TeachingEval-50 来自既有 SFT dev，二者互不重叠；
+- TeachingEval-50 直接从既有 SFT dev 冻结，不要求存在可执行测试；
+- GRPO dev 优先从 reward-compatible 的 SFT dev 选择；数量不足时，
+  从 reward-compatible 的 SFT train 划出并从 GRPO train 中移除；
 - 所有选择使用固定 seed 的哈希排序，重复运行结果一致；
 - 产物包含 JSONL、ID 文件和 SHA256 manifest。
 """
@@ -64,12 +65,14 @@ def io_mode(record: dict[str, Any]) -> str:
 
 
 def is_reward_compatible(record: dict[str, Any]) -> bool:
+    """与现有 GRPO 入口保持同一最低合同：可执行，且至少 4 条测试。"""
     metadata = record.get("metadata") or {}
     if metadata.get("reward_compatible") is not True:
         return False
     test_cases = metadata.get("test_cases") or []
     if not isinstance(test_cases, list) or len(test_cases) < 4:
         return False
+
     mode = io_mode(record)
     if mode == "standard_input":
         return all(
@@ -78,6 +81,7 @@ def is_reward_compatible(record: dict[str, Any]) -> bool:
         )
     if mode != "call_based":
         return False
+
     fn_name = metadata.get("fn_name") or next(
         (
             case.get("fn_name")
@@ -100,6 +104,17 @@ def stable_rank(problem_id: str, seed: int) -> str:
     return hashlib.sha256(f"{seed}\0{problem_id}".encode("utf-8")).hexdigest()
 
 
+def ids_for_mode(
+    candidates: list[str],
+    by_id: dict[str, dict[str, Any]],
+    mode: str,
+    seed: int,
+) -> list[str]:
+    result = [problem_id for problem_id in candidates if io_mode(by_id[problem_id]) == mode]
+    result.sort(key=lambda problem_id: stable_rank(problem_id, seed))
+    return result
+
+
 def select_by_mode(
     candidates: list[str],
     by_id: dict[str, dict[str, Any]],
@@ -114,8 +129,7 @@ def select_by_mode(
     }
     selected: list[str] = []
     for mode, count in targets.items():
-        mode_ids = [problem_id for problem_id in candidates if io_mode(by_id[problem_id]) == mode]
-        mode_ids.sort(key=lambda problem_id: stable_rank(problem_id, seed))
+        mode_ids = ids_for_mode(candidates, by_id, mode, seed)
         if len(mode_ids) < count:
             raise RuntimeError(
                 f"{mode} 候选不足：需要 {count}，实际 {len(mode_ids)}"
@@ -123,6 +137,49 @@ def select_by_mode(
         selected.extend(mode_ids[:count])
     selected_set = set(selected)
     return [problem_id for problem_id in candidates if problem_id in selected_set]
+
+
+def select_dev_with_train_fallback(
+    *,
+    eligible_dev: list[str],
+    eligible_train: list[str],
+    by_id: dict[str, dict[str, Any]],
+    standard_count: int,
+    call_count: int,
+    seed: int,
+) -> tuple[list[str], list[str]]:
+    """优先从 SFT dev 选择；不足部分从 SFT train 划出。"""
+    targets = {
+        "standard_input": standard_count,
+        "call_based": call_count,
+    }
+    selected: list[str] = []
+    borrowed_from_train: list[str] = []
+
+    for offset, (mode, count) in enumerate(targets.items()):
+        dev_mode = ids_for_mode(eligible_dev, by_id, mode, seed + offset)
+        train_mode = ids_for_mode(eligible_train, by_id, mode, seed + 100 + offset)
+
+        take_dev = dev_mode[:count]
+        need = count - len(take_dev)
+        if len(train_mode) < need:
+            raise RuntimeError(
+                f"{mode} 的 GRPO dev 候选不足：需要 {count}，"
+                f"SFT dev 可用 {len(dev_mode)}，SFT train 可补 {len(train_mode)}"
+            )
+
+        take_train = train_mode[:need]
+        selected.extend(take_dev)
+        selected.extend(take_train)
+        borrowed_from_train.extend(take_train)
+
+    selected_set = set(selected)
+    ordered = [
+        problem_id
+        for problem_id in [*eligible_dev, *eligible_train]
+        if problem_id in selected_set
+    ]
+    return ordered, borrowed_from_train
 
 
 def sha256_file(path: Path) -> str:
@@ -200,29 +257,38 @@ def main() -> None:
     if missing:
         raise RuntimeError(f"canonical 缺少冻结 ID：{missing[:5]}")
 
-    grpo_train_ids = [
+    eligible_train = [
         problem_id for problem_id in train_ids if is_reward_compatible(by_id[problem_id])
     ]
     eligible_dev = [
         problem_id for problem_id in dev_ids if is_reward_compatible(by_id[problem_id])
     ]
 
+    # 教学盲评只看回答质量，不需要可执行测试，因此直接从完整 SFT dev 冻结。
     teaching_ids = select_by_mode(
-        eligible_dev,
+        dev_ids,
         by_id,
         standard_count=args.teaching_standard,
         call_count=args.teaching_call,
         seed=args.seed + 1,
     )
     teaching_set = set(teaching_ids)
-    remaining_dev = [problem_id for problem_id in eligible_dev if problem_id not in teaching_set]
-    grpo_dev_ids = select_by_mode(
-        remaining_dev,
-        by_id,
+    remaining_eligible_dev = [
+        problem_id for problem_id in eligible_dev if problem_id not in teaching_set
+    ]
+
+    grpo_dev_ids, borrowed_from_train = select_dev_with_train_fallback(
+        eligible_dev=remaining_eligible_dev,
+        eligible_train=eligible_train,
+        by_id=by_id,
         standard_count=args.dev_standard,
         call_count=args.dev_call,
         seed=args.seed + 2,
     )
+    borrowed_set = set(borrowed_from_train)
+    grpo_train_ids = [
+        problem_id for problem_id in eligible_train if problem_id not in borrowed_set
+    ]
 
     if set(grpo_train_ids) & set(grpo_dev_ids):
         raise RuntimeError("GRPO train/dev 重叠")
@@ -250,10 +316,20 @@ def main() -> None:
             "sft_dev_ids": str(dev_ids_path.relative_to(ROOT)),
         },
         "policy": {
-            "grpo_train": "SFT train 中 reward-compatible 且测试不少于 4 条的全部样本",
-            "grpo_dev": "SFT dev 中冻结 75 standard_input + 25 call_based",
-            "teaching_eval": "SFT dev 中冻结 40 standard_input + 10 call_based，不进入 GRPO",
+            "grpo_train": "SFT train 中 reward-compatible 且测试不少于 4 条；扣除借给 GRPO dev 的样本",
+            "grpo_dev": "优先取 SFT dev 的 75 standard_input + 25 call_based；不足时从 SFT train 划出",
+            "teaching_eval": "完整 SFT dev 中冻结 40 standard_input + 10 call_based，不要求可执行测试",
             "note": "TeachingEval 属于训练域教学回归集，不宣称完全未见泛化",
+        },
+        "source_counts": {
+            "sft_train": len(train_ids),
+            "sft_dev": len(dev_ids),
+            "eligible_sft_train": len(eligible_train),
+            "eligible_sft_dev": len(eligible_dev),
+            "eligible_sft_train_by_io_mode": mode_counts(eligible_train, by_id),
+            "eligible_sft_dev_by_io_mode": mode_counts(eligible_dev, by_id),
+            "grpo_dev_borrowed_from_sft_train": len(borrowed_from_train),
+            "borrowed_by_io_mode": mode_counts(borrowed_from_train, by_id),
         },
         "counts": {
             name: {
@@ -271,8 +347,6 @@ def main() -> None:
             "dev_teaching": len(set(grpo_dev_ids) & set(teaching_ids)),
         },
         "canonical_records": len(ordered),
-        "eligible_grpo_train": len(grpo_train_ids),
-        "eligible_sft_dev": len(eligible_dev),
     }
     write_json(output_dir / "freeze_manifest.json", manifest, force=args.force)
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
