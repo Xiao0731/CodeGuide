@@ -194,7 +194,7 @@ def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as handle:
         for item in records:
-            handle.write(json.dumps(item, ensure_ascii=False, separators=(",", ",")) + "\n")
+            handle.write(json.dumps(item, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
 def write_ids(path: Path, records: list[dict[str, Any]]) -> None:
