@@ -73,6 +73,8 @@ def main() -> None:
     reward = cfg.setdefault("reward", {})
     reward.update(
         {
+            # alpha 仅用于兼容旧日志；实际计算由 minimal_grpo_reward.py 完成。
+            "alpha": 0.60,
             "execution_backend": "subprocess",
             "container_image": "",
             "exec_timeout": 5.0,
