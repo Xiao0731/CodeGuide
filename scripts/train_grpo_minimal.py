@@ -3,6 +3,12 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 from src.reward.minimal_grpo_reward import make_reward_fn_with_cfg
 from src.training import grpo_train
 
