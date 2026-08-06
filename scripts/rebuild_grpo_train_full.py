@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""从完整 TACO + 已有 reference cache 重建正式 GRPO train。
+"""从 SFT accepted 恢复测试用例并冻结正式 GRPO train/dev。
 
-正确口径：
-- TACO-515 只保留为 dev / TeachingEval，全部 515 ID 从训练集排除；
-- 完整 TACO 中 reference_verified、测试不少于 4 条且当前 verifier 支持的样本，
-  默认全部进入 GRPO train；
-- 不再人为设置 2000 / 4000 条抽样上限。
+数据口径：
+- data/final/sft_accepted.jsonl 是母集，保证 GRPO 只继续训练 SFT 已使用的题目；
+- 根据题目 ID 回到 data/raw/TACO/ALL 恢复 test_cases、接口和难度信息；
+- TACO-515 永久作为 Base/SFT/GRPO 共用的自研回归测试集，不进入 GRPO train/dev；
+- 恢复后要求测试不少于 4 条且当前 verifier 支持；
+- 从 eligible 中固定 40 道 standard_input + 10 道 call_based 作为 GRPO dev，
+  只用于 checkpoint 选择；其余全部进入 GRPO train，不做人为数量截断。
 """
 
 from __future__ import annotations
@@ -61,48 +63,73 @@ def normalize_difficulty(value: Any) -> str:
     return "medium"
 
 
-def load_verified_ids(path: Path) -> tuple[set[str], int]:
-    verified: set[str] = set()
-    total = 0
+def load_jsonl_records(path: Path, *, label: str) -> dict[str, dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
     with path.open(encoding="utf-8") as handle:
         for line_no, line in enumerate(handle, 1):
             if not line.strip():
                 continue
             item = json.loads(line)
-            total += 1
             try:
                 item_id = record_id(item)
             except ValueError as exc:
-                raise ValueError(f"reference cache 第 {line_no} 行缺少 ID") from exc
-            if item.get("reference_verified") is True:
-                verified.add(item_id)
-    return verified, total
+                raise ValueError(f"{label} 第 {line_no} 行缺少 ID") from exc
+            if item_id in records:
+                raise ValueError(f"{label} 存在重复 ID：{item_id}")
+            records[item_id] = item
+    return records
 
 
 def load_ids(path: Path) -> set[str]:
-    ids: set[str] = set()
-    with path.open(encoding="utf-8") as handle:
-        for line_no, line in enumerate(handle, 1):
-            if not line.strip():
+    return set(load_jsonl_records(path, label="TACO-515 source bank"))
+
+
+def prompt_messages(accepted: dict[str, Any], problem: Any) -> list[dict[str, str]]:
+    """保留 SFT 时的 system/user prompt，移除 assistant 标签。"""
+    messages = accepted.get("messages")
+    kept: list[dict[str, str]] = []
+    if isinstance(messages, list):
+        for message in messages:
+            if not isinstance(message, dict):
                 continue
-            try:
-                ids.add(record_id(json.loads(line)))
-            except ValueError as exc:
-                raise ValueError(f"TACO-515 source bank 第 {line_no} 行缺少 ID") from exc
-    return ids
+            role = message.get("role")
+            content = message.get("content")
+            if role in {"system", "user"} and isinstance(content, str) and content.strip():
+                kept.append({"role": str(role), "content": content})
+
+    if any(message["role"] == "user" for message in kept):
+        if not any(message["role"] == "system" for message in kept):
+            kept.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
+        return kept
+
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                "请按教学格式讲解以下算法题：\n\n"
+                f"【题目描述】\n{str(problem.description).strip()}"
+            ),
+        },
+    ]
 
 
-def problem_to_record(problem: Any) -> dict[str, Any] | None:
+def restore_record(accepted: dict[str, Any], problem: Any) -> dict[str, Any] | None:
     from src.reward.execution import supports_verification
 
     input_output = problem.input_output if isinstance(problem.input_output, dict) else {}
     fn_name = input_output.get("fn_name")
     io_mode = "call_based" if fn_name else "standard_input"
     tests = list(problem.public_tests or [])
-    difficulty = normalize_difficulty(problem.difficulty)
+
+    accepted_meta = accepted.get("metadata")
+    if not isinstance(accepted_meta, dict):
+        accepted_meta = {}
+
     metadata = {
+        **accepted_meta,
         "source": problem.source,
-        "difficulty": difficulty,
+        "difficulty": normalize_difficulty(problem.difficulty),
         "original_difficulty": str(problem.difficulty or "unknown"),
         "tags": list(problem.tags or []),
         "raw_tags": list(problem.raw_tags or []),
@@ -111,110 +138,107 @@ def problem_to_record(problem: Any) -> dict[str, Any] | None:
         "fn_name": fn_name,
         "starter_code": problem.starter_code or "",
         "test_cases": tests,
-        "reward_compatible": True,
     }
     metadata["reward_compatible"] = len(tests) >= 4 and supports_verification(metadata)
     if metadata["reward_compatible"] is not True:
         return None
 
-    tags = ", ".join(metadata["tags"][:12]) or "无"
-    user_content = (
-        "请按教学格式讲解以下算法题：\n\n"
-        f"【题目描述】\n{problem.description.strip()}\n\n"
-        f"【难度】{difficulty}\n"
-        f"【标签】{tags}\n\n"
-        "【判题接口】\n"
-        f"- io_mode: {io_mode}\n"
-        f"- fn_name: {fn_name or 'None'}\n\n"
-        "【starter_code】\n"
-        f"```python\n{problem.starter_code or ''}\n```"
-    )
     return {
         "id": problem.id,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
+        "messages": prompt_messages(accepted, problem),
         "metadata": metadata,
     }
 
 
-def interleave_all(
+def select_dev(
     records: list[dict[str, Any]],
+    *,
+    standard_count: int,
+    call_count: int,
     seed: int,
-) -> list[dict[str, Any]]:
-    """按难度交错排列全部样本，只改变顺序，不丢弃数据。"""
-    pools: dict[str, list[dict[str, Any]]] = {}
-    for difficulty in ("easy", "medium", "hard"):
-        pool = [
-            item for item in records
-            if item["metadata"]["difficulty"] == difficulty
-        ]
-        pools[difficulty] = sorted(
-            pool,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    by_mode = {
+        mode: sorted(
+            [item for item in records if item["metadata"]["io_mode"] == mode],
             key=lambda item: stable_rank(item["id"], seed),
         )
+        for mode in ("standard_input", "call_based")
+    }
+    if len(by_mode["standard_input"]) < standard_count:
+        raise RuntimeError(
+            f"standard_input GRPO dev 候选不足：需要 {standard_count}，"
+            f"实际 {len(by_mode['standard_input'])}"
+        )
+    if len(by_mode["call_based"]) < call_count:
+        raise RuntimeError(
+            f"call_based GRPO dev 候选不足：需要 {call_count}，"
+            f"实际 {len(by_mode['call_based'])}"
+        )
 
-    offsets = {key: 0 for key in pools}
-    ordered: list[dict[str, Any]] = []
-    while len(ordered) < len(records):
-        added = False
-        for difficulty in ("easy", "medium", "hard"):
-            index = offsets[difficulty]
-            if index < len(pools[difficulty]):
-                ordered.append(pools[difficulty][index])
-                offsets[difficulty] += 1
-                added = True
-        if not added:
-            break
-    return ordered
+    dev = (
+        by_mode["standard_input"][:standard_count]
+        + by_mode["call_based"][:call_count]
+    )
+    # GRPO dev 完全不参与优化，因此全部测试均作为 checkpoint held-out tests。
+    for item in dev:
+        item["metadata"]["heldout_tests"] = list(item["metadata"]["test_cases"])
+
+    dev_ids = {item["id"] for item in dev}
+    train = [item for item in records if item["id"] not in dev_ids]
+    train = sorted(train, key=lambda item: stable_rank(item["id"], seed + 1))
+    dev = sorted(dev, key=lambda item: stable_rank(item["id"], seed + 2))
+    return train, dev
 
 
 def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as handle:
         for item in records:
-            handle.write(json.dumps(item, ensure_ascii=False, separators=(",", ":")) + "\n")
+            handle.write(json.dumps(item, ensure_ascii=False, separators=(",", ",")) + "\n")
+
+
+def write_ids(path: Path, records: list[dict[str, Any]]) -> None:
+    path.write_text(
+        json.dumps({"ids": [item["id"] for item in records]}, ensure_ascii=False, indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def counts_for(records: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "samples": len(records),
+        "by_io_mode": dict(Counter(item["metadata"]["io_mode"] for item in records)),
+        "by_difficulty": dict(
+            Counter(item["metadata"]["difficulty"] for item in records)
+        ),
+    }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--reference-cache",
-        default="data/cache/taco_reference_verification_train_full.jsonl",
-    )
+    parser.add_argument("--sft-accepted", default="data/final/sft_accepted.jsonl")
     parser.add_argument("--taco-data-root", default="data/raw/TACO/ALL")
     parser.add_argument(
         "--taco515-source-bank",
         default="data/experts/io_mode/taco515_oracle_source_bank.jsonl",
     )
-    parser.add_argument(
-        "--output-dir",
-        default="data/splits/grpo_minimal_v1",
-    )
-    parser.add_argument(
-        "--max-train-samples",
-        type=int,
-        default=0,
-        help="默认 0 表示使用全部 eligible；仅调试时可显式设正整数截断",
-    )
+    parser.add_argument("--output-dir", default="data/splits/grpo_minimal_v1")
+    parser.add_argument("--dev-standard", type=int, default=40)
+    parser.add_argument("--dev-call", type=int, default=10)
     parser.add_argument("--max-load", type=int, default=30000)
     parser.add_argument("--seed", type=int, default=20260728)
     args = parser.parse_args()
 
-    cache_path = resolve(args.reference_cache)
+    accepted_path = resolve(args.sft_accepted)
     taco_root = resolve(args.taco_data_root)
     taco515_path = resolve(args.taco515_source_bank)
     output_dir = resolve(args.output_dir)
-    manifest_path = output_dir / "freeze_manifest.json"
-    dev_path = output_dir / "grpo_dev.jsonl"
-    teaching_path = output_dir / "teaching_eval_50.jsonl"
-
-    for required in (cache_path, taco515_path, dev_path, teaching_path):
+    for required in (accepted_path, taco_root, taco515_path):
         if not required.exists():
             raise FileNotFoundError(f"缺少必要文件：{required}")
 
-    verified_ids, cache_records = load_verified_ids(cache_path)
+    accepted = load_jsonl_records(accepted_path, label="SFT accepted")
     taco515_ids = load_ids(taco515_path)
 
     from src.data.loader import load_problems
@@ -226,91 +250,104 @@ def main() -> None:
         deduplicate=True,
         taco_data_root=taco_root,
     )
+    problem_map = {problem.id: problem for problem in problems}
 
+    stats = Counter()
     eligible: list[dict[str, Any]] = []
-    verified_loaded = 0
-    excluded_taco515 = 0
-    for problem in problems:
-        if problem.id not in verified_ids:
+    missing_raw_examples: list[str] = []
+    for item_id, accepted_record in accepted.items():
+        stats["sft_accepted"] += 1
+        if item_id in taco515_ids:
+            stats["excluded_taco515"] += 1
             continue
-        verified_loaded += 1
-        if problem.id in taco515_ids:
-            excluded_taco515 += 1
+        problem = problem_map.get(item_id)
+        if problem is None:
+            stats["missing_in_raw_taco"] += 1
+            if len(missing_raw_examples) < 20:
+                missing_raw_examples.append(item_id)
             continue
-        item = problem_to_record(problem)
-        if item is not None:
-            eligible.append(item)
+        stats["matched_to_raw_taco"] += 1
+        restored = restore_record(accepted_record, problem)
+        if restored is None:
+            stats["rejected_after_restore"] += 1
+            continue
+        stats["eligible_after_restore"] += 1
+        eligible.append(restored)
 
-    selected = interleave_all(eligible, seed=args.seed)
-    if args.max_train_samples > 0:
-        selected = selected[: args.max_train_samples]
-    if not selected:
-        raise RuntimeError(
-            "未构造出 GRPO train；请检查 reference cache 与本地 TACO 是否同一版本"
-        )
+    train, dev = select_dev(
+        eligible,
+        standard_count=args.dev_standard,
+        call_count=args.dev_call,
+        seed=args.seed,
+    )
 
+    train_ids = {item["id"] for item in train}
+    dev_ids = {item["id"] for item in dev}
+    if train_ids & dev_ids:
+        raise RuntimeError("GRPO train/dev 存在重叠")
+    if (train_ids | dev_ids) & taco515_ids:
+        raise RuntimeError("GRPO 数据与 TACO-515 存在重叠")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
     train_path = output_dir / "grpo_train.jsonl"
-    ids_path = output_dir / "grpo_train.ids.json"
-    write_jsonl(train_path, selected)
-    ids_path.write_text(
-        json.dumps({"ids": [item["id"] for item in selected]}, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    dev_path = output_dir / "grpo_dev.jsonl"
+    write_jsonl(train_path, train)
+    write_jsonl(dev_path, dev)
+    write_ids(output_dir / "grpo_train.ids.json", train)
+    write_ids(output_dir / "grpo_dev.ids.json", dev)
 
-    manifest = (
-        json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest_path.exists()
-        else {}
-    )
-    manifest.update(
-        {
-            "schema_version": "codeguide-grpo-minimal-freeze-v4",
-            "reference_cache": str(cache_path.relative_to(ROOT)),
-            "reference_cache_sha256": sha256_file(cache_path),
-            "reference_cache_records": cache_records,
-            "reference_verified_ids": len(verified_ids),
-            "taco_loaded": len(problems),
-            "verified_ids_found_in_loaded_taco": verified_loaded,
-            "excluded_taco515_verified": excluded_taco515,
-            "train_eligible": len(eligible),
-            "train_limit": args.max_train_samples,
-        }
-    )
-    manifest.setdefault("policy", {})["grpo_train"] = (
-        "完整 TACO train 中 reference_verified、当前 verifier 支持、测试不少于 4 条，"
-        "排除全部 TACO-515 后默认全部使用"
-    )
-    manifest.setdefault("counts", {})["grpo_train"] = {
-        "samples": len(selected),
-        "by_io_mode": dict(Counter(item["metadata"]["io_mode"] for item in selected)),
-        "by_difficulty": dict(Counter(item["metadata"]["difficulty"] for item in selected)),
-        "jsonl": str(train_path.relative_to(ROOT)),
-        "jsonl_sha256": sha256_file(train_path),
+    report = {
+        "schema_version": "codeguide-grpo-from-sft-accepted-v1",
+        "seed": args.seed,
+        "sources": {
+            "sft_accepted": str(accepted_path.relative_to(ROOT)),
+            "sft_accepted_sha256": sha256_file(accepted_path),
+            "taco_data_root": str(taco_root.relative_to(ROOT)),
+            "taco515_source_bank": str(taco515_path.relative_to(ROOT)),
+            "taco515_source_bank_sha256": sha256_file(taco515_path),
+        },
+        "policy": {
+            "candidate_pool": "SFT accepted ID 与原始 TACO 的交集",
+            "taco515": "永久冻结为 Base/SFT/GRPO 共用自研回归测试集，不参与 train/dev",
+            "eligibility": "恢复测试后 test_cases>=4 且当前 verifier 支持",
+            "grpo_dev": (
+                f"{args.dev_standard} standard_input + {args.dev_call} call_based，"
+                "只用于 checkpoint 选择"
+            ),
+            "grpo_train": "eligible 排除 GRPO dev 后全部使用，不做人为截断",
+        },
+        "counts": {
+            **dict(stats),
+            "raw_taco_loaded": len(problems),
+            "taco515_ids": len(taco515_ids),
+            "grpo_train": counts_for(train),
+            "grpo_dev": counts_for(dev),
+        },
+        "overlap": {
+            "train_dev": len(train_ids & dev_ids),
+            "train_taco515": len(train_ids & taco515_ids),
+            "dev_taco515": len(dev_ids & taco515_ids),
+        },
+        "diagnostics": {
+            "missing_in_raw_taco_examples": missing_raw_examples,
+        },
+        "artifacts": {
+            "grpo_train": str(train_path.relative_to(ROOT)),
+            "grpo_train_sha256": sha256_file(train_path),
+            "grpo_dev": str(dev_path.relative_to(ROOT)),
+            "grpo_dev_sha256": sha256_file(dev_path),
+        },
     }
-    selected_ids = {item["id"] for item in selected}
-    manifest["overlap"] = {
-        **dict(manifest.get("overlap") or {}),
-        "train_taco515": len(selected_ids & taco515_ids),
-    }
+    manifest_path = output_dir / "freeze_manifest.json"
     manifest_path.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
-    print(json.dumps({
-        "reference_verified_ids": len(verified_ids),
-        "taco_loaded": len(problems),
-        "verified_ids_found_in_loaded_taco": verified_loaded,
-        "excluded_taco515_verified": excluded_taco515,
-        "eligible_after_all_filters": len(eligible),
-        "grpo_train": len(selected),
-        "by_io_mode": dict(Counter(item["metadata"]["io_mode"] for item in selected)),
-        "by_difficulty": dict(Counter(item["metadata"]["difficulty"] for item in selected)),
-        "train_taco515_overlap": len(selected_ids & taco515_ids),
-    }, ensure_ascii=False, indent=2))
+    print(json.dumps(report, ensure_ascii=False, indent=2))
     print(
-        f"[完成] GRPO train 使用全部 eligible={len(selected)}；"
-        "TACO-515 仅保留为 dev/TeachingEval"
+        f"[完成] GRPO train={len(train)}，dev={len(dev)}；"
+        f"排除 TACO-515={stats['excluded_taco515']}"
     )
 
 
