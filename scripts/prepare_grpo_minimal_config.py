@@ -86,7 +86,7 @@ def main() -> None:
             "num_train_epochs": 1,
             "normalize_rewards": False,
             "save_best": True,
-            "eval_steps": 10,
+            "eval_steps": 100,
             "checkpoint_eval_max_samples": 50,
             "seed": 20260728,
         }
@@ -155,6 +155,7 @@ def main() -> None:
     print(f"[完成] 正式 GRPO 配置：{output_path}")
     print(f"[完成] Smoke GRPO 配置：{smoke_output_path}")
     print(f"[完成] Smoke 数据：{smoke_train_path}（{args.smoke_samples} 条，约 {expected_steps} step）")
+    print(f"[正式训练集] {len(lines)} 条，默认全部使用")
     print(f"[起点] {args.sft_adapter}")
     print("[奖励] 0.6 Code + 0.4 门控 Format；Teaching 仅监控")
     print("[执行] 训练阶段 subprocess；最终评测仍使用本地 Docker")
