@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """复用既有 TACO-515，冻结最小版 GRPO 数据。
 
-为了尽快完成项目，不再重新构造独立数据集。脚本将已经用于 SFT 回归评测的
-TACO-515 确认集固定拆分为：
-- GRPO train：剩余 415 题；
+为了尽快完成项目，不再重新构造独立数据集。脚本将既有 TACO-515 固定拆分为：
+- GRPO train：剩余样本；
 - GRPO dev：40 standard_input + 10 call_based；
 - TeachingEval-50：40 standard_input + 10 call_based。
 
-三部分在 GRPO 阶段互不重叠。由于这些题曾参与 SFT 数据与 checkpoint 分析，
-它们只被称为训练域开发/回归集，不宣称完全未见泛化。
+source bank 负责提供 IO 与测试信息；若其中没有题面，则按 ID 从既有
+SFT accepted JSONL 回填题面。三部分在 GRPO 阶段互不重叠。
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -55,27 +54,72 @@ def record_id(record: dict[str, Any]) -> str:
     return str(value)
 
 
-def extract_user_content(record: dict[str, Any]) -> str:
-    messages = record.get("messages")
-    if isinstance(messages, list):
-        for message in messages:
-            if isinstance(message, dict) and message.get("role") == "user":
-                content = str(message.get("content") or "").strip()
-                if content:
-                    return content
-
-    for key in ("question", "description", "problem_statement", "prompt"):
+def nested_records(record: dict[str, Any] | None) -> Iterable[dict[str, Any]]:
+    if not isinstance(record, dict):
+        return
+    yield record
+    for key in ("record", "source", "problem", "sample", "payload", "raw"):
         value = record.get(key)
-        if isinstance(value, str) and value.strip():
-            return (
-                "请按教学格式讲解以下算法题：\n\n"
-                "【题目描述】\n"
-                + value.strip()
-            )
-    raise ValueError(f"样本 {record_id(record)} 缺少题目文本")
+        if isinstance(value, dict):
+            yield value
 
 
-def normalize_tests(record: dict[str, Any], metadata: dict[str, Any]) -> tuple[list[dict], str, str | None]:
+def extract_user_content(
+    record: dict[str, Any],
+    fallback: dict[str, Any] | None = None,
+) -> str:
+    """优先读 source bank；缺题面时按 ID 使用既有 SFT 记录回填。"""
+    for candidate in (*nested_records(record), *nested_records(fallback)):
+        messages = candidate.get("messages")
+        if isinstance(messages, list):
+            for message in messages:
+                if isinstance(message, dict) and message.get("role") == "user":
+                    content = str(message.get("content") or "").strip()
+                    if content:
+                        return content
+
+        for key in (
+            "question",
+            "description",
+            "problem_statement",
+            "prompt",
+            "statement",
+            "problem",
+        ):
+            value = candidate.get(key)
+            if isinstance(value, str) and value.strip():
+                return (
+                    "请按教学格式讲解以下算法题：\n\n"
+                    "【题目描述】\n"
+                    + value.strip()
+                )
+
+    raise ValueError(
+        f"样本 {record_id(record)} 缺少题目文本，且未能从 question bank 按 ID 回填"
+    )
+
+
+def load_question_bank(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        raise FileNotFoundError(f"未找到题面回填文件：{path}")
+    result: dict[str, dict[str, Any]] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line_no, line in enumerate(handle, 1):
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            try:
+                item_id = record_id(item)
+            except ValueError as exc:
+                raise ValueError(f"题面文件第 {line_no} 行缺少 ID") from exc
+            result[item_id] = item
+    return result
+
+
+def normalize_tests(
+    record: dict[str, Any],
+    metadata: dict[str, Any],
+) -> tuple[list[dict], str, str | None]:
     """兼容已归一化 source bank 与原始 TACO input_output。"""
     direct = metadata.get("test_cases") or record.get("test_cases")
     if isinstance(direct, list) and direct:
@@ -118,25 +162,29 @@ def normalize_tests(record: dict[str, Any], metadata: dict[str, Any]) -> tuple[l
         return cases, "call_based", str(fn_name)
 
     for raw_input, raw_output in zip(inputs, outputs):
-        cases.append(
-            {
-                "input": str(raw_input),
-                "output": str(raw_output),
-            }
-        )
+        cases.append({"input": str(raw_input), "output": str(raw_output)})
     return cases, "standard_input", None
 
 
-def normalize_record(record: dict[str, Any]) -> dict[str, Any] | None:
+def normalize_record(
+    record: dict[str, Any],
+    fallback: dict[str, Any] | None,
+) -> dict[str, Any] | None:
     from src.reward.execution import supports_verification
 
-    metadata = dict(record.get("metadata") or {})
+    fallback_meta = dict((fallback or {}).get("metadata") or {})
+    metadata = {**fallback_meta, **dict(record.get("metadata") or {})}
     test_cases, io_mode, fn_name = normalize_tests(record, metadata)
     metadata.update(
         {
             "io_mode": io_mode,
             "fn_name": fn_name,
-            "starter_code": metadata.get("starter_code") or record.get("starter_code") or "",
+            "starter_code": (
+                metadata.get("starter_code")
+                or record.get("starter_code")
+                or (fallback or {}).get("starter_code")
+                or ""
+            ),
             "test_cases": test_cases,
         }
     )
@@ -148,7 +196,7 @@ def normalize_record(record: dict[str, Any]) -> dict[str, Any] | None:
         "id": record_id(record),
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": extract_user_content(record)},
+            {"role": "user", "content": extract_user_content(record, fallback)},
         ],
         "metadata": metadata,
     }
@@ -204,6 +252,11 @@ def main() -> None:
         default="data/experts/io_mode/taco515_oracle_source_bank.jsonl",
         help="此前严格验证使用的 TACO-515 source bank",
     )
+    parser.add_argument(
+        "--question-bank",
+        default="data/final/sft_accepted.jsonl",
+        help="source bank 缺题面时，按 ID 从这里回填",
+    )
     parser.add_argument("--output-dir", default="data/splits/grpo_minimal_v1")
     parser.add_argument("--seed", type=int, default=20260728)
     parser.add_argument("--dev-standard", type=int, default=40)
@@ -214,22 +267,31 @@ def main() -> None:
     args = parser.parse_args()
 
     source_path = resolve(args.source_bank)
+    question_path = resolve(args.question_bank)
     output_dir = resolve(args.output_dir)
     if not source_path.exists():
-        raise FileNotFoundError(
-            f"未找到 TACO-515 source bank：{source_path}\n"
-            "该文件就是此前双专家严格验证使用的 515 题源文件。"
-        )
+        raise FileNotFoundError(f"未找到 TACO-515 source bank：{source_path}")
 
+    question_bank = load_question_bank(question_path)
     normalized: list[dict[str, Any]] = []
     rejected = 0
+    missing_question_ids: list[str] = []
     seen: set[str] = set()
+
     with source_path.open(encoding="utf-8") as handle:
         for line_no, line in enumerate(handle, 1):
             if not line.strip():
                 continue
             raw = json.loads(line)
-            item = normalize_record(raw)
+            raw_id = record_id(raw)
+            fallback = question_bank.get(raw_id)
+            try:
+                item = normalize_record(raw, fallback)
+            except ValueError as exc:
+                if "缺少题目文本" in str(exc):
+                    missing_question_ids.append(raw_id)
+                    continue
+                raise
             if item is None:
                 rejected += 1
                 continue
@@ -237,6 +299,12 @@ def main() -> None:
                 raise ValueError(f"source bank 存在重复 ID：{item['id']}，行 {line_no}")
             seen.add(item["id"])
             normalized.append(item)
+
+    if missing_question_ids:
+        raise RuntimeError(
+            "仍有 TACO-515 题目无法按 ID 回填题面："
+            f"数量={len(missing_question_ids)}，示例={missing_question_ids[:5]}"
+        )
 
     standard = split_mode(normalized, "standard_input", args.seed)
     call = split_mode(normalized, "call_based", args.seed)
@@ -249,10 +317,7 @@ def main() -> None:
             f"call_based={len(call)}（至少需要 {need_call}），rejected={rejected}"
         )
 
-    teaching = (
-        standard[: args.teaching_standard]
-        + call[: args.teaching_call]
-    )
+    teaching = standard[: args.teaching_standard] + call[: args.teaching_call]
     dev = (
         standard[args.teaching_standard : need_standard]
         + call[args.teaching_call : need_call]
@@ -283,14 +348,16 @@ def main() -> None:
         )
 
     manifest = {
-        "schema_version": "codeguide-grpo-minimal-taco515-freeze-v1",
+        "schema_version": "codeguide-grpo-minimal-taco515-freeze-v2",
         "seed": args.seed,
         "source_bank": str(source_path.relative_to(ROOT)),
         "source_bank_sha256": sha256_file(source_path),
+        "question_bank": str(question_path.relative_to(ROOT)),
+        "question_bank_sha256": sha256_file(question_path),
         "normalized_samples": len(normalized),
         "rejected_samples": rejected,
         "policy": {
-            "grpo_train": "TACO-515 中排除 dev 与 TeachingEval 后的全部样本",
+            "grpo_train": "TACO-515 中排除 dev 与 TeachingEval 后的全部可执行样本",
             "grpo_dev": "40 standard_input + 10 call_based",
             "teaching_eval": "40 standard_input + 10 call_based",
             "disclosure": "该集合曾参与 SFT 与 checkpoint 分析，仅作为训练域开发/回归集",
