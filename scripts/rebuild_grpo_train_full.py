@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """从完整 TACO + 已有 reference cache 重建正式 GRPO train。
 
-TACO-515 只保留为 dev / TeachingEval；全部 515 ID 从训练集排除。
-默认固定抽取 2000 条，避免把最小项目扩成超长训练。
+正确口径：
+- TACO-515 只保留为 dev / TeachingEval，全部 515 ID 从训练集排除；
+- 完整 TACO 中 reference_verified、测试不少于 4 条且当前 verifier 支持的样本，
+  默认全部进入 GRPO train；
+- 不再人为设置 2000 / 4000 条抽样上限。
 """
 
 from __future__ import annotations
@@ -136,11 +139,11 @@ def problem_to_record(problem: Any) -> dict[str, Any] | None:
     }
 
 
-def select_balanced(
+def interleave_all(
     records: list[dict[str, Any]],
-    max_samples: int,
     seed: int,
 ) -> list[dict[str, Any]]:
+    """按难度交错排列全部样本，只改变顺序，不丢弃数据。"""
     pools: dict[str, list[dict[str, Any]]] = {}
     for difficulty in ("easy", "medium", "hard"):
         pool = [
@@ -153,20 +156,18 @@ def select_balanced(
         )
 
     offsets = {key: 0 for key in pools}
-    selected: list[dict[str, Any]] = []
-    while len(selected) < max_samples:
+    ordered: list[dict[str, Any]] = []
+    while len(ordered) < len(records):
         added = False
         for difficulty in ("easy", "medium", "hard"):
             index = offsets[difficulty]
             if index < len(pools[difficulty]):
-                selected.append(pools[difficulty][index])
+                ordered.append(pools[difficulty][index])
                 offsets[difficulty] += 1
                 added = True
-                if len(selected) >= max_samples:
-                    break
         if not added:
             break
-    return selected
+    return ordered
 
 
 def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
@@ -191,7 +192,12 @@ def main() -> None:
         "--output-dir",
         default="data/splits/grpo_minimal_v1",
     )
-    parser.add_argument("--max-train-samples", type=int, default=2000)
+    parser.add_argument(
+        "--max-train-samples",
+        type=int,
+        default=0,
+        help="默认 0 表示使用全部 eligible；仅调试时可显式设正整数截断",
+    )
     parser.add_argument("--max-load", type=int, default=30000)
     parser.add_argument("--seed", type=int, default=20260728)
     args = parser.parse_args()
@@ -222,18 +228,22 @@ def main() -> None:
     )
 
     eligible: list[dict[str, Any]] = []
+    verified_loaded = 0
+    excluded_taco515 = 0
     for problem in problems:
-        if problem.id not in verified_ids or problem.id in taco515_ids:
+        if problem.id not in verified_ids:
+            continue
+        verified_loaded += 1
+        if problem.id in taco515_ids:
+            excluded_taco515 += 1
             continue
         item = problem_to_record(problem)
         if item is not None:
             eligible.append(item)
 
-    selected = select_balanced(
-        eligible,
-        max_samples=args.max_train_samples,
-        seed=args.seed,
-    )
+    selected = interleave_all(eligible, seed=args.seed)
+    if args.max_train_samples > 0:
+        selected = selected[: args.max_train_samples]
     if not selected:
         raise RuntimeError(
             "未构造出 GRPO train；请检查 reference cache 与本地 TACO 是否同一版本"
@@ -254,19 +264,21 @@ def main() -> None:
     )
     manifest.update(
         {
-            "schema_version": "codeguide-grpo-minimal-freeze-v3",
+            "schema_version": "codeguide-grpo-minimal-freeze-v4",
             "reference_cache": str(cache_path.relative_to(ROOT)),
             "reference_cache_sha256": sha256_file(cache_path),
             "reference_cache_records": cache_records,
             "reference_verified_ids": len(verified_ids),
             "taco_loaded": len(problems),
-            "train_eligible_before_sampling": len(eligible),
-            "train_max_samples": args.max_train_samples,
+            "verified_ids_found_in_loaded_taco": verified_loaded,
+            "excluded_taco515_verified": excluded_taco515,
+            "train_eligible": len(eligible),
+            "train_limit": args.max_train_samples,
         }
     )
     manifest.setdefault("policy", {})["grpo_train"] = (
-        "完整 TACO train 中 reference_verified、可执行、测试不少于4条，"
-        "排除全部 TACO-515 后固定抽取"
+        "完整 TACO train 中 reference_verified、当前 verifier 支持、测试不少于 4 条，"
+        "排除全部 TACO-515 后默认全部使用"
     )
     manifest.setdefault("counts", {})["grpo_train"] = {
         "samples": len(selected),
@@ -285,9 +297,19 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    print(json.dumps(manifest["counts"]["grpo_train"], ensure_ascii=False, indent=2))
+    print(json.dumps({
+        "reference_verified_ids": len(verified_ids),
+        "taco_loaded": len(problems),
+        "verified_ids_found_in_loaded_taco": verified_loaded,
+        "excluded_taco515_verified": excluded_taco515,
+        "eligible_after_all_filters": len(eligible),
+        "grpo_train": len(selected),
+        "by_io_mode": dict(Counter(item["metadata"]["io_mode"] for item in selected)),
+        "by_difficulty": dict(Counter(item["metadata"]["difficulty"] for item in selected)),
+        "train_taco515_overlap": len(selected_ids & taco515_ids),
+    }, ensure_ascii=False, indent=2))
     print(
-        f"[完成] 从 eligible={len(eligible)} 中固定抽取 GRPO train={len(selected)}；"
+        f"[完成] GRPO train 使用全部 eligible={len(selected)}；"
         "TACO-515 仅保留为 dev/TeachingEval"
     )
 
