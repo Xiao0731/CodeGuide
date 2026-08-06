@@ -16,11 +16,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 SYSTEM_PROMPT = (
     "你是 CodeGuide，一位专为 OI/ACM 初学者设计的算法教学助手。"
