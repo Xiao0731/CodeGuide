@@ -211,6 +211,36 @@ def split_mode(records: list[dict[str, Any]], mode: str, seed: int) -> list[dict
     return sorted(selected, key=lambda item: stable_rank(item["id"], seed))
 
 
+def attach_dev_heldout(record: dict[str, Any], seed: int) -> dict[str, Any]:
+    """为 BestCheckpoint 固定 70% 在线测试和 30% held-out 测试。"""
+    item = dict(record)
+    metadata = dict(record.get("metadata") or {})
+    test_cases = list(metadata.get("test_cases") or [])
+    identity = record_id(record)
+    order = sorted(
+        range(len(test_cases)),
+        key=lambda index: hashlib.sha256(
+            (
+                f"{seed}\0{identity}\0{index}\0"
+                + json.dumps(test_cases[index], ensure_ascii=False, sort_keys=True)
+            ).encode("utf-8")
+        ).hexdigest(),
+    )
+    reward_count = max(1, min(len(test_cases) - 1, round(len(test_cases) * 0.7)))
+    reward_indices = set(order[:reward_count])
+    metadata["test_cases"] = [
+        case for index, case in enumerate(test_cases) if index in reward_indices
+    ]
+    metadata["heldout_tests"] = [
+        case for index, case in enumerate(test_cases) if index not in reward_indices
+    ]
+    metadata["test_split_seed"] = "sha256-v1"
+    metadata["reward_test_count"] = len(metadata["test_cases"])
+    metadata["heldout_test_count"] = len(metadata["heldout_tests"])
+    item["metadata"] = metadata
+    return item
+
+
 def write_text(path: Path, content: str, *, force: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and not force:
@@ -322,6 +352,7 @@ def main() -> None:
         standard[args.teaching_standard : need_standard]
         + call[args.teaching_call : need_call]
     )
+    dev = [attach_dev_heldout(item, args.seed + 3) for item in dev]
     heldout_ids = {item["id"] for item in teaching + dev}
     train = [item for item in normalized if item["id"] not in heldout_ids]
 
@@ -348,7 +379,7 @@ def main() -> None:
         )
 
     manifest = {
-        "schema_version": "codeguide-grpo-minimal-taco515-freeze-v2",
+        "schema_version": "codeguide-grpo-minimal-taco515-freeze-v3",
         "seed": args.seed,
         "source_bank": str(source_path.relative_to(ROOT)),
         "source_bank_sha256": sha256_file(source_path),
@@ -358,7 +389,7 @@ def main() -> None:
         "rejected_samples": rejected,
         "policy": {
             "grpo_train": "TACO-515 中排除 dev 与 TeachingEval 后的全部可执行样本",
-            "grpo_dev": "40 standard_input + 10 call_based",
+            "grpo_dev": "40 standard_input + 10 call_based；每题固定 70/30 reward/held-out 测试",
             "teaching_eval": "40 standard_input + 10 call_based",
             "disclosure": "该集合曾参与 SFT 与 checkpoint 分析，仅作为训练域开发/回归集",
         },
