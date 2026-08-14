@@ -240,3 +240,11 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - SFT 对照：外部 GPT-4o scratch prompt 不含 reference/tests/interface，TACO tests 为空，默认不执行代码；当前 DeepSeek reference-guided 流程以 10,415 个 verified source 为母库，A/B 两路都以统一 verifier 为接纳硬门槛。
 - Benchmark 归因：HumanEval 88.4% 来自 Qwen2.5-Coder-7B-Instruct 官方技术报告，不是外部项目训练结果；本项目也不得直接占用该数字作为训练收益。
 - 值得迁移并实测的设计：独立验证集 best checkpoint、zero-advantage 监控、curriculum 消融、Bootstrap 教学评测。暂不迁移：无测试 AST correctness、整批 reward Z-score、未经对齐的 teaching heuristic 入梯度。
+
+# EXP-022：仓库清理与正式入口回归
+
+- 删除 34 个旧/重复已跟踪文件，并清除约 2.874 GiB 可恢复中间资产；没有删除 canonical SFT、source bank、TACO test、GRPO 正式数据或最终评测输出。
+- SFT 训练实现从“两套入口”收敛为 `src.training.train_sft`，`scripts/train_sft.py` 只保留兼容转发。
+- 旧 2048-token 校准输出删除，4096-token calibration/full 原始 generation 与 verification 保留并移入统一 `outputs/eval/`。
+- 测试首次暴露 0 字节 `summarize_evalplus_code_capability.py` 与旧 G0 smoke manifest 测试；两者对应实验已有冻结结果，故删除失效入口/过期测试，不恢复中间 smoke 依赖。
+- 回归：compileall 通过，完整 pytest 85 passed；SFT/GRPO CLI help 均可启动。

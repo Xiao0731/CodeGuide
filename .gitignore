@@ -36,9 +36,8 @@ data/splits/*
 data/*.parquet
 data/*.arrow
 data/tmp_*.py
-# 只提交小规模 smoke；正式生成数据通过 manifest/hash 追踪。
+# SFT JSONL 通过 manifest/hash 追踪，不提交 probe、smoke 或正式大文件。
 data/sft_train*.jsonl
-!data/sft_train_smoke*.jsonl
 data/*.jsonl.tmp
 
 # 实验日志

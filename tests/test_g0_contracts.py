@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import yaml
 
 from scripts.build_sft_dataset import _is_accepted_verification
-from scripts.evaluate_model import validate_manifest
 from scripts.validate_config import validate
 from src.reward.execution import verify_code
 from src.reward import execution
@@ -121,12 +120,6 @@ def test_main_config_contract_is_static_valid_but_lengths_unfrozen():
     assert config["sft"]["num_train_epochs"] == 1.0
     assert config["sft"]["completion_only_loss"] is True
     assert config["sft"]["length_grouped_sampling"] is True
-
-
-def test_manifest_reader_checks_frozen_smoke_file():
-    manifest = validate_manifest(ROOT / "data/manifests/g0_smoke.json")
-    assert manifest["record_count"] == 5
-    assert manifest["split_name"] == "g0_reference_guided_smoke"
 
 
 def test_empty_step_headings_do_not_get_full_contract_reward():

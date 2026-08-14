@@ -101,12 +101,14 @@ step200 相对 Base 增加 48 道严格通过题，Overall 提升 9.32 个百分
 
 ```text
 scripts/build_sft_dataset.py
-src/training/train_sft.py
+python -m src.training.train_sft
 scripts/train_grpo.py
-scripts/evaluate_model.py
+scripts/evaluate_sft_matrix.py
 ```
 
-`scripts/train_grpo.py` 是公开 GRPO 命令；实际实现位于 `src/training/grpo_train.py`。`scripts/data_generate/` 下的 APPS 脚本属于早期探索路径，不是当前正式数据主线。
+`scripts/train_sft.py` 和 `scripts/train_grpo.py` 只保留为兼容入口，正式实现分别位于
+`src/training/train_sft.py` 和 `src/training/grpo_train.py`。脚本用途与主入口见
+`scripts/README.md`。
 
 ## 数据与执行合同
 

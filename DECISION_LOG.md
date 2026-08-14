@@ -599,3 +599,10 @@
 - **归一化**：默认关闭 reward 函数中的 batch Z-score。GRPO 已做 prompt 组内相对优势标准化；如研究额外预标准化，必须作为独立消融并同时报告组内方差和 reward 排序变化。
 - **框架选择**：不因外部项目使用 Unsloth 而重写已在双 4090、8K 上通过的 Transformers/PEFT/bitsandbytes/Liger SFT 管线。Unsloth 仅在同配置显存与吞吐基准证明收益后考虑用于后续入口。
 - **评测补齐**：后续需要执行 HumanEval+/MBPP+ 等代码保持评测和带技术正确性门控的教学评测；官方 HumanEval 88.4% 只作为基座来源数据，不作为 CodeGuide 训练后结果。
+
+# DEC-033：冻结后删除可恢复中间资产，统一正式入口
+
+- **日期**：2026-08-14
+- **决定**：canonical SFT、source bank、TACO test、固定 split、GRPO 正式数据和版本化评测目录为必须保留资产；TACO train、reference cache、传输压缩包、API smoke 与 superseded 输出可在其下游冻结产物验证后删除。
+- **代码边界**：SFT 唯一实现为 `src.training.train_sft`，TACO checkpoint 唯一通用评测器为 `scripts/evaluate_sft_matrix.py`；历史入口只在确有兼容价值时保留薄包装器，不再维护平行实现。
+- **证据边界**：删除一次性运行脚本不等于删除实验结论；原始正式 generation/verification、汇总报告、固定哈希与 `EXPERIMENT_LOG.md` 继续保留。

@@ -7,9 +7,8 @@
 ## 本地检查
 
 ```bash
-python scripts/prepare_sft_calibration.py
 python scripts/audit_sft_training_format.py --local-files-only
-python -m src.training.train_sft --validate-only --mode calibration
+python -m src.training.train_sft --validate-only --mode full
 pytest -q tests/test_sft_data.py
 ```
 
@@ -23,7 +22,7 @@ pytest -q tests/test_sft_data.py
 pip install -r requirements-sft.txt
 huggingface-cli login  # 或通过 HF_TOKEN 提供访问权限
 bash scripts/preflight_sft_dual_4090.sh
-bash scripts/run_sft_calibration_dual_4090.sh
+bash scripts/run_sft_full_dual_4090.sh 2>&1 | tee logs/sft_full.log
 ```
 
 当前云镜像若使用 PyTorch CUDA 13，bitsandbytes 必须为0.48.0以上；项目锁定
@@ -35,22 +34,7 @@ PagedAdamW8bit step，不能仅凭 Python 包可导入判定兼容。
 `python -m torch.distributed.run`，确保继承当前激活虚拟环境；不能直接调用 PATH 中可能来自
 base conda 的 `torchrun`。输出仅包含 LoRA adapter、checkpoint、tokenizer/config 和 run manifest。
 
-恢复校准训练：
-
-```bash
-bash scripts/run_sft_calibration_dual_4090.sh \
-  --resume-from-checkpoint outputs/sft/qwen25_coder_7b_qlora_8k/calibration_seed20260728/checkpoint-25
-```
-
-校准完成后执行固定 Base/Adapter 对照（需要 source bank 和 Docker verifier）：
-
-```bash
-export CODEGUIDE_EXECUTION_IMAGE='python:3.11.9-slim-bookworm@sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317'
-bash scripts/eval_sft_calibration.sh \
-  outputs/sft/qwen25_coder_7b_qlora_8k/calibration_seed20260728/adapter
-```
-
-正式全量入口已经准备，但只有500条校准达到验收门槛后才可执行：
+正式全量入口：
 
 ```bash
 python -m torch.distributed.run --standalone --nproc_per_node=2 -m src.training.train_sft \

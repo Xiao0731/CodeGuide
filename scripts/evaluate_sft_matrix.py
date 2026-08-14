@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """TACO-515 checkpoint matrix evaluation.
 
-This is a NEW evaluation path. Keep ``scripts/evaluate_sft_adapter.py`` unchanged
-so the historical 40-problem / legacy-teaching evaluation remains reproducible.
+This is the canonical checkpoint-matrix evaluator. Historical 40-problem
+calibration outputs remain as experiment artifacts, but their one-off evaluator
+has been retired.
 
 Stages
 ------

@@ -13,7 +13,7 @@
 - `tests/test_sft_eval_protocol.py`
 - `tests/test_static_proxy.py`
 
-不要修改或删除旧的 `scripts/evaluate_sft_adapter.py`。
+历史 40 题校准结论保留在实验日志中；当前统一使用矩阵评测器，避免维护两套提取与执行逻辑。
 
 ## 先做本地检查
 

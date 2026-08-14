@@ -65,18 +65,11 @@ cat outputs/eval/evalplus_code_capability_v1/cloud_generation_acceptance.json
 
 必须为 `"complete": true`。
 
-## 本地Docker评分
+## 已冻结结果
 
-```powershell
-$env:PYTHONUTF8 = "1"
-$env:PYTHONIOENCODING = "utf-8"
-
-powershell -ExecutionPolicy Bypass -File `
-  .\scripts\evaluate_evalplus_code_capability_local.ps1 `
-  -RunRoot outputs/eval/evalplus_code_capability_v1 `
-  -Parallel 4 `
-  -PullImage
-```
+本轮 EvalPlus 已完成，原始 sample、执行日志和汇总结果统一保存在下列正式目录。
+一次性的本地评分包装器与汇总脚本不再维护；需要重做新实验时，使用当前 EvalPlus CLI
+执行并建立新的版本化 run 目录，不覆盖本轮结果。
 
 最终输出位于：
 

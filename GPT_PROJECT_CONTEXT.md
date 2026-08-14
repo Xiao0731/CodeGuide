@@ -724,3 +724,11 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 外部 README 的 HumanEval 88.4% 是 Qwen2.5-Coder-7B-Instruct 官方基座成绩，不是该项目 SFT/GRPO 后实测。当前项目同样继承该基座，但尚未运行 HumanEval+/MBPP+/LiveCodeBench，不能把官方基座数字写成本项目结果。
 - 数据构造方面，外部 teacher 只看到题面、难度和标签；reference 虽被 loader 取出但没有进入 prompt。TACO tests 被置空，`--run_code` 默认关闭，质量分主要检查结构、闭合代码块、复杂度和长度。默认 source=`both` 还会先加载 CodeContests 到 `max_items`，并不保证 10,000 条中确实包含 TACO。
 - 本项目 teacher 使用 verified reference、接口元数据、测试摘要和可选 seed teaching examples；student prompt 不泄漏 reference；A 类输出必须通过统一 Docker verifier，B 类锁定 reference 并只生成讲解/安全注释；最终 canonical 为 10,306 条。外部 `build_seed.py` 的 50 条 seed 是独立生成供人工查看，没有作为 few-shot 示例注入全量蒸馏 prompt。
+
+## 2026-08-14：仓库主线清理与入口收敛
+
+- 删除复制的评测 bundle、早期 APPS 数据生成链、Colab/Kaggle/AIStudio/ModelScope 一次性安装入口、API smoke、500 条校准包装器和旧 `evaluate_sft_adapter.py`；正式矩阵评测统一使用 `evaluate_sft_matrix.py`。
+- 旧 `scripts/train_sft.py` 的 Unsloth 独立实现已移除，改为薄包装器调用 `src.training.train_sft`，避免与已在双 4090 上验证的 Transformers/PEFT/bitsandbytes/Liger 主线继续分叉。
+- 本地删除约 2.874 GiB 可恢复资产：TACO train 分片、全量 reference cache、GRPO 上传分卷/压缩包、Python cache 和 superseded 2048-token 校准输出。TACO test、canonical SFT、source bank、固定 split、GRPO 正式数据与正式评测结果全部保留。
+- 4096-token 校准/full 结果归档到 `outputs/eval/sft_calibration_4096` 与 `outputs/eval/sft_full_4096`；项目脚本用途集中记录在 `scripts/README.md`。
+- 完整回归为 85 passed；清理没有调用 API、Docker 或训练任务。详细边界见 `reports/repository_cleanup_20260814.md`。
