@@ -1,3 +1,0 @@
-# Frozen code-capability benchmark dependency.
-# The training environment already provides torch/transformers/peft/PyYAML.
-evalplus==0.3.1

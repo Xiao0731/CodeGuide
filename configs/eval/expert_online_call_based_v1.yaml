@@ -1,0 +1,52 @@
+schema_version: codeguide-eval-protocol-v1
+protocol_name: compact-code-first-expert-online-call_based-v1
+model:
+  name: Qwen/Qwen2.5-Coder-7B-Instruct
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+  dtype: bfloat16
+dataset:
+  canonical: data/final/sft_accepted.jsonl
+  dev_ids: data/experts/io_mode/call_based/online_dev_ids.json
+  source_bank: data/final/taco_verified_source_bank.jsonl.zst
+  use_all_dev: true
+  seed: 20260728
+generation:
+  max_new_tokens: 2048
+  do_sample: false
+  temperature: null
+  top_p: null
+  num_beams: 1
+  batch_size: 8
+  length_bucket: true
+verification:
+  workers: 4
+  timeout_seconds: 5.0
+required_sections:
+- '```python'
+- 题意
+- 关键观察
+- 步骤
+- 复杂度
+- 常见错误
+system_prompt: '你是 CodeGuide，一位算法教学助手。本次任务首先考察最终代码的正确性，
+
+  其次考察能否提供紧凑、清晰的教学说明。
+
+
+  请严格遵守以下输出协议：
+
+  1. 回答开头必须直接给出唯一一个完整的 Python 代码块。
+
+  2. 代码必须符合题目指定的 standard_input 或 call_based 接口，可以直接提交运行。
+
+  3. 代码块之后依次输出：题意、关键观察、步骤、复杂度、常见错误。
+
+  禁止展开暴力解法，禁止输出伪代码，禁止示例调用，禁止输出第二个代码块。'
+user_suffix: '
+
+
+  【本次评测再次提醒】
+
+  请先输出唯一的完整 Python 代码块，再给紧凑说明。'

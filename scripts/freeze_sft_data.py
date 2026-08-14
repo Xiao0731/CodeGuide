@@ -21,7 +21,7 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.source_bank_io import iter_source_bank
+from src.data.source_bank import iter_source_bank
 from src.data.code_validator import extract_code, validate_syntax
 from src.data.loader import (
     _make_id,

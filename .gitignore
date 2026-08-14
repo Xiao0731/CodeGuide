@@ -25,6 +25,8 @@ data/distilled/
 data/cache/
 data/final/
 data/processed/
+data/experts/
+data/external/
 data/splits/
 !data/splits/
 data/splits/*
@@ -49,6 +51,7 @@ artifacts/g0/*
 !artifacts/g0/environment.json
 !artifacts/g0/docker_verifier_report.json
 *.log
+reports/data/
 
 # 环境变量
 .env

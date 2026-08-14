@@ -1,19 +1,13 @@
-try:
-    from .composite import CompositeReward, RewardOutput
-    from .correctness import CodeCorrectnessReward
-    from .format import FormatComplianceReward
-    from .teaching import TeachingCompletenessReward
-except ModuleNotFoundError:
-    CompositeReward = None
-    RewardOutput = None
-    CodeCorrectnessReward = None
-    FormatComplianceReward = None
-    TeachingCompletenessReward = None
+"""CodeGuide execution and teaching-contract rewards."""
+
+from .execution import VerificationResult, verify_code
+from .format import FormatComplianceReward, contract_score
+from .grpo import build_reward_functions
 
 __all__ = [
-    "CompositeReward",
-    "RewardOutput",
-    "CodeCorrectnessReward",
     "FormatComplianceReward",
-    "TeachingCompletenessReward",
+    "VerificationResult",
+    "build_reward_functions",
+    "contract_score",
+    "verify_code",
 ]

@@ -1826,3 +1826,12 @@ Codex 必须先回答：
 3. 正式评测统一写入 `outputs/eval/<versioned_run>/`，至少保留 selection、generation、verification 与 summary；旧运行不得覆盖。
 4. TACO train 与 reference cache 已在下游 source bank/manifest/hash 验证后本地删除；如重新构造数据可按来源下载，但训练与评测不得依赖项目根目录外的绝对路径。
 5. 下一阶段继续以 full SFT adapter 暖启动 GRPO，不因清理重新运行 SFT、API 蒸馏或已完成评测。
+
+## 2026-08-15 训练实现基线更新
+
+1. 训练依赖以根目录唯一 `requirements.txt` 为准，不再维护阶段性 requirements 文件。
+2. SFT 与 GRPO 唯一入口分别为 `scripts/train_sft.py` 和 `scripts/train_grpo.py`，底层使用 TRL Trainer；实验变化通过 YAML 与 CLI 参数表达，不新增一次性训练脚本。
+3. 双卡进程由 Accelerate 管理；默认 MULTI_GPU，DeepSpeed ZeRO-2 是可选启动配置。项目代码不得再次手工初始化或销毁分布式进程组。
+4. SFT 继续使用冻结的 assistant-only 标签；数据已经预分词并审计时，TRL 必须跳过二次数据准备，禁止静默改变 mask 或截断代码。
+5. GRPO 从 full SFT adapter 热启动，correctness 必须调用统一 verifier，teaching contract 只衡量明确的教学结构合同；正式教学质量提升仍需独立评测，不能由启发式 reward 直接宣称。
+6. 本轮完成的是代码主线重构与本地合同验证。重构后的训练入口在云端至少完成一个最小 GPU smoke 后，才可更新为“运行验证通过”。

@@ -1,0 +1,59 @@
+schema_version: codeguide-training-v2
+stage: grpo
+seed: 20260728
+
+model:
+  name_or_path: Qwen/Qwen2.5-Coder-7B-Instruct
+  sft_adapter_path: outputs/sft/qwen25_coder_7b_qlora_8k/full_seed20260728/adapter
+  trust_remote_code: false
+  attention_backend: auto
+
+data:
+  train: data/splits/grpo_minimal_v1/grpo_train.jsonl
+  eval: data/splits/grpo_minimal_v1/grpo_dev.jsonl
+  manifest: data/splits/grpo_minimal_v1/freeze_manifest.json
+  expected_train_count: 6451
+  expected_eval_count: 50
+
+quantization:
+  load_in_4bit: true
+  quant_type: nf4
+  double_quant: true
+  compute_dtype: bfloat16
+
+generation:
+  max_prompt_length: 2048
+  max_completion_length: 1024
+  num_generations: 4
+  temperature: 0.8
+  top_p: 0.95
+
+reward:
+  weights: [0.9, 0.1]
+  execution_backend: docker
+  container_image: ''
+  timeout: 5.0
+
+training:
+  output_dir: outputs/grpo/codeguide_v1
+  num_train_epochs: 1.0
+  max_steps: -1
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 1.0e-5
+  optim: paged_adamw_8bit
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  beta: 0.05
+  loss_type: dr_grpo
+  scale_rewards: true
+  mask_truncated_completions: true
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  logging_steps: 10
+  save_steps: 100
+  save_total_limit: 2
+  report_to: none

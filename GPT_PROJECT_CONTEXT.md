@@ -732,3 +732,13 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 本地删除约 2.874 GiB 可恢复资产：TACO train 分片、全量 reference cache、GRPO 上传分卷/压缩包、Python cache 和 superseded 2048-token 校准输出。TACO test、canonical SFT、source bank、固定 split、GRPO 正式数据与正式评测结果全部保留。
 - 4096-token 校准/full 结果归档到 `outputs/eval/sft_calibration_4096` 与 `outputs/eval/sft_full_4096`；项目脚本用途集中记录在 `scripts/README.md`。
 - 完整回归为 85 passed；清理没有调用 API、Docker 或训练任务。详细边界见 `reports/repository_cleanup_20260814.md`。
+
+## 2026-08-15：训练代码框架化与二次清理
+
+- 依赖文件收敛为根目录唯一 `requirements.txt`，删除 SFT、router、external-eval 和 G0 lock 等并行清单；训练版本固定为 Transformers 4.53.3、TRL 0.19.1、PEFT 0.17.1，并保留 bitsandbytes、Liger、FlashAttention 2 与可选 DeepSpeed。
+- SFT 唯一实现改为 TRL `SFTTrainer`。CodeGuide 只保留冻结数据哈希、固定 split、8K 不截断检查和预计算 assistant-only `labels`；TRL 通过 `skip_prepare_dataset` 原样使用已审计标签。
+- GRPO 唯一实现改为 TRL `GRPOTrainer`，从 full SFT adapter 热启动，正式 reward 为统一 `verify_code()` correctness 0.9 与 teaching contract 0.1；移除手写 rollout、优化循环、进程组和重复 reward 类。
+- 双卡启动统一由 Accelerate 管理；默认 `MULTI_GPU`，另提供可选的 Accelerate + DeepSpeed ZeRO-2 配置。FlashAttention 2 可用时自动启用，否则明确回退 SDPA。
+- `scripts/` 由约 45 个入口缩减为 10 个核心 Python 入口；一次性 shell/PowerShell 包装器、probe/audit 脚本、旧训练分叉和静态代理奖励已删除。参数差异进入 YAML，重复验证进入参数化 pytest。
+- 正式评测输出继续保留在 `outputs/eval/`；被正式矩阵替代的旧 `outputs/sft/taco_test` 与旧增量 ZIP 已删除。canonical SFT、source bank、固定 split、GRPO 数据和正式评测记录未改动。
+- 本轮仅完成静态、数据合同和 CLI 验证；没有重新训练 SFT/GRPO，也没有把“框架迁移”宣称为 GPU 运行通过。

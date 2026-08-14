@@ -89,7 +89,7 @@ def load_evalplus_dataset(name: str) -> dict[str, dict[str, Any]]:
         from evalplus.data import get_human_eval_plus, get_mbpp_plus
     except ImportError as exc:
         raise RuntimeError(
-            "EvalPlus is missing. Install requirements-external-eval.txt."
+            "EvalPlus is missing. Install the project requirements.txt."
         ) from exc
 
     if name == "humaneval":

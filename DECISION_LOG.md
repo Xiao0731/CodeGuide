@@ -606,3 +606,12 @@
 - **决定**：canonical SFT、source bank、TACO test、固定 split、GRPO 正式数据和版本化评测目录为必须保留资产；TACO train、reference cache、传输压缩包、API smoke 与 superseded 输出可在其下游冻结产物验证后删除。
 - **代码边界**：SFT 唯一实现为 `src.training.train_sft`，TACO checkpoint 唯一通用评测器为 `scripts/evaluate_sft_matrix.py`；历史入口只在确有兼容价值时保留薄包装器，不再维护平行实现。
 - **证据边界**：删除一次性运行脚本不等于删除实验结论；原始正式 generation/verification、汇总报告、固定哈希与 `EXPERIMENT_LOG.md` 继续保留。
+
+# DEC-034：训练基础设施交回成熟框架
+
+- **日期**：2026-08-15
+- **决定**：SFT/GRPO 分别以 TRL `SFTTrainer`/`GRPOTrainer` 为唯一训练循环，Accelerate 负责双卡进程，PEFT/bitsandbytes 负责 NF4 QLoRA；不再维护手写分布式、rollout 或优化器循环。
+- **项目保留边界**：只保留 CodeGuide 特有的数据冻结合同、assistant-only 标签、接口感知代码提取、Docker correctness 和 teaching contract。
+- **配置边界**：实验差异进入 `configs/sft.yaml`、`configs/grpo.yaml` 和 Accelerate 配置；不再为每个实验复制 shell/PowerShell 或 Python 训练脚本。
+- **DeepSpeed/FlashAttention**：FlashAttention 2 为可选自动后端，缺失时回退 SDPA；DeepSpeed ZeRO-2 通过独立 Accelerate 配置启用，默认双卡入口仍为普通 MULTI_GPU。
+- **证据边界**：本轮框架化只在本地完成静态、测试和数据合同验证；云端正式训练前仍需执行最小 GPU smoke，历史 full SFT 结果不因代码重构而失效。

@@ -1,1104 +1,234 @@
-#!/usr/bin/env python3
-"""
-CodeGuide-LLM GRPO 后训练主入口
-
-技术要点：
-  - 从 SFT adapter（models/sft_adapter/）热启动，无 adapter 则从 base 冷启动
-  - TRL GRPOTrainer：在线采样 + Group Relative Policy Optimization
-  - 奖励信号：combined_reward = alpha×accuracy + (1-alpha)×format（本地，无 API）
-  - 数据：sft_train.jsonl 的 prompt 部分（只传题目，不传参考答案）
-  - 产物：LoRA adapter（models/grpo_final/）+ 合并模型（models/codeguide_llm_merged/）
-
-运行：
-    python src/training/grpo_train.py
-    python src/training/grpo_train.py --config configs/train_config.yaml
-    python src/training/grpo_train.py --resume_from_checkpoint models/grpo_final/checkpoint-200
-
-显存估算（RTX 4090, 24 GB）：
-    NF4 base model      ~4  GB
-    LoRA adapter        ~0.3 GB
-    4 × rollout buffer  ~3  GB  (4 generations × 1024 tokens)
-    Optimizer (8bit)    ~1.5 GB
-    Activations (gc)    ~3  GB
-    ──────────────────────────
-    合计                ~12 GB  （余量充足）
-"""
+"""TRL GRPOTrainer entry point, warm-started from the frozen SFT adapter."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import logging
-import math
 import os
-import sys
+import platform
+import time
 from pathlib import Path
+from typing import Any
 
-# 项目根目录加入 sys.path（src/training/ → 上两级为项目根）
-_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(_ROOT))
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
-    datefmt="%H:%M:%S",
-)
-logger = logging.getLogger("grpo_train")
-
-
-# ════════════════════════════════════════════════════════════════
-# 1. 模型加载（SFT adapter 热启动）
-# ════════════════════════════════════════════════════════════════
-
-def load_policy_model(cfg):
-    """
-    优先从 SFT adapter 热启动；若 adapter 不存在则从 base model 冷启动。
-
-    热启动步骤：
-      1. Unsloth 检测到 adapter_config.json 后自动加载 base + adapter
-      2. from_pretrained 默认冻结所有参数；手动恢复 LoRA 参数的 requires_grad
-    冷启动步骤：
-      1. 直接加载 base model
-      2. 附加新的 LoRA adapter
-
-    注：use_gradient_checkpointing 使用 True（标准 HF 实现），
-    而非 Unsloth 专属的 "unsloth" 模式，因为 GRPOTrainer 的 online rollout
-    阶段需要在 inference/training 模式间切换，Unsloth 实现兼容性不稳定。
-    """
-    from unsloth import FastLanguageModel
-
-    grpo = cfg.grpo
-    adapter_path = Path(grpo.sft_adapter_path)
-    has_adapter = (adapter_path / "adapter_config.json").exists()
-
-    if has_adapter:
-        logger.info("热启动：从 SFT adapter 加载 → %s", adapter_path)
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name    = str(adapter_path),
-            max_seq_length= grpo.max_seq_length,
-            dtype         = None,
-            load_in_4bit  = True,
-        )
-        # 恢复 LoRA 参数为可训练状态（base model 权重保持冻结）
-        trainable = 0
-        for name, param in model.named_parameters():
-            if "lora_" in name:
-                param.requires_grad_(True)
-                trainable += param.numel()
-        logger.info("已恢复 %s 个 LoRA 参数为可训练状态", f"{trainable:,}")
-
-    else:
-        logger.warning(
-            "未找到 SFT adapter（%s），从 base model 冷启动。"
-            "建议先运行 python scripts/train_sft.py", adapter_path
-        )
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name    = cfg.model.local_path or cfg.model.name,
-            max_seq_length= grpo.max_seq_length,
-            dtype         = None,
-            load_in_4bit  = True,
-        )
-        model = FastLanguageModel.get_peft_model(
-            model,
-            r              = cfg.sft.lora_r,
-            lora_alpha     = cfg.sft.lora_alpha,
-            lora_dropout   = cfg.sft.lora_dropout,
-            target_modules = list(cfg.lora.target_modules),
-            bias           = "none",
-            use_gradient_checkpointing = True,
-            random_state   = grpo.seed,
-        )
-
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"   # GRPO 生成阶段需要 left padding
-
-    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    total     = sum(p.numel() for p in model.parameters())
-    logger.info(
-        "可训练参数：%s / %s（%.3f%%）",
-        f"{trainable:,}", f"{total:,}", 100 * trainable / total,
-    )
-    return model, tokenizer
-
-
-# ════════════════════════════════════════════════════════════════
-# 2. 数据集准备
-# ════════════════════════════════════════════════════════════════
-
-_GRPO_SYSTEM = (
-    "你是 CodeGuide，一位专为 OI/ACM 初学者设计的算法教学助手。"
-    "当用户提出一道算法题时，你会："
-    "1. 先用简单的语言理解题意，举例说明；"
-    "2. 从暴力解出发，逐步优化到最优解；"
-    "3. 每一步都解释「为什么这样想」，而不只是「怎么做」；"
-    "4. 最后给出带详细注释的完整 Python 代码。"
-    "你的讲解应当通俗易懂，适合刚开始学习算法竞赛的初学者。"
+from src.reward.grpo import build_reward_functions
+from src.training.common import (
+    load_config,
+    load_jsonl,
+    report_targets,
+    resolve_path,
+    select_attention_backend,
 )
 
 
-def prepare_dataset(cfg, tokenizer, Dataset):
-    """
-    从 sft_train.jsonl 构建 GRPO 数据集。
-
-    输出列：
-      - "prompt"      : ChatML 格式字符串（system+user，末尾含 generation prompt）
-      - "test_cases"  : JSON 字符串，反序列化后为 List[dict]（透传给 reward_fn）
-
-    不传入 assistant 内容，让模型自由生成后由 reward_fn 打分。
-    """
-    data_path = Path(cfg.grpo.train_data)
-    if not data_path.exists():
-        raise FileNotFoundError(
-            f"训练数据不存在：{data_path}\n"
-            "请先运行：python scripts/build_sft_dataset.py"
-        )
-
-    logger.info("加载训练数据：%s", data_path)
-    records, stats = _build_grpo_records(data_path, tokenizer)
-
-    _log_grpo_filter_stats("GRPO 数据集", stats)
-    if not records:
-        raise ValueError(
-            "GRPO 数据集为空：没有 metadata.reward_compatible == true 的样本。"
-            "请先运行数据审计，或确认 build_sft_dataset.py 已写入 test_cases/reward_compatible。"
-        )
-
-    return Dataset.from_list(records)
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default="configs/grpo.yaml")
+    parser.add_argument("--output-dir")
+    parser.add_argument("--model-name-or-path")
+    parser.add_argument("--sft-adapter-path")
+    parser.add_argument("--cache-dir")
+    parser.add_argument("--resume-from-checkpoint")
+    parser.add_argument("--max-steps", type=int)
+    parser.add_argument("--validate-only", action="store_true")
+    return parser
 
 
-def _extract_user_content(messages: list[dict]) -> str | None:
-    return next((m.get("content", "") for m in messages if m.get("role") == "user"), None)
+def _prompt_record(record: dict[str, Any]) -> dict[str, Any]:
+    messages = record.get("messages")
+    if not isinstance(messages, list):
+        raise ValueError(f"record {record.get('id')} has no messages")
+    prompt = [message for message in messages if message.get("role") != "assistant"]
+    if not prompt or prompt[-1].get("role") != "user":
+        raise ValueError(f"record {record.get('id')} has no final user prompt")
 
-
-def _build_prompt(tokenizer, user_content: str) -> str:
-    return tokenizer.apply_chat_template(
-        [
-            {"role": "system", "content": _GRPO_SYSTEM},
-            {"role": "user", "content": user_content},
-        ],
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-
-
-def _empty_filter_stats() -> dict:
+    metadata = dict(record.get("metadata") or {})
+    test_cases = metadata.pop("test_cases", None)
+    if not isinstance(test_cases, list) or not test_cases:
+        raise ValueError(f"record {record.get('id')} has no executable test cases")
+    contract = {
+        key: metadata.get(key)
+        for key in ("io_mode", "fn_name", "starter_code", "difficulty")
+    }
     return {
-        "total": 0,
-        "kept": 0,
-        "missing_user": 0,
-        "not_reward_compatible": 0,
-        "unsupported_reward_metadata": 0,
-        "missing_test_cases": 0,
-        "insufficient_test_cases": 0,
-        "standard_input_reward_compatible": 0,
-        "call_based_reward_compatible": 0,
-        "skipped_incompatible": 0,
-        "io_mode_counts": {},
+        "problem_id": record.get("id") or record.get("problem_id"),
+        "prompt": prompt,
+        "test_cases": json.dumps(test_cases, ensure_ascii=False),
+        "metadata": json.dumps(contract, ensure_ascii=False),
     }
 
 
-def _count_io_mode(stats: dict, io_mode: str) -> None:
-    io_mode = io_mode or "unknown"
-    stats["io_mode_counts"][io_mode] = stats["io_mode_counts"].get(io_mode, 0) + 1
-
-
-def _build_grpo_records(
-    data_path: Path,
-    tokenizer,
-    *,
-    difficulty: str | None = None,
-) -> tuple[list[dict], dict]:
-    """
-    Build GRPO records and explicitly filter to samples compatible with the
-    current execution-based Accuracy Reward.
-
-    The SFT JSONL must mark metadata.reward_compatible=true; the verifier then
-    re-checks that the metadata schema is supported before the sample is kept.
-    """
-    from src.reward.execution import supports_verification
-
-    records: list[dict] = []
-    stats = _empty_filter_stats()
-
-    with open(data_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-
-            obj = json.loads(line)
-            meta = obj.get("metadata", {})
-
-            if difficulty is not None and meta.get("difficulty", "").lower() != difficulty.lower():
-                continue
-
-            stats["total"] += 1
-            _count_io_mode(stats, meta.get("io_mode", "unknown"))
-
-            user_content = _extract_user_content(obj.get("messages", []))
-            if not user_content:
-                stats["missing_user"] += 1
-                continue
-
-            test_cases = meta.get("test_cases", [])
-            if not test_cases:
-                stats["missing_test_cases"] += 1
-
-            if meta.get("reward_compatible") is not True:
-                stats["not_reward_compatible"] += 1
-                stats["skipped_incompatible"] += 1
-                continue
-
-            if not supports_verification(meta):
-                stats["unsupported_reward_metadata"] += 1
-                stats["skipped_incompatible"] += 1
-                continue
-
-            # Online reward tests and held-out tests must be disjoint. With
-            # fewer than four cases the split is too weak, so the sample stays
-            # eligible for SFT but is excluded from GRPO.
-            if len(test_cases) < 4:
-                stats["insufficient_test_cases"] += 1
-                stats["skipped_incompatible"] += 1
-                continue
-
-            identity = str(obj.get("id") or meta.get("id") or user_content)
-            order = sorted(
-                range(len(test_cases)),
-                key=lambda i: hashlib.sha256(
-                    f"{identity}\0{i}\0{json.dumps(test_cases[i], sort_keys=True, ensure_ascii=False)}".encode(
-                        "utf-8"
-                    )
-                ).hexdigest(),
-            )
-            reward_count = max(1, min(len(test_cases) - 1, round(len(test_cases) * 0.7)))
-            reward_indices = set(order[:reward_count])
-            reward_tests = [
-                case for i, case in enumerate(test_cases) if i in reward_indices
-            ]
-            heldout_tests = [
-                case for i, case in enumerate(test_cases) if i not in reward_indices
-            ]
-            reward_meta = {
-                key: value
-                for key, value in meta.items()
-                if key not in {"test_cases", "heldout_tests"}
-            }
-            reward_meta["test_split_seed"] = "sha256-v1"
-            reward_meta["reward_test_count"] = len(reward_tests)
-            reward_meta["heldout_test_count"] = len(heldout_tests)
-
-            io_mode = meta.get("io_mode", "unknown")
-            if io_mode == "standard_input":
-                stats["standard_input_reward_compatible"] += 1
-            elif io_mode == "call_based":
-                stats["call_based_reward_compatible"] += 1
-
-            records.append({
-                "prompt": _build_prompt(tokenizer, user_content),
-                "test_cases": json.dumps(reward_tests, ensure_ascii=False),
-                "metadata": json.dumps(reward_meta, ensure_ascii=False),
-            })
-            stats["kept"] += 1
-
-    return records, stats
-
-
-def _log_grpo_filter_stats(label: str, stats: dict) -> None:
-    total = stats["total"]
-    kept = stats["kept"]
-    ratio = kept / total if total else 0.0
-    logger.info(
-        "%s 过滤统计：原始=%d，保留=%d（%.2f%%），"
-        "缺 user=%d，缺 test_cases=%d，测试少于4=%d，reward_compatible=false=%d，io_mode=%s",
-        label,
-        total,
-        kept,
-        ratio * 100,
-        stats["missing_user"],
-        stats["missing_test_cases"],
-        stats["insufficient_test_cases"],
-        stats["not_reward_compatible"],
-        stats["io_mode_counts"],
-    )
-    logger.info(
-        "%s reward-compatible split: standard_input=%d, call_based=%d, skipped_incompatible=%d, unsupported=%d",
-        label,
-        stats["standard_input_reward_compatible"],
-        stats["call_based_reward_compatible"],
-        stats["skipped_incompatible"],
-        stats["unsupported_reward_metadata"],
-    )
-
-
-# ════════════════════════════════════════════════════════════════
-# 2b. Curriculum 数据集构建
-# ════════════════════════════════════════════════════════════════
-
-def build_curriculum_dataset(cfg, tokenizer, Dataset, difficulty: str):
-    """
-    从 sft_train.jsonl 中按难度过滤，构建 Curriculum 某阶段的数据集。
-
-    设计动机（v3 新增）：
-    GRPO 早期直接遇到 hard 题，Pass@1≈0，所有 reward≈0，梯度消失。
-    课程学习按 easy→medium→hard 分阶段，让模型先建立基础能力再接受挑战。
-
-    面试叙事："我观察到训练初期 accuracy_reward 几乎全为零，模型学不到任何东西；
-    引入 Curriculum Learning 后，easy 阶段结束时 Pass@1 从 0 提升到 0.3，
-    medium 阶段 Pass@1 进一步到 0.5，最后 hard 阶段仍有梯度可学。"
-
-    Args:
-        difficulty: "easy" | "medium" | "hard"（匹配 metadata.difficulty 字段）
-    """
-    data_path = Path(cfg.grpo.train_data)
-    if not data_path.exists():
-        raise FileNotFoundError(
-            f"训练数据不存在：{data_path}\n"
-            "请先运行：python scripts/build_sft_dataset.py"
+def prepare_records(config: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    data = config["data"]
+    train_path, eval_path = resolve_path(data["train"]), resolve_path(data["eval"])
+    assert train_path and eval_path
+    train = [_prompt_record(item) for item in load_jsonl(train_path)]
+    evaluation = [_prompt_record(item) for item in load_jsonl(eval_path)]
+    expected = (int(data["expected_train_count"]), int(data["expected_eval_count"]))
+    if (len(train), len(evaluation)) != expected:
+        raise RuntimeError(
+            f"frozen GRPO count mismatch: train={len(train)}, eval={len(evaluation)}"
         )
+    train_ids = {item["problem_id"] for item in train}
+    eval_ids = {item["problem_id"] for item in evaluation}
+    if train_ids & eval_ids:
+        raise RuntimeError("GRPO train/eval problem_id overlap")
+    return train, evaluation
+
+
+def validation_summary(config: dict[str, Any]) -> dict[str, Any]:
+    data = config["data"]
+    manifest_path = resolve_path(data["manifest"])
+    assert manifest_path
+    with manifest_path.open(encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    counts = manifest["counts"]
+    train_count = int(counts["grpo_train"]["samples"])
+    eval_count = int(counts["grpo_dev"]["samples"])
+    if train_count != int(data["expected_train_count"]):
+        raise RuntimeError("GRPO manifest train count mismatch")
+    if eval_count != int(data["expected_eval_count"]):
+        raise RuntimeError("GRPO manifest eval count mismatch")
+    adapter = resolve_path(config["model"]["sft_adapter_path"])
+    return {
+        "stage": "grpo",
+        "framework": "trl.GRPOTrainer",
+        "train": train_count,
+        "eval": eval_count,
+        "sft_adapter": str(adapter),
+        "sft_adapter_exists": bool(adapter and adapter.exists()),
+        "reward_functions": ["correctness", "teaching_contract"],
+    }
 
-    logger.info("Curriculum 数据集（difficulty=%s）：%s", difficulty, data_path)
-    records, stats = _build_grpo_records(data_path, tokenizer, difficulty=difficulty)
-
-    _log_grpo_filter_stats(f"Curriculum [{difficulty}]", stats)
-    if not records:
-        logger.warning(
-            "Curriculum [%s] 数据集为空！可能缺少该 difficulty 或 reward_compatible 样本。",
-            difficulty,
-        )
-    return Dataset.from_list(records)
-
-
-# ════════════════════════════════════════════════════════════════
-# 3. 奖励函数与可观测性
-# ════════════════════════════════════════════════════════════════
-
-# 全局 reward 缓冲区，由 reward_fn 写入，由 RewardLoggingCallback 读取并上报 WandB
-# 使用列表而非 dict，便于线程安全追加（GRPO 在 trl 内部串行调用 reward_fn）
-_reward_buffer: list[dict] = []
-
-
-def make_reward_fn(alpha: float, exec_timeout: float):
-    """
-    返回符合 GRPOTrainer 接口的奖励函数（本地执行，无 API 调用）。
-
-    改进（v2）：
-    - 拆分三路奖励：accuracy / format / teaching 各自记录到 _reward_buffer
-    - WandB 通过 RewardLoggingCallback 读取缓冲区，分别上报 reward/accuracy 等指标
-    - 同时记录 reward_std（批内奖励标准差），监控奖励坍缩
-
-    GRPOTrainer 调用签名（trl >= 0.8）：
-        reward_fn(prompts, completions, **extra_dataset_columns)
-
-    奖励公式：
-        combined = alpha × accuracy_reward(code, test_cases)
-                 + (1-alpha) × format_reward(completion)
-        （teaching 单独记录用于监控，不进入 GRPO 梯度，可通过 composite.py 接入）
-    """
-    import statistics
-    from src.data.code_validator import extract_code
-    from src.reward_functions import accuracy_reward, format_reward, combined_reward
-    from src.reward.teaching import build_teaching_reward
-
-    # 注意：teaching reward 需要 cfg，这里用简单的 lambda 占位
-    # 实际使用时通过 make_reward_fn_with_cfg 传入
-    _teaching_fn = None
-
-    def reward_fn(
-        prompts:     list[str],
-        completions: list[str],
-        test_cases:  list[str] | None = None,
-        metadata:    list[str] | None = None,
-        **kwargs,
-    ) -> list[float]:
-        acc_scores:  list[float] = []
-        fmt_scores:  list[float] = []
-        combined:    list[float] = []
-
-        for idx, completion in enumerate(completions):
-            code = extract_code(completion) or ""
-
-            tc: list[dict] = []
-            if test_cases is not None and idx < len(test_cases):
-                try:
-                    parsed = json.loads(test_cases[idx])
-                    if isinstance(parsed, list):
-                        tc = parsed
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            meta: dict = {}
-            if metadata is not None and idx < len(metadata):
-                try:
-                    parsed_meta = json.loads(metadata[idx])
-                    if isinstance(parsed_meta, dict):
-                        meta = parsed_meta
-                except (json.JSONDecodeError, TypeError):
-                    pass
-
-            acc = accuracy_reward(code, tc, timeout=exec_timeout, metadata=meta)
-            fmt = format_reward(completion)
-            score = alpha * acc + (1.0 - alpha) * fmt
-
-            acc_scores.append(acc)
-            fmt_scores.append(fmt)
-            combined.append(score)
-
-        # 记录到缓冲区（批级别统计）
-        n = len(combined)
-        batch_stats = {
-            "reward/accuracy":   sum(acc_scores) / n,
-            "reward/format":     sum(fmt_scores) / n,
-            "reward/total":      sum(combined) / n,
-            "reward/std":        statistics.stdev(combined) if n > 1 else 0.0,
-            "reward/min":        min(combined),
-            "reward/max":        max(combined),
-        }
-        # 计算 teaching 分数（仅监控，不进梯度）
-        if _teaching_fn is not None:
-            try:
-                teaching_scores = _teaching_fn(prompts, completions)
-                batch_stats["reward/teaching"] = sum(teaching_scores) / len(teaching_scores)
-            except Exception:
-                pass
-
-        _reward_buffer.append(batch_stats)
-        return combined
-
-    return reward_fn
-
-
-def make_reward_fn_with_cfg(cfg):
-    """
-    Build the canonical execution-correctness plus contract reward.
-
-    The local teaching heuristic is logged only as a surface diagnostic. It is
-    not a teaching-quality reward and does not enter the gradient. Optional
-    batch Z-score remains available only for a named ablation; the main config
-    keeps it disabled because GRPO already performs group-relative scaling.
-    """
-    import statistics
-    from src.data.code_validator import extract_code
-    from src.reward_functions import accuracy_reward, format_reward
-    from src.reward.teaching import build_teaching_reward
-
-    alpha           = float(cfg.reward.alpha)
-    exec_timeout    = float(cfg.reward.exec_timeout)
-    teaching_fn     = build_teaching_reward(cfg)
-    num_gen         = int(cfg.grpo.num_generations)
-    normalize       = bool(getattr(cfg.grpo, "normalize_rewards", False))
-    execution_backend = str(getattr(cfg.reward, "execution_backend", "docker"))
-    container_image = str(getattr(cfg.reward, "container_image", "")) or None
-
-    def reward_fn(
-        prompts:     list[str],
-        completions: list[str],
-        test_cases:  list[str] | None = None,
-        metadata:    list[str] | None = None,
-        **kwargs,
-    ) -> list[float]:
-        acc_scores: list[float] = []
-        fmt_scores: list[float] = []
-        raw_combined: list[float] = []
-
-        for idx, completion in enumerate(completions):
-            code = extract_code(completion) or ""
-            tc: list[dict] = []
-            if test_cases is not None and idx < len(test_cases):
-                try:
-                    parsed = json.loads(test_cases[idx])
-                    if isinstance(parsed, list):
-                        tc = parsed
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            meta: dict = {}
-            if metadata is not None and idx < len(metadata):
-                try:
-                    parsed_meta = json.loads(metadata[idx])
-                    if isinstance(parsed_meta, dict):
-                        meta = parsed_meta
-                except (json.JSONDecodeError, TypeError):
-                    pass
-
-            acc = accuracy_reward(
-                code,
-                tc,
-                timeout=exec_timeout,
-                metadata=meta,
-                execution_backend=execution_backend,
-                container_image=container_image,
-            )
-            fmt = format_reward(completion)
-            acc_scores.append(acc)
-            fmt_scores.append(fmt)
-            raw_combined.append(alpha * acc + (1.0 - alpha) * fmt)
-
-        # Surface-only teaching diagnostic; never enters raw_combined.
-        try:
-            teaching_scores = teaching_fn(prompts, completions)
-            avg_teaching = sum(teaching_scores) / len(teaching_scores)
-        except Exception:
-            avg_teaching = 0.0
-
-        n = len(raw_combined)
-
-        # ── 每组（prompt）内 reward 方差（Generation Collapse 检测） ──
-        # GRPO 每个 prompt 采样 num_gen 条 completion，组内方差趋零 → 坍缩。
-        group_vars: list[float] = []
-        if num_gen > 1 and n >= num_gen:
-            for i in range(0, n, num_gen):
-                grp = raw_combined[i : i + num_gen]
-                if len(grp) > 1:
-                    grp_mean = sum(grp) / len(grp)
-                    grp_var  = sum((r - grp_mean) ** 2 for r in grp) / len(grp)
-                    group_vars.append(grp_var)
-
-        # ── Batch 内 Z-score 归一化（可选）──────────────────────────
-        # 归一化后送入 GRPO；日志记录原始 raw_combined，保留可解释性。
-        if normalize and n > 1:
-            mean_r = sum(raw_combined) / n
-            std_r  = statistics.stdev(raw_combined)
-            if std_r > 1e-8:
-                combined_out = [(r - mean_r) / std_r for r in raw_combined]
-            else:
-                combined_out = [0.0] * n          # 方差为零时全部置零（坍缩态）
-        else:
-            combined_out = raw_combined
-
-        _reward_buffer.append({
-            "reward/accuracy":   sum(acc_scores) / n,
-            "reward/format":     sum(fmt_scores) / n,
-            "diagnostic/teaching_surface": avg_teaching,
-            "reward/total":      sum(raw_combined) / n,   # 记录原始分，非归一化
-            "reward/std":        statistics.stdev(raw_combined) if n > 1 else 0.0,
-            "reward/min":        min(raw_combined),
-            "reward/max":        max(raw_combined),
-            "_group_vars":       group_vars,              # 供 collapse 检测使用
-        })
-        return combined_out
-
-    return reward_fn
-
-
-# ════════════════════════════════════════════════════════════════
-# 3b. 可观测性 Callback
-# ════════════════════════════════════════════════════════════════
-
-class RewardLoggingCallback:
-    """
-    自定义 WandB 回调（v2）：
-
-    1. 分路 reward 上报（accuracy / format / teaching / total / std）
-    2. Zero-advantage 监控：
-       - 每 batch 统计组内（num_gen 条 completion 为一组）reward 方差
-       - 记录 train/generation_reward_var（组内方差均值）
-       - 记录 train/zero_advantage_ratio（组内方差 < 阈值的 prompt 占比）
-    3. 定期样本示例记录
-
-    设计动机：
-    Low reward variance proves only that the group has little usable
-    advantage. It does not by itself prove textual generation collapse;
-    diversity metrics must be reported separately before making that claim.
-    """
-
-    def __init__(
-        self,
-        log_example_every_n_steps: int = 100,
-        collapse_var_threshold: float   = 0.01,
-        collapse_warn_steps: int        = 20,
-    ):
-        self.log_example_every_n_steps = log_example_every_n_steps
-        self.collapse_var_threshold    = collapse_var_threshold
-        self.collapse_warn_steps       = collapse_warn_steps
-        self._step                     = 0
-        self._consecutive_collapse     = 0   # 连续 collapse 步数计数
-        self._example_table            = None
-
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        import wandb
-        self._step += 1
-
-        if not _reward_buffer:
-            return
-        latest = _reward_buffer[-1]
-
-        # ── 分路 reward 上报（过滤内部字段）──────────────────────
-        public_metrics = {k: v for k, v in latest.items() if not k.startswith("_")}
-        wandb.log(public_metrics, step=state.global_step)
-
-        # ── Zero-advantage monitoring ─────────────────────────────
-        group_vars: list[float] = latest.get("_group_vars", [])
-        if group_vars:
-            avg_var       = sum(group_vars) / len(group_vars)
-            collapse_ratio = sum(1 for v in group_vars if v < self.collapse_var_threshold) / len(group_vars)
-            wandb.log({
-                "train/generation_reward_var": avg_var,
-                "train/zero_advantage_ratio":  collapse_ratio,
-            }, step=state.global_step)
-
-            if collapse_ratio > 0.5:
-                self._consecutive_collapse += 1
-            else:
-                self._consecutive_collapse = 0
-
-            if self._consecutive_collapse >= self.collapse_warn_steps:
-                logger.warning(
-                    "连续 %d 步 zero_advantage_ratio=%.2f > 0.5；"
-                    "当前组内奖励缺少可用优势。请联合检查文本、代码和 AST "
-                    "多样性后再判断是否发生生成坍缩。temperature=%.2f",
-                    self._consecutive_collapse, collapse_ratio,
-                    getattr(args, "temperature", float("nan")),
-                )
-
-        # ── 定期记录样本示例 ──────────────────────────────────────
-        if (self._step % self.log_example_every_n_steps == 0
-                and "completions" in (logs or {})):
-            completions = logs.get("completions", [])
-            prompts     = logs.get("prompts", [])
-            if completions and prompts:
-                if self._example_table is None:
-                    self._example_table = wandb.Table(
-                        columns=["step", "prompt_excerpt", "completion_excerpt",
-                                 "reward_total"]
-                    )
-                self._example_table.add_data(
-                    state.global_step,
-                    str(prompts[0])[:300],
-                    str(completions[0])[:500],
-                    latest.get("reward/total", 0.0),
-                )
-                wandb.log({"examples/completions": self._example_table},
-                          step=state.global_step)
-
-
-# ════════════════════════════════════════════════════════════════
-# 3c. 验证集 Pass@1 最优 Checkpoint 选择
-# ════════════════════════════════════════════════════════════════
-
-class BestCheckpointCallback:
-    """
-    每 eval_steps 步在有测试用例的验证题上计算 Pass@1，
-    当 Pass@1 超越历史最高时自动保存最优 checkpoint。
-
-    设计动机（v3 新增）：
-    GRPO 后期 training reward 虚高（模型在"讨好" reward 函数），
-    但验证集 Pass@1 实际已开始下降（reward overfit）。
-    按最后一个 epoch 保存等于随机选 checkpoint。
-    用验证集 Pass@1 选优，能保证实际部署的模型质量。
-
-    面试叙事："我在 GRPO 训练中发现 training reward 在 300 步后持续上升，
-    但手动测试 Pass@1 却在下降——这是 reward overfit 的典型症状。
-    因此我加了 BestCheckpointCallback，每 100 步用验证集 Pass@1 做 checkpoint 选择。"
-    """
-
-    def __init__(self, model, tokenizer, eval_problems: list[dict], cfg):
-        from src.data.code_validator import extract_code
-        from src.reward_functions import accuracy_reward
-
-        self._extract_code    = extract_code
-        self._accuracy_reward = accuracy_reward
-        self.model        = model
-        self.tokenizer    = tokenizer
-        # 只保留有测试用例的题目
-        self.eval_problems = [p for p in eval_problems if p.get("heldout_tests")]
-        self.cfg          = cfg
-        self.best_pass1   = -1.0
-        self.best_step    = -1
-        best_dir = getattr(cfg.grpo, "best_model_dir", "models/grpo_best")
-        self.best_dir     = Path(best_dir)
-        self.eval_steps   = int(getattr(cfg.grpo, "eval_steps", 100))
-        self.max_samples = int(
-            getattr(cfg.grpo, "checkpoint_eval_max_samples", 50)
-        )
-        self.execution_backend = str(
-            getattr(cfg.reward, "execution_backend", "docker")
-        )
-        self.container_image = (
-            str(getattr(cfg.reward, "container_image", "")) or None
-        )
-        logger.info(
-            "[BestCheckpoint] 初始化：%d 道有测试用例的验证题，每 %d 步评估一次",
-            len(self.eval_problems), self.eval_steps,
-        )
-
-    def on_step_end(self, args, state, control, **kwargs):
-        if state.global_step == 0 or state.global_step % self.eval_steps != 0:
-            return
-        if not self.eval_problems:
-            return
-
-        import torch
-        import wandb
-
-        logger.info("[BestCheckpoint] step=%d 开始验证集 Pass@1 评估…", state.global_step)
-        self.model.eval()
-        pass1_scores: list[float] = []
-
-        with torch.inference_mode():
-            for prob in self.eval_problems[: self.max_samples]:
-                messages = [
-                    {"role": "system", "content": _GRPO_SYSTEM},
-                    {"role": "user",   "content": prob.get("description", "")},
-                ]
-                text   = self.tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
-                )
-                inputs = self.tokenizer(
-                    text,
-                    return_tensors="pt",
-                    truncation=True,
-                    max_length=int(self.cfg.grpo.max_prompt_length),
-                ).to(self.model.device)
-                out = self.model.generate(
-                    **inputs,
-                    max_new_tokens = int(self.cfg.grpo.max_new_tokens),
-                    do_sample      = False,
-                    pad_token_id   = self.tokenizer.pad_token_id,
-                )
-                new_tokens = out[0][inputs["input_ids"].shape[1]:]
-                completion = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-                code = self._extract_code(completion) or ""
-                score = self._accuracy_reward(
-                    code,
-                    prob.get("heldout_tests", []),
-                    timeout=float(self.cfg.reward.exec_timeout),
-                    metadata=prob.get("metadata", {}),
-                    execution_backend=self.execution_backend,
-                    container_image=self.container_image,
-                )
-                pass1_scores.append(1.0 if score >= 1.0 else 0.0)
-
-        self.model.train()
-        avg_pass1 = sum(pass1_scores) / len(pass1_scores) if pass1_scores else 0.0
-        is_best   = avg_pass1 > self.best_pass1
-
-        wandb.log({
-            "eval/pass1":    avg_pass1,
-            "eval/is_best":  float(is_best),
-        }, step=state.global_step)
-
-        logger.info(
-            "[BestCheckpoint] step=%d  Pass@1=%.3f  历史最优=%.3f  %s",
-            state.global_step, avg_pass1, max(self.best_pass1, 0.0),
-            "✅ 更新最优" if is_best else "—",
-        )
-
-        if is_best:
-            self.best_pass1 = avg_pass1
-            self.best_step  = state.global_step
-            self.best_dir.mkdir(parents=True, exist_ok=True)
-            self.model.save_pretrained(str(self.best_dir))
-            self.tokenizer.save_pretrained(str(self.best_dir))
-
-
-# ════════════════════════════════════════════════════════════════
-# 4. 训练摘要
-# ════════════════════════════════════════════════════════════════
-
-def _print_summary(cfg, n_samples: int) -> None:
-    grpo = cfg.grpo
-    steps_per_epoch = math.ceil(
-        n_samples
-        / (grpo.per_device_train_batch_size * grpo.gradient_accumulation_steps)
-    )
-    total_steps     = steps_per_epoch * grpo.num_train_epochs
-    rollouts_per_step = grpo.per_device_train_batch_size * grpo.num_generations
-    logger.info(
-        "\n"
-        "╔══════════════════════════════════════════════╗\n"
-        "║       CodeGuide-LLM  GRPO  Training           ║\n"
-        "╠══════════════════════════════════════════════╣\n"
-        "║  SFT adapter : %-29s║\n"
-        "║  num_gen     : %-3d  (rollouts/step: %-10d)║\n"
-        "║  Batch       : %d × accumulate %d steps        ║\n"
-        "║  LR          : %-29s║\n"
-        "║  KL coef     : %-29s║\n"
-        "║  Epochs      : %-3d  steps/epoch: %-13d║\n"
-        "║  Total steps : %-29d║\n"
-        "╚══════════════════════════════════════════════╝",
-        grpo.sft_adapter_path,
-        grpo.num_generations, rollouts_per_step,
-        grpo.per_device_train_batch_size, grpo.gradient_accumulation_steps,
-        f"{grpo.learning_rate:.1e}",
-        str(grpo.kl_coef),
-        grpo.num_train_epochs, steps_per_epoch,
-        total_steps,
-    )
-
-
-# ════════════════════════════════════════════════════════════════
-# 5. 主流程
-# ════════════════════════════════════════════════════════════════
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="CodeGuide-LLM GRPO 后训练",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("--config", default="configs/train_config.yaml",
-                        help="OmegaConf YAML 配置文件路径")
-    parser.add_argument("--resume_from_checkpoint", default=None,
-                        help="从指定 checkpoint 恢复，例如 models/grpo_final/checkpoint-200")
-    cli = parser.parse_args()
-
-    # ── 依赖检查 ──────────────────────────────────────────────────
-    try:
-        from unsloth import FastLanguageModel  # noqa: F401
-    except ImportError:
-        logger.error("未找到 unsloth，请安装：pip install unsloth[cu121-ampere-torch240]")
-        sys.exit(1)
+    cli = build_parser().parse_args()
+    config = load_config(cli.config, "grpo")
+    if cli.validate_only:
+        print(json.dumps(validation_summary(config), ensure_ascii=False))
+        return
 
     try:
-        import wandb
+        import torch
+        import transformers
+        from accelerate import PartialState
         from datasets import Dataset
-        from omegaconf import OmegaConf
+        from peft import PeftModel, prepare_model_for_kbit_training
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         from trl import GRPOConfig, GRPOTrainer
-    except ImportError as e:
-        logger.error("缺少依赖：%s\n请运行 pip install -r requirements.txt", e)
-        sys.exit(1)
+    except ImportError as exc:
+        raise RuntimeError("install the single project requirements.txt before training") from exc
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is required; CPU fallback is forbidden")
 
-    # ── 配置 ──────────────────────────────────────────────────────
-    cfg_path = Path(cli.config)
-    if not cfg_path.exists():
-        logger.error("配置文件不存在：%s", cfg_path)
-        sys.exit(1)
-    cfg  = OmegaConf.load(cfg_path)
-    grpo = cfg.grpo
-    if grpo.max_seq_length not in (4096, 6144, 8192):
-        raise ValueError(
-            "grpo.max_seq_length 尚未冻结；先完成 tokenizer 长度审计"
-        )
-    if int(cfg.lora.r) != int(cfg.sft.lora_r) or int(
-        cfg.lora.lora_alpha
-    ) != int(cfg.sft.lora_alpha):
-        raise ValueError("SFT 与 GRPO 必须使用相同的 LoRA rank/alpha")
+    train_records, eval_records = prepare_records(config)
+    model_cfg = config["model"]
+    quant_cfg = config["quantization"]
+    generation_cfg = config["generation"]
+    reward_cfg = config["reward"]
+    train_cfg = dict(config["training"])
+    model_name = cli.model_name_or_path or model_cfg["name_or_path"]
+    adapter_path = resolve_path(cli.sft_adapter_path or model_cfg["sft_adapter_path"])
+    if not adapter_path or not adapter_path.exists():
+        raise RuntimeError(f"missing SFT adapter for GRPO warm start: {adapter_path}")
 
-    for d in (grpo.output_dir, grpo.merged_dir, grpo.logging_dir):
-        Path(d).mkdir(parents=True, exist_ok=True)
+    attention_backend = select_attention_backend(model_cfg["attention_backend"])
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        cache_dir=cli.cache_dir,
+        trust_remote_code=bool(model_cfg["trust_remote_code"]),
+    )
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
 
-    # ── W&B ───────────────────────────────────────────────────────
-    wandb.init(
-        project = "codeguide-grpo",
-        name    = f"grpo-qwen2.5-coder-7b-kl{grpo.kl_coef}",
-        tags    = ["grpo", "qlora", "qwen2.5", "oi-teaching"],
-        config  = OmegaConf.to_container(grpo, resolve=True),
+    compute_dtype = getattr(torch, str(quant_cfg["compute_dtype"]))
+    quantization = BitsAndBytesConfig(
+        load_in_4bit=bool(quant_cfg["load_in_4bit"]),
+        bnb_4bit_quant_type=quant_cfg["quant_type"],
+        bnb_4bit_use_double_quant=bool(quant_cfg["double_quant"]),
+        bnb_4bit_compute_dtype=compute_dtype,
+    )
+    state = PartialState()
+    base_model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        cache_dir=cli.cache_dir,
+        trust_remote_code=bool(model_cfg["trust_remote_code"]),
+        quantization_config=quantization,
+        torch_dtype=compute_dtype,
+        attn_implementation=attention_backend,
+        device_map={"": state.local_process_index},
+    )
+    base_model.config.use_cache = False
+    base_model = prepare_model_for_kbit_training(
+        base_model,
+        use_gradient_checkpointing=bool(train_cfg["gradient_checkpointing"]),
+        gradient_checkpointing_kwargs={"use_reentrant": False},
+    )
+    model = PeftModel.from_pretrained(base_model, adapter_path, is_trainable=True)
+
+    output_dir = resolve_path(cli.output_dir or train_cfg.pop("output_dir"))
+    assert output_dir
+    if cli.max_steps is not None:
+        train_cfg["max_steps"] = cli.max_steps
+    train_cfg["report_to"] = report_targets(train_cfg.get("report_to"))
+    args = GRPOConfig(
+        output_dir=str(output_dir),
+        max_prompt_length=int(generation_cfg["max_prompt_length"]),
+        max_completion_length=int(generation_cfg["max_completion_length"]),
+        num_generations=int(generation_cfg["num_generations"]),
+        temperature=float(generation_cfg["temperature"]),
+        top_p=float(generation_cfg["top_p"]),
+        reward_weights=list(reward_cfg["weights"]),
+        gradient_checkpointing_kwargs={"use_reentrant": False},
+        remove_unused_columns=False,
+        seed=int(config["seed"]),
+        data_seed=int(config["seed"]),
+        **train_cfg,
+    )
+    backend = str(reward_cfg["execution_backend"])
+    image = os.environ.get("CODEGUIDE_EXECUTION_IMAGE") or reward_cfg.get("container_image")
+    reward_functions = build_reward_functions(
+        backend=backend,
+        container_image=str(image) if image else None,
+        timeout=float(reward_cfg["timeout"]),
+    )
+    trainer = GRPOTrainer(
+        model=model,
+        reward_funcs=list(reward_functions),
+        args=args,
+        train_dataset=Dataset.from_list(train_records),
+        eval_dataset=Dataset.from_list(eval_records),
+        processing_class=tokenizer,
     )
 
-    # ── 模型加载 ──────────────────────────────────────────────────
-    model, tokenizer = load_policy_model(cfg)
-
-    # ── 奖励函数（带三路拆分监控 + 归一化）──────────────────────
-    reward_fn = make_reward_fn_with_cfg(cfg)
-
-    # ── GRPOConfig 工厂（Curriculum 各阶段可复用，仅 max_new_tokens 不同）──
-    def _make_grpo_config(max_new_tokens: int, num_epochs: int = 1) -> "GRPOConfig":
-        return GRPOConfig(
-            # GRPO 专属
-            num_generations   = grpo.num_generations,
-            max_new_tokens    = max_new_tokens,
-            temperature       = grpo.temperature,
-            top_p             = grpo.top_p,
-            kl_coef           = grpo.kl_coef,
-            max_prompt_length = grpo.max_prompt_length,
-            # 优化器 / 调度器
-            learning_rate            = grpo.learning_rate,
-            lr_scheduler_type        = grpo.lr_scheduler_type,
-            warmup_ratio             = grpo.warmup_ratio,
-            weight_decay             = grpo.weight_decay,
-            max_grad_norm            = grpo.max_grad_norm,
-            # 批次
-            per_device_train_batch_size = grpo.per_device_train_batch_size,
-            gradient_accumulation_steps = grpo.gradient_accumulation_steps,
-            num_train_epochs            = num_epochs,
-            # 精度 & 显存
-            bf16                   = grpo.bf16,
-            fp16                   = grpo.fp16,
-            gradient_checkpointing = grpo.gradient_checkpointing,
-            # 保存 & 日志
-            output_dir       = grpo.output_dir,
-            logging_dir      = grpo.logging_dir,
-            logging_steps    = grpo.logging_steps,
-            save_strategy    = "steps",
-            save_steps       = grpo.save_steps,
-            save_total_limit = 3,
-            # 其他
-            seed                   = grpo.seed,
-            report_to              = "wandb",
-            run_name               = wandb.run.name,
-            dataloader_num_workers = 2,
-            remove_unused_columns  = False,
+    started = time.time()
+    result = trainer.train(resume_from_checkpoint=cli.resume_from_checkpoint)
+    adapter_dir = output_dir / "adapter"
+    trainer.save_model(str(adapter_dir))
+    if trainer.accelerator.is_main_process:
+        tokenizer.save_pretrained(adapter_dir)
+        manifest = {
+            "schema_version": "codeguide-training-run-v2",
+            "stage": "grpo",
+            "framework": "trl.GRPOTrainer",
+            "warm_start_adapter": str(adapter_path),
+            "train_count": len(train_records),
+            "eval_count": len(eval_records),
+            "reward_functions": ["correctness", "teaching_contract"],
+            "reward_weights": list(reward_cfg["weights"]),
+            "execution_backend": backend,
+            "attention_backend": attention_backend,
+            "elapsed_seconds": time.time() - started,
+            "metrics": result.metrics,
+            "python": platform.python_version(),
+            "torch": torch.__version__,
+            "transformers": transformers.__version__,
+        }
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "run_manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
         )
-
-    # ── Callback 构建 ─────────────────────────────────────────────
-    from transformers import TrainerCallback
-
-    collapse_threshold = float(getattr(cfg.grpo, "collapse_var_threshold", 0.01))
-    collapse_warn_steps = int(getattr(cfg.grpo, "collapse_warn_steps", 20))
-    reward_cb = RewardLoggingCallback(
-        log_example_every_n_steps = 100,
-        collapse_var_threshold    = collapse_threshold,
-        collapse_warn_steps       = collapse_warn_steps,
-    )
-
-    class _RewardCallbackAdapter(TrainerCallback):
-        """将 RewardLoggingCallback 适配到 HuggingFace TrainerCallback 接口。"""
-        def on_log(self, args, state, control, logs=None, **kwargs):
-            reward_cb.on_log(args, state, control, logs=logs, **kwargs)
-
-    callbacks: list = [_RewardCallbackAdapter()]
-
-    # ── BestCheckpointCallback（需要验证题目）────────────────────
-    save_best = bool(getattr(cfg.grpo, "save_best", False))
-    best_ckpt_cb: BestCheckpointCallback | None = None
-    if save_best:
-        # Checkpoint selection must use a separately frozen dev file. Reading
-        # training rows here would leak the optimization set into model
-        # selection and make the reported Pass@1 invalid.
-        eval_problems: list[dict] = []
-        eval_path = Path(str(getattr(cfg.grpo, "eval_data", "")))
-        try:
-            if not str(eval_path) or not eval_path.is_file():
-                raise FileNotFoundError(
-                    f"frozen GRPO dev file not found: {eval_path}"
-                )
-            with open(eval_path, encoding="utf-8") as _ef:
-                for _line in _ef:
-                    _line = _line.strip()
-                    if not _line:
-                        continue
-                    _obj = json.loads(_line)
-                    meta = _obj.get("metadata", {})
-                    heldout_tests = meta.get("heldout_tests", [])
-                    if heldout_tests:
-                        eval_problems.append({
-                            "description": next(
-                                (m["content"] for m in _obj.get("messages", [])
-                                 if m.get("role") == "user"), ""
-                            ),
-                            "heldout_tests": heldout_tests,
-                            "metadata": {
-                                key: value
-                                for key, value in meta.items()
-                                if key not in {"test_cases", "heldout_tests"}
-                            },
-                        })
-        except Exception as _e:
-            raise RuntimeError(
-                "save_best=true requires a frozen, disjoint grpo.eval_data "
-                "whose metadata contains heldout_tests"
-            ) from _e
-
-        if not eval_problems:
-            raise ValueError(
-                f"no held-out checkpoint cases found in {eval_path}"
-            )
-        best_ckpt_cb = BestCheckpointCallback(model, tokenizer, eval_problems, cfg)
-
-        class _BestCkptAdapter(TrainerCallback):
-            def on_step_end(self, args, state, control, **kwargs):
-                best_ckpt_cb.on_step_end(args, state, control, **kwargs)
-        callbacks.append(_BestCkptAdapter())
-        logger.info(
-            "BestCheckpointCallback 已启用，冻结验证题目数：%d，文件=%s",
-            len(eval_problems),
-            eval_path,
-        )
-
-    # ── 训练（支持 Curriculum Learning）──────────────────────────
-    curriculum_cfg = getattr(cfg, "curriculum", None)
-    use_curriculum = curriculum_cfg is not None and bool(getattr(curriculum_cfg, "enabled", False))
-
-    if use_curriculum:
-        stages = list(curriculum_cfg.stages)
-        logger.info("Curriculum Learning 已启用，共 %d 阶段：%s",
-                    len(stages), [s.difficulty for s in stages])
-
-        for stage_idx, stage in enumerate(stages):
-            difficulty    = stage.difficulty
-            stage_epochs  = int(getattr(stage, "epochs", 1))
-            stage_tokens  = int(getattr(stage, "max_new_tokens", grpo.max_new_tokens))
-
-            logger.info(
-                "═══ Curriculum Stage %d/%d (%s) — epochs=%d, max_new_tokens=%d ═══",
-                stage_idx + 1, len(stages), difficulty, stage_epochs, stage_tokens,
-            )
-            wandb.log({"train/curriculum_stage": stage_idx + 1})
-
-            stage_dataset = build_curriculum_dataset(cfg, tokenizer, Dataset, difficulty)
-            if len(stage_dataset) == 0:
-                logger.warning("Stage [%s] 数据集为空，跳过", difficulty)
-                continue
-
-            _print_summary(cfg, len(stage_dataset))
-            grpo_config = _make_grpo_config(stage_tokens, stage_epochs)
-
-            trainer = GRPOTrainer(
-                model         = model,
-                args          = grpo_config,
-                train_dataset = stage_dataset,
-                reward_funcs  = reward_fn,
-                tokenizer     = tokenizer,
-                callbacks     = callbacks,
-            )
-            # 仅第一阶段支持 resume；后续阶段从当前权重继续
-            resume = cli.resume_from_checkpoint if stage_idx == 0 else None
-            trainer.train(resume_from_checkpoint=resume)
-
-            # 阶段结束保存中间 checkpoint
-            stage_dir = Path(grpo.output_dir) / f"stage_{stage_idx + 1}_{difficulty}"
-            stage_dir.mkdir(parents=True, exist_ok=True)
-            model.save_pretrained(str(stage_dir))
-            tokenizer.save_pretrained(str(stage_dir))
-            logger.info("Stage [%s] 中间 checkpoint 已保存 → %s", difficulty, stage_dir)
-
-    else:
-        # 普通训练（无 Curriculum）
-        dataset = prepare_dataset(cfg, tokenizer, Dataset)
-        _print_summary(cfg, len(dataset))
-        grpo_config = _make_grpo_config(grpo.max_new_tokens, grpo.num_train_epochs)
-
-        trainer = GRPOTrainer(
-            model         = model,
-            args          = grpo_config,
-            train_dataset = dataset,
-            reward_funcs  = reward_fn,
-            tokenizer     = tokenizer,
-            callbacks     = callbacks,
-        )
-        logger.info("开始 GRPO 训练…")
-        train_result = trainer.train(resume_from_checkpoint=cli.resume_from_checkpoint)
-        trainer.log_metrics("train", train_result.metrics)
-        trainer.save_metrics("train", train_result.metrics)
-
-    # ── 保存最终 LoRA adapter ────────────────────────────────────
-    logger.info("保存 GRPO LoRA adapter → %s", grpo.output_dir)
-    model.save_pretrained(grpo.output_dir)
-    tokenizer.save_pretrained(grpo.output_dir)
-
-    # ── 合并 LoRA → 完整模型（bf16，约 14 GB）─────────────────────
-    logger.info("合并 LoRA → 完整模型 → %s", grpo.merged_dir)
-    model.save_pretrained_merged(
-        grpo.merged_dir,
-        tokenizer,
-        save_method = "merged_16bit",
-    )
-
-    if save_best and best_ckpt_cb and best_ckpt_cb.best_step >= 0:
-        logger.info(
-            "最优 Checkpoint（Pass@1=%.3f）已保存 → %s（step %d）",
-            best_ckpt_cb.best_pass1, best_ckpt_cb.best_dir, best_ckpt_cb.best_step,
-        )
-
-    wandb.finish()
-    logger.info(
-        "\n训练完成！\n"
-        "  LoRA adapter  : %s\n"
-        "  合并模型       : %s\n"
-        "\n推理：\n"
-        "  python scripts/inference_demo.py --model %s",
-        grpo.output_dir, grpo.merged_dir, grpo.merged_dir,
-    )
 
 
 if __name__ == "__main__":

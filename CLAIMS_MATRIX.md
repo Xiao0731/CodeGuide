@@ -34,7 +34,7 @@
 | 教学结构学习 | 已有部分证据 | calibration/full 的 `template_complete`、生成样例 | SFT 学会了部分教学栏目与表达风格 | 已证明讲解技术正确、初学者友好或显著优于 Base |
 | 教学客观格式全量审计 | 已设计，未完成 | 已冻结代码块、栏目、顺序、非空、冗余与截断指标 | 将复用已有 515 generations，无需重新生成 | 已完成教学格式总评 |
 | TACO-100 教学盲评 | 已设计，未完成 | 已冻结评价维度与全样本/双方通过交集两种口径 | 将比较 Base、step20、step200 | 已验证教学质量显著提升 |
-| GRPO 唯一正式入口与 online/held-out 拆分 | 已实现，待正式 smoke | `scripts/train_grpo.py`、`src/training/grpo_train.py`、测试拆分合同 | 入口与确定性测试拆分已经实现 | 正式 7B GRPO 已训练完成 |
+| GRPO 唯一正式入口与冻结 train/dev 拆分 | 已实现，待正式 smoke | TRL `GRPOTrainer` 入口、6,451/50 freeze manifest、参数化合同测试 | 入口、SFT adapter 热启动和冻结拆分已静态验证 | 正式 7B GRPO 已训练完成 |
 | Teaching Reward 真正进入梯度 | 未实现/未验证 | 当前可靠教学 critic 尚未准入 | 现阶段教学启发式只作诊断 | Teaching Reward 已有效提升教学质量 |
 | anti-hacking contract reward 进入正式训练 | 未验证 | 代码存在，待 GRPO smoke 与集成验收 | 正式 smoke 后再更新状态 | 已解决 reward hacking |
 | best checkpoint 基于独立冻结 dev 严格 Pass@1 | 已实现，待 GRPO smoke | held-out 合同与 checkpoint 逻辑 | checkpoint 选择合同已修复 | callback 已在正式 GRPO 跑通 |
@@ -66,3 +66,9 @@
 - 评测正式拆成代码能力与教学能力两个模块。
 - EvalPlus 外源协议已实现，但官方数据尚未完成云端验收，因此结果保持为空。
 - GRPO 仍未启动；需先冻结唯一 SFT_CHAMPION、教学基线和 reward smoke。
+
+### 2026-08-15
+
+- 训练主线收敛到 TRL 0.19.1 + Accelerate + PEFT/bitsandbytes；删除手写训练循环和重复 reward 实现。
+- SFT/GRPO 数据数量、配置和 CLI 已完成本地合同验证，但重构后的入口尚未在云端 GPU 重新运行，因此不新增训练效果声明。
+- 正式历史 generation、Docker verification 和报告继续作为实验结果；删除的是一次性入口与被替代的中间产物，不是实验结论。

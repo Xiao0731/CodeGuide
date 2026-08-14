@@ -248,3 +248,12 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 旧 2048-token 校准输出删除，4096-token calibration/full 原始 generation 与 verification 保留并移入统一 `outputs/eval/`。
 - 测试首次暴露 0 字节 `summarize_evalplus_code_capability.py` 与旧 G0 smoke manifest 测试；两者对应实验已有冻结结果，故删除失效入口/过期测试，不恢复中间 smoke 依赖。
 - 回归：compileall 通过，完整 pytest 85 passed；SFT/GRPO CLI help 均可启动。
+
+# EXP-023：统一 TRL/Accelerate 训练入口回归
+
+- 范围：只重构训练与奖励基础设施，不改 canonical SFT、固定 split、teacher 标签或既有正式评测结果。
+- SFT：同一 `scripts/train_sft.py` 以 `--mode calibration/full` 解析为 500/100 与 9,791/515；预计算 `labels=-100` 掩码继续承担 assistant-only loss，TRL 不再二次准备数据。
+- GRPO：冻结 manifest 解析为 6,451 train / 50 eval；从配置中的 full SFT adapter 热启动，奖励函数固定为 correctness 与 teaching contract 两路。
+- 兼容性修复：依据 TRL 0.19.1 接口，将不受支持的 `loss_type=dapo` 改为 `dr_grpo`，将 `scale_rewards` 改为布尔值，并检查双卡有效 batch 可被 `num_generations=4` 整除。
+- 清理结果：训练/数据/评测命令均由配置驱动；约 13,700 行旧脚本和重复实现被移除。正式实验结果保留，旧占位矩阵与可重建压缩包删除。
+- 验证边界：本地执行 compileall、pytest、SFT 两模式 validate-only、GRPO validate-only 和配置检查；本轮没有 GPU、Docker 奖励或模型训练运行。

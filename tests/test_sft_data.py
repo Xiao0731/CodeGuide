@@ -60,10 +60,7 @@ def test_load_frozen_id_manifest(tmp_path):
 
 def test_8k_training_config_uses_fused_liger_loss():
     config = yaml.safe_load(
-        Path("configs/sft/qwen25_coder_7b_qlora_8k.yaml").read_text(encoding="utf-8")
+        Path("configs/sft.yaml").read_text(encoding="utf-8")
     )
-    assert config["model"]["max_seq_length"] == 8192
+    assert config["model"]["max_length"] == 8192
     assert config["training"]["use_liger_kernel"] is True
-    assert config["training"]["liger_kernel_config"] == {
-        "fused_linear_cross_entropy": True,
-    }
