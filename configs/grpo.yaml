@@ -4,7 +4,9 @@ seed: 20260728
 
 model:
   name_or_path: Qwen/Qwen2.5-Coder-7B-Instruct
-  sft_adapter_path: outputs/sft/qwen25_coder_7b_qlora_8k/full_seed20260728/adapter
+  # Formal GRPO must warm-start from the selected best SFT checkpoint.
+  # Set this path explicitly with --sft-adapter-path for each formal run.
+  sft_adapter_path: ''
   trust_remote_code: false
   attention_backend: auto
 
@@ -14,6 +16,9 @@ data:
   manifest: data/splits/grpo_minimal_v1/freeze_manifest.json
   expected_train_count: 6451
   expected_eval_count: 50
+  expected_taco515_count: 515
+  checkpoint_selection_split: grpo_dev
+  final_evaluation_split: taco515
 
 quantization:
   load_in_4bit: true
@@ -23,22 +28,43 @@ quantization:
 
 generation:
   max_prompt_length: 2048
-  max_completion_length: 1024
   num_generations: 4
   temperature: 0.8
   top_p: 0.95
 
+curriculum:
+  enabled: true
+  stages:
+    - difficulty: easy
+      expected_count: 3228
+      epochs: 1.0
+      max_completion_length: 512
+    - difficulty: medium
+      expected_count: 1735
+      epochs: 1.0
+      max_completion_length: 768
+    - difficulty: hard
+      expected_count: 1488
+      epochs: 1.0
+      max_completion_length: 1024
+
 reward:
-  weights: [0.9, 0.1]
-  execution_backend: docker
-  container_image: ''
+  code_weight: 0.60
+  contract_weight: 0.40
+  static_validity_weight: 0.05
+  partial_pass_weight: 0.70
+  strict_pass_weight: 0.25
+  contract_gate_floor: 0.25
+  execution_backend: subprocess
   timeout: 5.0
 
 training:
   output_dir: outputs/grpo/codeguide_v1
   num_train_epochs: 1.0
   max_steps: -1
-  per_device_train_batch_size: 2
+  per_device_train_batch_size: 1
+  # Dual-GPU global eval batch is 2 * 2 = 4, matching num_generations=4.
+  per_device_eval_batch_size: 2
   gradient_accumulation_steps: 8
   learning_rate: 1.0e-5
   optim: paged_adamw_8bit
@@ -47,13 +73,18 @@ training:
   weight_decay: 0.01
   max_grad_norm: 1.0
   beta: 0.05
-  loss_type: dr_grpo
-  scale_rewards: true
-  mask_truncated_completions: true
+  loss_type: grpo
+  scale_rewards: false
+  mask_truncated_completions: false
   bf16: true
   fp16: false
   gradient_checkpointing: true
   logging_steps: 10
+  eval_strategy: steps
+  eval_steps: 100
+  save_strategy: steps
   save_steps: 100
   save_total_limit: 2
+  metric_for_best_model: reward
+  greater_is_better: true
   report_to: none

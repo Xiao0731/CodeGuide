@@ -1002,7 +1002,8 @@ R_teach_effective = R_teach_raw × R_exec
 未达准入门槛时，可信的降级主实验为：
 
 ```text
-0.90 × R_exec + 0.10 × R_contract
+0.60 × (0.05 × R_static + 0.70 × R_pass + 0.25 × R_strict)
++ 0.40 × (R_contract × (0.25 + 0.75 × R_pass))
 ```
 
 但该结果只能称为“执行正确性 GRPO + 教学能力保持”，不得声称在核心主题上超越外部基线。要通过第 19 节超越基线 Gate，必须使用：
@@ -1016,7 +1017,7 @@ R_teach_effective = R_teach_raw × R_exec
 ### 9.3 奖励缩放
 
 1. 删除旧的自定义“先合并再 batch Z-score”逻辑。
-2. 使用 TRL 原生 `reward_funcs` 与 `reward_weights`。
+2. 使用一个 canonical composite reward callable；每条 completion 只调用一次统一 verifier，再同时计算并记录 static、pass-rate、code、contract 与 total。
 3. 第一版主实验设置 `scale_rewards=false`，避免额外的题目难度标准差偏置。
 4. `scale_rewards="batch"` 仅可作为后续消融，不得在主实验中临时切换。
 
@@ -1047,25 +1048,31 @@ max_prompt_length: TO_BE_FROZEN_FROM_PROMPT_AUDIT
 max_completion_length: TO_BE_FROZEN_FROM_COMPLETION_AUDIT
 temperature: 0.8
 top_p: 0.95
-learning_rate: 5.0e-6
-beta: 0.0
-loss_type: dr_grpo
+learning_rate: 1.0e-5
+beta: 0.05
+loss_type: grpo
 scale_rewards: false
 num_iterations: 1
 gradient_checkpointing: true
-mask_truncated_completions: true
-seed: 42
+mask_truncated_completions: false
+seed: 20260728
 ```
 
 说明：
 
-- `beta=0.0` 与当前 TRL 默认思路一致，减少 reference model 开销；是否加入非零 KL 只作为未来实验。
-- `dr_grpo` 用于降低回答长度偏置；如果当前锁定 TRL 版本不支持，回退其稳定默认值并记录，不能手写一个未验证替代实现。
+- 正式云端协议固定 `beta=0.05`，保留 KL 约束。
+- 正式云端协议固定 TRL 0.22.2、`loss_type=grpo`、`scale_rewards=false`；不得因版本迁移改成 DR-GRPO、DAPO 或 GSPO。
 - `max_completion_length` 必须以 SFT 输出长度审计为依据，不能让代码普遍被截断。
 
-### 9.5 基于可学习度的课程采样
+### 9.5 正式静态难度课程与后续可学习度消融
 
-外部基线按静态 `easy → medium → hard` 训练，但题库 difficulty 不等于当前模型的可学习度。GRPO 真正需要的是同一 prompt 的多次生成存在有意义的 reward 差异。
+2026-08-15 正式实验固定使用静态 `easy → medium → hard` 三阶段课程，不得在主运行中替换为随机单 epoch 或动态采样：
+
+1. easy：3,228 条，1 epoch，`max_completion_length=512`；
+2. medium：1,735 条，1 epoch，`max_completion_length=768`；
+3. hard：1,488 条，1 epoch，`max_completion_length=1024`。
+
+下面的可学习度采样只作为完成正式静态课程后的候选消融，不覆盖主实验协议。题库 difficulty 不完全等于当前模型的可学习度，因此消融可考察同一 prompt 的多次生成是否存在有意义的 reward 差异。
 
 在正式 GRPO 前，对候选 prompt 使用 SFT checkpoint 各采样 4 次，记录：
 
@@ -1077,7 +1084,7 @@ zero_advantage
 mean_completion_length
 ```
 
-主训练按可学习度分三阶段：
+候选消融可按可学习度分三阶段：
 
 1. 阶段 A：优先 `0.25 ≤ p_strict_pass ≤ 0.75` 且 reward 有方差的题，建立有效梯度；
 2. 阶段 B：混入更难题与少量易题，保持 difficulty/io_mode 覆盖；
@@ -1814,7 +1821,7 @@ Codex 必须先回答：
 
 1. 正式 GRPO 从已完成的 full SFT adapter 暖启动；“warm-start”专指该阶段，不把从官方 Instruct 基座开始的 QLoRA SFT表述为 adapter 暖启动。
 2. 正确性奖励继续要求可执行测试和统一 verifier；无测试样本不得以 AST/格式代理分冒充 correctness。
-3. TeachingCritic 准入前，LocalTeachingReward 只作表面教学特征监控，不进入梯度；主奖励保持 correctness 0.9 + contract 0.1。
+3. TeachingCritic 准入前，LocalTeachingReward 只作表面教学特征监控，不进入梯度；正式主奖励使用第 9.2 节冻结的 code/contract 门控 composite 公式。
 4. GRPO 自带组相对优势归一化，额外 batch Z-score 默认关闭，只能作为命名消融。
 5. 候选增强按优先级验证：独立 heldout strict Pass@1 best checkpoint、zero-advantage 监控、curriculum 消融、Bootstrap 教学评测。任何 README 声明均须以本项目冻结数据、Docker 口径和落盘结果重新验证。
 6. HumanEval 88.4% 是 Qwen2.5-Coder-7B-Instruct 官方基座结果，不是 CodeGuide 训练收益；正式报告需要单独运行 HumanEval+/MBPP+ 等保持性评测。

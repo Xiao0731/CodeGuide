@@ -735,10 +735,19 @@ small smoke outputs, and small reference-cache examples. It excludes:
 
 ## 2026-08-15：训练代码框架化与二次清理
 
-- 依赖文件收敛为根目录唯一 `requirements.txt`，删除 SFT、router、external-eval 和 G0 lock 等并行清单；训练版本固定为 Transformers 4.53.3、TRL 0.19.1、PEFT 0.17.1，并保留 bitsandbytes、Liger、FlashAttention 2 与可选 DeepSpeed。
+- 依赖文件收敛为根目录唯一 `requirements.txt`，删除 SFT、router、external-eval 和 G0 lock 等并行清单；初次重构曾误锁 Transformers 4.53.3、TRL 0.19.1，本轮已纠正为正式云端实验对应的 Transformers 4.55.4、TRL 0.22.2。
 - SFT 唯一实现改为 TRL `SFTTrainer`。CodeGuide 只保留冻结数据哈希、固定 split、8K 不截断检查和预计算 assistant-only `labels`；TRL 通过 `skip_prepare_dataset` 原样使用已审计标签。
-- GRPO 唯一实现改为 TRL `GRPOTrainer`，从 full SFT adapter 热启动，正式 reward 为统一 `verify_code()` correctness 0.9 与 teaching contract 0.1；移除手写 rollout、优化循环、进程组和重复 reward 类。
+- GRPO 唯一实现为 TRL `GRPOTrainer`，从用户指定的最佳 SFT adapter 热启动；初次重构中的 correctness 0.9 + contract 0.1 已废止，正式梯度输入改为一次 `verify_code()` 得到的 canonical composite total reward。
 - 双卡启动统一由 Accelerate 管理；默认 `MULTI_GPU`，另提供可选的 Accelerate + DeepSpeed ZeRO-2 配置。FlashAttention 2 可用时自动启用，否则明确回退 SDPA。
 - `scripts/` 由约 45 个入口缩减为 10 个核心 Python 入口；一次性 shell/PowerShell 包装器、probe/audit 脚本、旧训练分叉和静态代理奖励已删除。参数差异进入 YAML，重复验证进入参数化 pytest。
 - 正式评测输出继续保留在 `outputs/eval/`；被正式矩阵替代的旧 `outputs/sft/taco_test` 与旧增量 ZIP 已删除。canonical SFT、source bank、固定 split、GRPO 数据和正式评测记录未改动。
 - 本轮仅完成静态、数据合同和 CLI 验证；没有重新训练 SFT/GRPO，也没有把“框架迁移”宣称为 GPU 运行通过。
+
+## 2026-08-15：正式 GRPO 实验语义纠偏
+
+- 数据协议恢复为 `6,451 train / 50 dev / 515 final TACO`，三者 problem ID 两两互斥。`dev50` 是唯一 checkpoint-selection 集，`TACO-515` 只用于选出 GRPO best 后的 Base/SFT best/GRPO best 最终对比。
+- curriculum 是正式实验变量：`easy 3,228 @ 512`、`medium 1,735 @ 768`、`hard 1,488 @ 1024`，固定顺序且每阶段 1 epoch；训练入口逐阶段调用 TRL `GRPOTrainer`，模型与 LoRA 状态连续，不合并成随机单 epoch。
+- 正式超参数恢复为 generations 4、temperature 0.8、top-p 0.95、LR `1e-5`、batch/device 1、gradient accumulation 8、KL beta 0.05、BF16、gradient checkpointing、save/eval 100 steps、`loss_type=grpo`、`scale_rewards=false`。
+- 正式奖励为 `code=.05*static+.70*pass_rate+.25*strict`，`gated_contract=contract*(.25+.75*pass_rate)`，`total=.60*code+.40*gated_contract`。static 只检查 AST、安全和接口；执行正确性只来自统一 `verify_code()`；training backend 固定 subprocess，Docker 仅用于最终严格离线评测。
+- teaching surface heuristic 仅作 diagnostic，不进入梯度。contract 固定为实质步骤 0.40、Python 代码块 0.30、复杂度 0.20、合理长度 0.05、教学词 0.05，并保留每步至少 50 字符和 Jaccard 去重。
+- 本轮没有启动训练，也没有修改冻结数据、已有 generation、verification 或实验报告。

@@ -253,7 +253,16 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 
 - 范围：只重构训练与奖励基础设施，不改 canonical SFT、固定 split、teacher 标签或既有正式评测结果。
 - SFT：同一 `scripts/train_sft.py` 以 `--mode calibration/full` 解析为 500/100 与 9,791/515；预计算 `labels=-100` 掩码继续承担 assistant-only loss，TRL 不再二次准备数据。
-- GRPO：冻结 manifest 解析为 6,451 train / 50 eval；从配置中的 full SFT adapter 热启动，奖励函数固定为 correctness 与 teaching contract 两路。
-- 兼容性修复：依据 TRL 0.19.1 接口，将不受支持的 `loss_type=dapo` 改为 `dr_grpo`，将 `scale_rewards` 改为布尔值，并检查双卡有效 batch 可被 `num_generations=4` 整除。
+- GRPO：冻结 manifest 解析为 6,451 train / 50 eval；从配置中的 full SFT adapter 热启动。该初次重构错误地将正式奖励简化成 correctness 与 contract 两路，已由 EXP-024 纠正。
+- 兼容性修复：该初次重构错误地迁移到 TRL 0.19.1 和 `dr_grpo`；这改变了 2026-08-15 正式运行语义，已由 EXP-024 恢复为 TRL 0.22.2、`loss_type=grpo`、`scale_rewards=false`。
 - 清理结果：训练/数据/评测命令均由配置驱动；约 13,700 行旧脚本和重复实现被移除。正式实验结果保留，旧占位矩阵与可重建压缩包删除。
 - 验证边界：本地执行 compileall、pytest、SFT 两模式 validate-only、GRPO validate-only 和配置检查；本轮没有 GPU、Docker 奖励或模型训练运行。
+
+# EXP-024：恢复 2026-08-15 正式 GRPO 语义
+
+- 目的：保留 TRL/Accelerate/PEFT/bitsandbytes 新架构，只纠正重构期间发生的实验配置漂移。
+- 数据实测：train `6,451`（easy `3,228`、medium `1,735`、hard `1,488`），dev `50`，TACO final `515`；三组交集均为 0。
+- curriculum：固定 easy -> medium -> hard，每阶段 1 epoch，completion 上限依次为 512/768/1024；入口不允许关闭或合并阶段。
+- 训练：Qwen2.5-Coder-7B-Instruct + 用户指定最佳 SFT adapter；TRL 0.22.2，`loss_type=grpo`、`scale_rewards=false`，generations 4、temperature .8、top-p .95、LR `1e-5`、beta .05、batch/device 1、accumulation 8。
+- reward：单个 canonical composite callable 对每条 completion 只执行一次 verifier，并按冻结公式返回 total；pass-rate、static、code、contract 仅记录诊断。training verifier 为 subprocess，Docker 不进入在线训练。
+- 验证：compileall、完整 pytest 和 `train_grpo.py --validate-only` 均通过；没有启动模型训练或覆盖任何历史结果。

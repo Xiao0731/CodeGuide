@@ -615,3 +615,12 @@
 - **配置边界**：实验差异进入 `configs/sft.yaml`、`configs/grpo.yaml` 和 Accelerate 配置；不再为每个实验复制 shell/PowerShell 或 Python 训练脚本。
 - **DeepSpeed/FlashAttention**：FlashAttention 2 为可选自动后端，缺失时回退 SDPA；DeepSpeed ZeRO-2 通过独立 Accelerate 配置启用，默认双卡入口仍为普通 MULTI_GPU。
 - **证据边界**：本轮框架化只在本地完成静态、测试和数据合同验证；云端正式训练前仍需执行最小 GPU smoke，历史 full SFT 结果不因代码重构而失效。
+
+# DEC-035：新架构必须保持正式 GRPO 实验语义
+
+- **日期**：2026-08-15
+- **决定**：保留 TRL `GRPOTrainer`、Accelerate、PEFT 和 bitsandbytes，不恢复任何手写训练循环；同时将配置和奖励恢复为 2026-08-15 正式云端运行协议。
+- **数据边界**：train 6,451、dev 50、TACO final 515 两两互斥。dev50 唯一用于 checkpoint selection；TACO-515 永不参与训练、调参或选优。
+- **课程边界**：easy 3,228/512、medium 1,735/768、hard 1,488/1024，固定三阶段各 1 epoch。curriculum 不得作为普通开关关闭。
+- **算法边界**：TRL 0.22.2、`loss_type=grpo`、`scale_rewards=false`、beta 0.05；不得因 API 迁移改成 DR-GRPO、DAPO 或 GSPO。
+- **奖励边界**：梯度只接收冻结公式的单一 composite total reward；执行正确性统一调用 `verify_code()` 且每 completion 一次。static 不冒充 correctness，teaching heuristic 只作 diagnostic，训练 backend 为 subprocess。

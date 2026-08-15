@@ -1,8 +1,8 @@
 # CodeGuide reproducible training and evaluation environment.
 # The cloud CUDA image may provide torch already; pip keeps a compatible install.
 torch>=2.6,<3
-transformers==4.53.3
-trl==0.19.1
+transformers==4.55.4
+trl==0.22.2
 peft==0.17.1
 accelerate>=1.10,<2
 datasets>=3.6,<5

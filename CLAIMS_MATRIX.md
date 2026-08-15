@@ -69,6 +69,7 @@
 
 ### 2026-08-15
 
-- 训练主线收敛到 TRL 0.19.1 + Accelerate + PEFT/bitsandbytes；删除手写训练循环和重复 reward 实现。
+- 训练主线收敛到 TRL 0.22.2 + Accelerate + PEFT/bitsandbytes；删除手写训练循环和重复 reward 实现。初次重构曾误用 0.19.1，现已纠正。
 - SFT/GRPO 数据数量、配置和 CLI 已完成本地合同验证，但重构后的入口尚未在云端 GPU 重新运行，因此不新增训练效果声明。
 - 正式历史 generation、Docker verification 和报告继续作为实验结果；删除的是一次性入口与被替代的中间产物，不是实验结论。
+- GRPO formal config 已静态锁定为 6,451 train、dev50 选优、TACO-515 最终评测；正式三阶段 curriculum 和 composite reward 均有测试，但尚未形成新的 GPU 训练结果，因此只能声明“实现与合同验证通过”。
