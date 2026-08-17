@@ -1,92 +1,29 @@
-"""
-tests/test_rewards.py
-
-三个端到端场景验证奖励函数的正确性：
-
-场景 A — 正确代码 + 规范教学格式
-    accuracy_reward  → 1.0
-    format_reward    → 1.0
-    combined_reward  → 1.0
-
-场景 B — 错误代码 + 规范教学格式
-    accuracy_reward  → 0.0
-    format_reward    → 1.0
-    combined_reward  → 0.4  (= 0.6×0 + 0.4×1)
-
-场景 C — 正确代码 + 无教学格式（直接给代码）
-    accuracy_reward  → 1.0
-    format_reward    → 低分（无步骤、无中文解释）
-    combined_reward  → 介于 0.6 和 1.0 之间
-
-另附：
-  - 安全扫描单元测试（os.system / open / subprocess 等）
-  - FormatWeights 权重校验异常测试
-"""
-
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import json
+from types import SimpleNamespace
 
 import pytest
 
-# 确保项目根目录在 sys.path（无论从哪里运行 pytest）
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.reward_functions import (
-    FormatWeights,
-    _scan_security,
-    accuracy_reward,
-    combined_reward,
-    format_reward,
+from src.reward.format import contract_score
+from src.reward.grpo import (
+    RewardWeights,
+    build_composite_reward,
+    combine_scores,
+    completion_text,
+    static_validity_score,
 )
 
 
-# ════════════════════════════════════════════════════════════════
-# 公共测试数据
-# ════════════════════════════════════════════════════════════════
+GOOD_TEACHING = """
+## 第一步：理解题意
+我们需要读取两个整数并输出它们的和。先明确输入输出合同非常重要，因为标准输入题必须从输入流读取数据，并把唯一答案写到标准输出中，不能误写成只返回结果的函数。
 
-# ── 两数之和：a + b ───────────────────────────────────────────
-_ADD_CASES = [
-    {"input": "3 5\n",    "output": "8"},
-    {"input": "1 2\n",    "output": "3"},    # 改掉 0 0→0（减法也成立的边界）
-    {"input": "-1 7\n",   "output": "6"},
-    {"input": "100 200\n", "output": "300"},
-]
+## 第二步：关键观察
+这道题没有隐藏状态，也不需要额外的数据结构。因为答案只依赖当前两个整数，所以直接相加就是完整算法；加入循环、搜索或排序只会增加不必要的复杂度。
 
-# 正确实现（stdin 读入，stdout 输出）
-_ADD_CODE_CORRECT = """\
-a, b = map(int, input().split())
-print(a + b)
-"""
-
-# 错误实现（输出 a - b，结果不对）
-_ADD_CODE_WRONG = """\
-a, b = map(int, input().split())
-print(a - b)
-"""
-
-# 规范教学格式回复（含步骤标题 + 代码块 + 充分中文解释）
-_GOOD_FORMAT_RESPONSE = """\
-**第一步：理解题意**
-
-题目要求读入两个整数 a 和 b，输出它们的和。
-输入格式：一行，两个整数用空格分隔。
-输出格式：一行，输出两数之和。
-因为目标只是计算两数之和，所以不需要额外的数据结构。
-
-举例：输入 "3 5"，则输出 "8"。
-
-**第二步：分析暴力解法**
-
-由于只有两个数，直接相加即可，时间复杂度 O(1)，无需优化。
-
-**第三步：设计最优解**
-
-这道题本身就是最优解，没有更复杂的算法需求。
-核心思路：读取 → 相加 → 输出，一行代码即可完成。
-
-**第四步：完整 Python 实现**
+## 第三步：算法步骤
+首先用 input 读取一行并拆成两个整数，然后计算两数之和，最后用 print 输出结果。每一步都只执行常数次操作，因此既容易验证，也不会引入边界条件之外的额外风险。
 
 ```python
 a, b = map(int, input().split())
@@ -94,240 +31,105 @@ answer = a + b
 print(answer)
 ```
 
-**复杂度分析**
-- 时间复杂度：O(1)，只做一次加法运算。
-- 空间复杂度：O(1)，只用了两个变量。
-"""
-
-# 无格式回复（直接给代码，无步骤标题，无中文解释）
-_BARE_CODE_RESPONSE = """\
-```python
-a, b = map(int, input().split())
-print(a + b)
-```
+时间复杂度 O(1)，空间复杂度 O(1)。
 """
 
 
-# ════════════════════════════════════════════════════════════════
-# 场景 A：正确代码 + 规范格式
-# ════════════════════════════════════════════════════════════════
-
-class TestScenarioA:
-    """正确解法 + 完整教学格式：三个奖励函数均应给高分。"""
-
-    def test_accuracy_is_full(self):
-        score = accuracy_reward(_ADD_CODE_CORRECT, _ADD_CASES)
-        assert score == pytest.approx(1.0), (
-            f"正确代码通过所有测试用例，期望 1.0，实际 {score}"
-        )
-
-    def test_format_is_full(self):
-        score = format_reward(_GOOD_FORMAT_RESPONSE)
-        assert score == pytest.approx(1.0), (
-            f"规范格式应得满分，实际 {score}"
-        )
-
-    def test_combined_is_full(self):
-        score = combined_reward(_ADD_CODE_CORRECT, _ADD_CASES, _GOOD_FORMAT_RESPONSE)
-        assert score == pytest.approx(1.0), (
-            f"双满分组合应得 1.0，实际 {score}"
-        )
+@pytest.mark.parametrize(
+    ("response", "lower", "upper"),
+    [
+        (GOOD_TEACHING, 0.95, 1.0),
+        ("```python\nprint(1)\n```", 0.0, 0.2),
+        ("", 0.0, 0.0),
+    ],
+)
+def test_contract_score(response, lower, upper):
+    assert lower <= contract_score(response) <= upper
 
 
-# ════════════════════════════════════════════════════════════════
-# 场景 B：错误代码 + 规范格式
-# ════════════════════════════════════════════════════════════════
-
-class TestScenarioB:
-    """错误解法（减法而非加法）+ 完整教学格式：accuracy=0，format=1，combined=0.4。"""
-
-    def test_accuracy_is_zero(self):
-        score = accuracy_reward(_ADD_CODE_WRONG, _ADD_CASES)
-        assert score == pytest.approx(0.0), (
-            f"错误代码应全部失败，期望 0.0，实际 {score}"
-        )
-
-    def test_format_still_full(self):
-        """格式得分与代码正确性无关。"""
-        score = format_reward(_GOOD_FORMAT_RESPONSE)
-        assert score == pytest.approx(1.0)
-
-    def test_combined_equals_format_weight(self):
-        """combined = 0.6×0 + 0.4×1 = 0.4"""
-        score = combined_reward(_ADD_CODE_WRONG, _ADD_CASES, _GOOD_FORMAT_RESPONSE)
-        assert score == pytest.approx(0.4, abs=1e-4), (
-            f"期望 0.4，实际 {score}"
-        )
-
-    def test_partial_pass_rate(self):
-        """
-        构造只有一半测试用例能通过的情况，验证 pass_rate 按比例返回。
-        案例：a==b 时 a-b==0 与 a+b==0 相同，其余不同。
-        """
-        mixed_cases = [
-            {"input": "0 0\n",  "output": "0"},   # PASS：0-0 == 0+0
-            {"input": "3 5\n",  "output": "8"},   # FAIL：3-5 != 3+5
-        ]
-        score = accuracy_reward(_ADD_CODE_WRONG, mixed_cases)
-        assert score == pytest.approx(0.5, abs=1e-4)
+def test_contract_rejects_repeated_short_steps():
+    repeated = "\n".join(f"## 第{i}步\n内容太短" for i in range(1, 5))
+    assert contract_score(repeated) == 0.0
 
 
-# ════════════════════════════════════════════════════════════════
-# 场景 C：正确代码 + 无教学格式
-# ════════════════════════════════════════════════════════════════
-
-class TestScenarioC:
-    """正确解法 + 仅有代码块无步骤讲解：accuracy=1，format 较低。"""
-
-    def test_accuracy_is_full(self):
-        score = accuracy_reward(_ADD_CODE_CORRECT, _ADD_CASES)
-        assert score == pytest.approx(1.0)
-
-    def test_format_is_low(self):
-        """无步骤标题且无中文解释，得分应低于 0.5。"""
-        score = format_reward(_BARE_CODE_RESPONSE)
-        # 只有代码块（+0.35），其余不满足，最多 0.35 + 0.1(长度) = 0.45
-        assert score < 0.5, f"无教学格式应低分，实际 {score}"
-
-    def test_combined_between_accuracy_and_one(self):
-        """combined = 0.6×1 + 0.4×low，应在 [0.6, 1.0) 区间。"""
-        score = combined_reward(_ADD_CODE_CORRECT, _ADD_CASES, _BARE_CODE_RESPONSE)
-        assert 0.6 <= score < 1.0, (
-            f"组合分数应在 [0.6, 1.0)，实际 {score}"
-        )
-
-    def test_custom_alpha(self):
-        """alpha=1.0 时 combined 完全等于 accuracy_reward。"""
-        score = combined_reward(
-            _ADD_CODE_CORRECT, _ADD_CASES, _BARE_CODE_RESPONSE, alpha=1.0
-        )
-        assert score == pytest.approx(1.0)
+def test_formal_reward_formula():
+    weights = RewardWeights()
+    perfect = combine_scores(
+        static_validity=1.0, pass_rate=1.0, contract=1.0, weights=weights
+    )
+    partial = combine_scores(
+        static_validity=1.0, pass_rate=0.5, contract=0.8, weights=weights
+    )
+    assert perfect.total == 1.0
+    assert partial.code_reward == 0.4
+    assert partial.contract_gate == 0.625
+    assert partial.gated_contract == 0.5
+    assert partial.total == 0.44
 
 
-# ════════════════════════════════════════════════════════════════
-# 安全扫描单元测试
-# ════════════════════════════════════════════════════════════════
-
-class TestSecurityScanner:
-    """验证 AST 安全扫描器能正确识别危险代码。"""
-
-    def test_os_system_blocked(self):
-        code = "import os\nos.system('rm -rf /')"
-        violations = _scan_security(code)
-        assert any("os" in v for v in violations), violations
-
-    def test_subprocess_blocked(self):
-        code = "import subprocess\nsubprocess.run(['ls'])"
-        violations = _scan_security(code)
-        assert violations, "subprocess 应被阻止"
-
-    def test_open_blocked(self):
-        code = "open('/etc/passwd').read()"
-        violations = _scan_security(code)
-        assert any("open" in v for v in violations), violations
-
-    def test_socket_import_blocked(self):
-        code = "import socket\ns = socket.socket()"
-        violations = _scan_security(code)
-        assert violations, "socket 应被阻止"
-
-    def test_dunder_globals_blocked(self):
-        code = "().__class__.__bases__[0].__subclasses__()"
-        violations = _scan_security(code)
-        assert violations, "dunder 属性访问应被阻止"
-
-    def test_safe_code_passes(self):
-        """普通算法竞赛代码不应触发安全扫描。"""
-        code = """\
-import sys
-from collections import defaultdict
-
-def solve():
-    n = int(sys.stdin.readline())
-    a = list(map(int, sys.stdin.readline().split()))
-    graph = defaultdict(list)
-    for _ in range(n - 1):
-        u, v = map(int, sys.stdin.readline().split())
-        graph[u].append(v)
-        graph[v].append(u)
-    print(sum(a))
-
-solve()
-"""
-        violations = _scan_security(code)
-        assert not violations, f"安全代码不应有违规：{violations}"
-
-    def test_accuracy_returns_zero_on_unsafe_code(self):
-        """不安全代码传入 accuracy_reward，应直接返回 0.0 而不执行。"""
-        unsafe_code = "import os\nos.system('echo hacked')"
-        score = accuracy_reward(unsafe_code, [{"input": "", "output": ""}])
-        assert score == 0.0
+def test_static_validity_checks_interface_without_claiming_correctness():
+    standard_meta = {"io_mode": "standard_input"}
+    call_meta = {"io_mode": "call_based", "fn_name": "add"}
+    assert static_validity_score("x = int(input())\nprint(x)", standard_meta) == 1.0
+    assert static_validity_score("def add(a, b):\n    return a - b", call_meta) == 1.0
+    assert static_validity_score("def wrong(a, b):\n    return a + b", call_meta) == 0.0
+    assert static_validity_score("import subprocess\nsubprocess.run([])", standard_meta) == 0.0
 
 
-# ════════════════════════════════════════════════════════════════
-# FormatWeights 配置测试
-# ════════════════════════════════════════════════════════════════
-
-class TestFormatWeights:
-    """验证 FormatWeights 权重配置与校验逻辑。"""
-
-    def test_default_weights_sum_to_one(self):
-        w = FormatWeights()
-        total = w.step_headings + w.code_block + w.chinese_explanation + w.length_sanity
-        assert abs(total - 1.0) < 1e-9
-
-    def test_invalid_weights_raise(self):
-        with pytest.raises(ValueError, match="1.0"):
-            FormatWeights(step_headings=0.5, code_block=0.5,
-                          chinese_explanation=0.5, length_sanity=0.5)
-
-    def test_custom_weights_applied(self):
-        """将 code_block 权重设为 1.0，其余全为 0，则只要有代码块就满分。"""
-        w = FormatWeights(step_headings=0.0, code_block=1.0,
-                          chinese_explanation=0.0, length_sanity=0.0)
-        score = format_reward(_BARE_CODE_RESPONSE, weights=w)
-        assert score == pytest.approx(1.0)
-
-    def test_all_zero_except_step(self):
-        """只看步骤标题时，无格式回复应得 0。"""
-        w = FormatWeights(step_headings=1.0, code_block=0.0,
-                          chinese_explanation=0.0, length_sanity=0.0)
-        score = format_reward(_BARE_CODE_RESPONSE, weights=w)
-        assert score == pytest.approx(0.0)
+def _reward_config() -> dict:
+    return {
+        "code_weight": 0.60,
+        "contract_weight": 0.40,
+        "static_validity_weight": 0.05,
+        "partial_pass_weight": 0.70,
+        "strict_pass_weight": 0.25,
+        "contract_gate_floor": 0.25,
+        "execution_backend": "subprocess",
+        "timeout": 2.0,
+    }
 
 
-# ════════════════════════════════════════════════════════════════
-# 边界条件测试
-# ════════════════════════════════════════════════════════════════
+def test_composite_reward_executes_standard_input_solution():
+    reward = build_composite_reward(reward_config=_reward_config())
+    cases = [{"input": "1 2\n", "output": "3"}]
+    metadata = {"io_mode": "standard_input", "fn_name": None, "starter_code": ""}
+    assert reward(
+        [GOOD_TEACHING],
+        test_cases=[json.dumps(cases)],
+        metadata=[json.dumps(metadata)],
+    ) == [1.0]
+    assert reward.last_diagnostics[0]["pass_rate"] == 1.0
 
-class TestEdgeCases:
-    """各种边界情况：空输入、超时、无测试用例等。"""
 
-    def test_empty_code_returns_zero(self):
-        assert accuracy_reward("", _ADD_CASES) == 0.0
+def test_composite_reward_respects_call_based_interface():
+    reward = build_composite_reward(reward_config=_reward_config())
+    cases = [{"input_args": [1, 2], "expected_output": 3}]
+    metadata = {"io_mode": "call_based", "fn_name": "add", "starter_code": ""}
+    completion = "```python\ndef add(a, b):\n    return a + b\n```"
+    score = reward(
+        [completion],
+        test_cases=[json.dumps(cases)],
+        metadata=[json.dumps(metadata)],
+    )[0]
+    assert score > 0.6
+    assert reward.last_diagnostics[0]["strict"] == 1.0
 
-    def test_syntax_error_returns_zero(self):
-        assert accuracy_reward("def f(:\n    pass", _ADD_CASES) == 0.0
 
-    def test_no_test_cases_fail_closed(self):
-        """AST 外观不能证明语义正确；无测试用例不得产生正确性奖励。"""
-        assert accuracy_reward(_ADD_CODE_CORRECT, []) == pytest.approx(0.0)
+def test_composite_reward_calls_verifier_once_per_completion(monkeypatch):
+    calls = []
 
-    def test_timeout_returns_zero(self):
-        """死循环代码应超时并返回 0.0。"""
-        infinite_loop = "while True: pass"
-        score = accuracy_reward(infinite_loop, _ADD_CASES, timeout=1.0)
-        assert score == 0.0
+    def fake_verify(code, metadata, **kwargs):
+        calls.append((code, metadata, kwargs))
+        return SimpleNamespace(pass_rate=0.5, unsupported=False)
 
-    def test_runtime_error_returns_zero(self):
-        """运行时抛出异常的代码（除零）应返回 0.0。"""
-        crash_code = "print(1 / 0)"
-        score = accuracy_reward(crash_code, [{"input": "", "output": "0"}])
-        assert score == 0.0
+    monkeypatch.setattr("src.reward.grpo.verify_code", fake_verify)
+    reward = build_composite_reward(reward_config=_reward_config())
+    completion = "```python\nx = int(input())\nprint(x)\n```"
+    cases = json.dumps([{"input": "1\n", "output": "1"}])
+    metadata = json.dumps({"io_mode": "standard_input"})
+    reward([completion, completion], test_cases=[cases, cases], metadata=[metadata, metadata])
+    assert len(calls) == 2
 
-    def test_empty_response_format(self):
-        assert format_reward("") == pytest.approx(0.0)
 
-    def test_combined_alpha_out_of_range(self):
-        with pytest.raises(ValueError, match="alpha"):
-            combined_reward("", [], "", alpha=1.5)
+def test_conversational_completion_is_normalized():
+    assert completion_text([{"role": "assistant", "content": "answer"}]) == "answer"

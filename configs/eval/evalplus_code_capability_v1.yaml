@@ -1,0 +1,49 @@
+schema_version: codeguide-external-code-eval-v1
+protocol_name: evalplus-code-capability-base-step20-step200-v1
+evaluation_module: code_capability
+teaching_metrics_in_scope: false
+
+base_model:
+  name_or_path: Qwen/Qwen2.5-Coder-7B-Instruct
+  revision: null
+  dtype: bfloat16
+  load_in_4bit: false
+  trust_remote_code: false
+  attention_backend: sdpa
+
+variants:
+  base:
+    adapter_path: null
+    role: reproduced_base
+  mixed_lr1e4_step020:
+    adapter_path: outputs/sft/qwen25_coder_7b_qlora_8k/full_lr1e4_seed20260728/checkpoint-20
+    role: early_call_preserving_control
+  mixed_lr1e4_step200:
+    adapter_path: outputs/sft/qwen25_coder_7b_qlora_8k/full_lr1e4_seed20260728/checkpoint-200
+    role: taco515_best_mixed_sft
+
+datasets:
+  humaneval:
+    expected_tasks: 164
+  mbpp:
+    expected_tasks: 378
+
+generation:
+  seed: 20260728
+  batch_size: 4
+  max_new_tokens: 2048
+  do_sample: false
+  num_beams: 1
+
+  # Qwen2.5-Coder instruct EvalPlus prompt style.
+  system_prompt: You are an intelligent programming assistant to produce Python algorithmic solutions
+  user_template: |-
+    Can you complete the following Python function?
+    ```python
+    {prompt}
+    ```
+  assistant_prefix: |-
+    ```python
+
+output:
+  root: outputs/eval/evalplus_code_capability_v1

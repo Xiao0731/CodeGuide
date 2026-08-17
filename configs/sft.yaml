@@ -1,0 +1,59 @@
+schema_version: codeguide-training-v2
+stage: sft
+seed: 20260728
+
+model:
+  name_or_path: Qwen/Qwen2.5-Coder-7B-Instruct
+  tokenizer_name_or_path: Qwen/Qwen2.5-Coder-7B-Instruct
+  trust_remote_code: false
+  attention_backend: auto
+  max_length: 8192
+
+data:
+  canonical: data/final/sft_accepted.jsonl
+  train_ids: data/splits/sft_train_ids.json
+  dev_ids: data/splits/sft_dev_ids.json
+  calibration_ids: data/splits/sft_calibration_500_ids.json
+  calibration_eval_size: 100
+  expected_sha256: 08ef448f4be6b6b34ee2b6b7af5748827feeba0a0f36cc393350374671c86a1b
+  expected_train_count: 9791
+  expected_dev_count: 515
+
+quantization:
+  load_in_4bit: true
+  quant_type: nf4
+  double_quant: true
+  compute_dtype: bfloat16
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  bias: none
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+training:
+  output_dir: outputs/sft/qwen25_coder_7b_qlora_8k/full_seed20260728
+  num_train_epochs: 1.0
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  optim: paged_adamw_8bit
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  use_liger_kernel: true
+  logging_steps: 1
+  eval_strategy: steps
+  eval_steps: 25
+  save_strategy: steps
+  save_steps: 25
+  save_total_limit: 2
+  dataloader_num_workers: 2
+  group_by_length: true
+  report_to: none

@@ -724,3 +724,30 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 外部 README 的 HumanEval 88.4% 是 Qwen2.5-Coder-7B-Instruct 官方基座成绩，不是该项目 SFT/GRPO 后实测。当前项目同样继承该基座，但尚未运行 HumanEval+/MBPP+/LiveCodeBench，不能把官方基座数字写成本项目结果。
 - 数据构造方面，外部 teacher 只看到题面、难度和标签；reference 虽被 loader 取出但没有进入 prompt。TACO tests 被置空，`--run_code` 默认关闭，质量分主要检查结构、闭合代码块、复杂度和长度。默认 source=`both` 还会先加载 CodeContests 到 `max_items`，并不保证 10,000 条中确实包含 TACO。
 - 本项目 teacher 使用 verified reference、接口元数据、测试摘要和可选 seed teaching examples；student prompt 不泄漏 reference；A 类输出必须通过统一 Docker verifier，B 类锁定 reference 并只生成讲解/安全注释；最终 canonical 为 10,306 条。外部 `build_seed.py` 的 50 条 seed 是独立生成供人工查看，没有作为 few-shot 示例注入全量蒸馏 prompt。
+
+## 2026-08-14：仓库主线清理与入口收敛
+
+- 删除复制的评测 bundle、早期 APPS 数据生成链、Colab/Kaggle/AIStudio/ModelScope 一次性安装入口、API smoke、500 条校准包装器和旧 `evaluate_sft_adapter.py`；正式矩阵评测统一使用 `evaluate_sft_matrix.py`。
+- 旧 `scripts/train_sft.py` 的 Unsloth 独立实现已移除，改为薄包装器调用 `src.training.train_sft`，避免与已在双 4090 上验证的 Transformers/PEFT/bitsandbytes/Liger 主线继续分叉。
+- 本地删除约 2.874 GiB 可恢复资产：TACO train 分片、全量 reference cache、GRPO 上传分卷/压缩包、Python cache 和 superseded 2048-token 校准输出。TACO test、canonical SFT、source bank、固定 split、GRPO 正式数据与正式评测结果全部保留。
+- 4096-token 校准/full 结果归档到 `outputs/eval/sft_calibration_4096` 与 `outputs/eval/sft_full_4096`；项目脚本用途集中记录在 `scripts/README.md`。
+- 完整回归为 85 passed；清理没有调用 API、Docker 或训练任务。详细边界见 `reports/repository_cleanup_20260814.md`。
+
+## 2026-08-15：训练代码框架化与二次清理
+
+- 依赖文件收敛为根目录唯一 `requirements.txt`，删除 SFT、router、external-eval 和 G0 lock 等并行清单；初次重构曾误锁 Transformers 4.53.3、TRL 0.19.1，本轮已纠正为正式云端实验对应的 Transformers 4.55.4、TRL 0.22.2。
+- SFT 唯一实现改为 TRL `SFTTrainer`。CodeGuide 只保留冻结数据哈希、固定 split、8K 不截断检查和预计算 assistant-only `labels`；TRL 通过 `skip_prepare_dataset` 原样使用已审计标签。
+- GRPO 唯一实现为 TRL `GRPOTrainer`，从用户指定的最佳 SFT adapter 热启动；初次重构中的 correctness 0.9 + contract 0.1 已废止，正式梯度输入改为一次 `verify_code()` 得到的 canonical composite total reward。
+- 双卡启动统一由 Accelerate 管理；默认 `MULTI_GPU`，另提供可选的 Accelerate + DeepSpeed ZeRO-2 配置。FlashAttention 2 可用时自动启用，否则明确回退 SDPA。
+- `scripts/` 由约 45 个入口缩减为 10 个核心 Python 入口；一次性 shell/PowerShell 包装器、probe/audit 脚本、旧训练分叉和静态代理奖励已删除。参数差异进入 YAML，重复验证进入参数化 pytest。
+- 正式评测输出继续保留在 `outputs/eval/`；被正式矩阵替代的旧 `outputs/sft/taco_test` 与旧增量 ZIP 已删除。canonical SFT、source bank、固定 split、GRPO 数据和正式评测记录未改动。
+- 本轮仅完成静态、数据合同和 CLI 验证；没有重新训练 SFT/GRPO，也没有把“框架迁移”宣称为 GPU 运行通过。
+
+## 2026-08-15：正式 GRPO 实验语义纠偏
+
+- 数据协议恢复为 `6,451 train / 50 dev / 515 final TACO`，三者 problem ID 两两互斥。`dev50` 是唯一 checkpoint-selection 集，`TACO-515` 只用于选出 GRPO best 后的 Base/SFT best/GRPO best 最终对比。
+- curriculum 是正式实验变量：`easy 3,228 @ 512`、`medium 1,735 @ 768`、`hard 1,488 @ 1024`，固定顺序且每阶段 1 epoch；训练入口逐阶段调用 TRL `GRPOTrainer`，模型与 LoRA 状态连续，不合并成随机单 epoch。
+- 正式超参数恢复为 generations 4、temperature 0.8、top-p 0.95、LR `1e-5`、batch/device 1、gradient accumulation 8、KL beta 0.05、BF16、gradient checkpointing、save/eval 100 steps、`loss_type=grpo`、`scale_rewards=false`。
+- 正式奖励为 `code=.05*static+.70*pass_rate+.25*strict`，`gated_contract=contract*(.25+.75*pass_rate)`，`total=.60*code+.40*gated_contract`。static 只检查 AST、安全和接口；执行正确性只来自统一 `verify_code()`；training backend 固定 subprocess，Docker 仅用于最终严格离线评测。
+- teaching surface heuristic 仅作 diagnostic，不进入梯度。contract 固定为实质步骤 0.40、Python 代码块 0.30、复杂度 0.20、合理长度 0.05、教学词 0.05，并保留每步至少 50 字符和 Jaccard 去重。
+- 本轮没有启动训练，也没有修改冻结数据、已有 generation、verification 或实验报告。

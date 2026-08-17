@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """TACO-515 checkpoint matrix evaluation.
 
-This is a NEW evaluation path. Keep ``scripts/evaluate_sft_adapter.py`` unchanged
-so the historical 40-problem / legacy-teaching evaluation remains reproducible.
+This is the canonical checkpoint-matrix evaluator. Historical 40-problem
+calibration outputs remain as experiment artifacts, but their one-off evaluator
+has been retired.
 
 Stages
 ------
@@ -41,12 +42,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Iterable
 
-from omegaconf import OmegaConf
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.source_bank_io import iter_source_bank
+from src.data.source_bank import iter_source_bank
 from src.data.code_validator import extract_code
 from src.reward.execution import verify_code
 from src.training.sft_data import load_canonical, load_id_list
@@ -129,6 +128,8 @@ def percentile(values: list[int | float], q: float) -> float | None:
 
 def load_protocol(config_path: Path) -> dict[str, Any]:
     """Load and validate the frozen compact-code-first protocol."""
+    from omegaconf import OmegaConf
+
     if not config_path.exists():
         raise FileNotFoundError(config_path)
     payload = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
