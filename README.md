@@ -1,6 +1,6 @@
 # CodeGuide
 
-CodeGuide 是一个面向 OI/ACM 初学者的算法教学模型后训练项目。训练目标同时包含两项硬要求：生成可执行的正确代码，以及给出题意、观察、推导、复杂度和常见错误组成的完整教学回答。
+CodeGuide 是一个面向 OI/ACM 初孊者的算法教孊模型后训练项目。训练目标同时包含两项硬要求：生成可执行的正确代码，以及给出题意、观察、推导、复杂度和常见错误组成的完整教学回答。
 
 ## 训练流程
 
@@ -47,6 +47,31 @@ pip install --no-build-isolation -r requirements.txt
 export HF_ENDPOINT=https://hf-mirror.com
 ```
 
+## 快速复现
+
+仓库提供统一的 `scripts/quickstart.py` 窗口，只负责编排已有训练、评测和验证入口，不复制底层逻辑。
+
+```bash
+# 1. 只检查数据与正式配置
+python scripts/quickstart.py check
+
+# 2. 正式 SFT
+python scripts/quickstart.py sft
+
+# 3. 从选定 SFT checkpoint 热启动 GRPO
+python scripts/quickstart.py grpo \
+  --sft-adapter /path/to/sft/checkpoint-200
+
+# 4. 一键评测 Base / SFT / GRPO
+python scripts/quickstart.py eval \
+  --sft-adapter /path/to/sft/checkpoint-200 \
+  --grpo-adapter /path/to/grpo/best_adapter
+```
+
+`eval` 会依次完成 TACO-515 的生成、Docker 严格验证与汇总，并运行 HumanEval(+)/MBPP(+)。若只想跑其中一部分，可使用 `eval-taco`、`eval-evalplus`，或给 `eval` 传入 `--skip-taco` / `--skip-evalplus`。
+
+SFT 默认复现 `LR=1e-4` 主轨迹；GRPO 必须显式提供选定的 SFT adapter。完整实验协议、历史 checkpoint 口径和底层分阶段命令仍保留在各脚本与项目记录中，快速入口不改变这些实验语义。
+
 ## 核心命令
 
 仅检查冻结数据和配置，不加载模型：
@@ -70,6 +95,7 @@ accelerate launch --config_file configs/accelerate/dual_gpu.yaml \
 ```bash
 accelerate launch --config_file configs/accelerate/dual_gpu.yaml \
   scripts/train_grpo.py --config configs/grpo.yaml \
+  --sft-adapter-path /path/to/best_sft_adapter \
   2>&1 | tee logs/grpo.log
 ```
 
