@@ -269,8 +269,19 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 
 # EXP-025：Blind Teaching Evaluation 流水线合同验证
 
-- 范围：实现 Base/SFT/GRPO 同题生成、DeepSeek/豆包双盲 pairwise + absolute scoring 和 Markdown 聚合；不修改训练代码，不运行模型或调用 Judge API。
+- 范围：实现 Base/SFT/GRPO 同题生成、DeepSeek/Qwen 双盲 pairwise + absolute scoring 和 Markdown 聚合；不修改训练代码，不运行模型或调用 Judge API。
 - 数据：默认从冻结 SFT dev/TACO-515 ID 池分层抽取 50 条；离线 validate 确认 canonical 与 selection IDs 可读取，参考 assistant 标签不进入生成消息或 Judge prompt。
 - 盲评：每个模型对的 A/B 位置按种子平衡；测试确认 10 条时每组正反各 5 条。winner 映射回真实模型后再计算胜率和 Judge disagreement。
 - 成本：50 条完整评测为 `50 × 3 pairs × 2 judges = 300` 个成功 judgment；五维绝对分与 pairwise winner 共用同一次请求，API/schema 失败重试会增加实际请求数。
-- 验证边界：新增离线测试覆盖 reference 剥离、盲序、加权分重算和 disagreement；真实教学提升结论必须等最佳 SFT/GRPO checkpoint 生成并由两位 Judge 完成后才能填写。
+- 验证边界：新增离线测试覆盖 reference 剥离、盲序、加权分重算和 disagreement；真实教学提升结论必须等两位 Judge 完成后才能填写。
+
+# EXP-026：冻结 TACO-515 三阶段回答导入
+
+- 日期：2026-08-24
+- 输入：Base、`mixed_lr2e4_step050`、`grpo_best` 三份既有 generation，各 515 条。
+- 一致性：三者唯一 ID 均为 515，交集 515，空回答 0，协议均为 `compact-code-first-taco515-selected-v1`。
+- Blind50：沿用 `sft_dev_ids.json` 与 seed 20260728 分层抽取 50 条；三阶段各导入 50 条。
+- 结果：`tests/test_sft_eval_protocol.py` 9 passed；`--stage validate` 和 `--stage import` 均通过。
+- 成本：本步骤没有模型推理、Docker 执行或 Judge API 请求。后续双 Judge 预计 `50×3×2=300` 个成功 judgment。
+- 边界：现有回答共享 compact-code-first prompt，因此可做公平的阶段相对比较；不能解释为换用原始长教学 prompt 后的新一轮生成。
+- Judge 更正：第二 Judge 从误记的豆包更正为 Qwen3.8 Max；选择最高能力通用模型而非 Coder 专项模型，关闭 thinking，并使用结构化 JSON 输出。本次仅修改配置和调用语义，尚未产生 API 请求。

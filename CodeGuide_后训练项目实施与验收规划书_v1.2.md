@@ -1838,7 +1838,7 @@ Codex 必须先回答：
 
 1. 最终教学评测固定比较 Base、最佳 SFT 与最佳 GRPO；三者接收相同的冻结 ChatML `system + user`，canonical assistant/reference 标签不得进入模型输入或 Judge prompt。
 2. 默认从与 GRPO train/dev 隔离的 TACO-515 池分层冻结 Blind50。该集合不能反向用于 checkpoint 选择或超参数调整。
-3. 每题比较 Base/SFT、Base/GRPO、SFT/GRPO，按固定种子平衡交换 A/B；DeepSeek V4 Flash 与豆包独立评分，Judge 不得看到模型阶段名称。
+3. 每题比较 Base/SFT、Base/GRPO、SFT/GRPO，按固定种子平衡交换 A/B；DeepSeek V4 Flash 与 Qwen3.8 Max 独立评分，Judge 不得看到模型阶段名称。
 4. 单次 Judge 调用同时返回 pairwise winner 与题意理解、算法讲解、推导流程、代码一致性、初学者友好五维 0-10 分；程序按 0.20/0.30/0.20/0.20/0.10 重算总分。
 5. 报告必须同时给出三模型平均分、三组胜率、五维均分和 Judge winner disagreement。不得因回答更长、标题更多或格式更漂亮直接加分。
 6. 教学盲评与执行正确性评测相互独立：TACO/EvalPlus 负责代码能力，双 Judge 负责教学质量；任何最终结论都必须同时保留 generation、原始 Judge JSON 和汇总报告。
@@ -1851,3 +1851,11 @@ Codex 必须先回答：
 4. SFT 继续使用冻结的 assistant-only 标签；数据已经预分词并审计时，TRL 必须跳过二次数据准备，禁止静默改变 mask 或截断代码。
 5. GRPO 从 full SFT adapter 热启动，correctness 必须调用统一 verifier，teaching contract 只衡量明确的教学结构合同；正式教学质量提升仍需独立评测，不能由启发式 reward 直接宣称。
 6. 本轮完成的是代码主线重构与本地合同验证。重构后的训练入口在云端至少完成一个最小 GPU smoke 后，才可更新为“运行验证通过”。
+
+## 2026-08-24 Blind Teaching Evaluation 本地复用补充
+
+1. 云端关闭后不重新加载三个模型，复用 `compact-code-first-taco515-selected-v1` 协议下已经落盘的 Base、SFT best-overall (`mixed_lr2e4_step050`) 和 `grpo_best` TACO-515 generation。
+2. 三份来源各 515 条且 problem ID 完全一致；按原冻结 dev 池和 seed 20260728 分层选取 Blind50。导入必须校验 variant、空回答、重复/缺失 ID 与已有结果冲突。
+3. 该复用只消除重复模型推理，不改变双盲规则：Judge 只看到题面和匿名 A/B 回答，不看到 reference、阶段名称或 Docker 正确性结果。
+4. 最终报告必须注明 generation protocol。该结果衡量 compact-code-first 协议下三阶段的相对教学质量，不能冒充其他 system prompt 下的新生成实验。
+5. Qwen Judge 固定 `qwen3.8-max`、`enable_thinking=false`、JSON object 输出；同一正式报告不得中途切换到 Plus/Flash。若做成本消融，使用独立输出目录和报告。

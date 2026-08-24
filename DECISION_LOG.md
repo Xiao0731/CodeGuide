@@ -628,7 +628,10 @@
 # DEC-036：教学能力使用双盲双 Judge，与代码正确性评测分离
 
 - **日期**：2026-08-24
-- **决定**：最终教学评测固定比较 Base/SFT/GRPO，使用同题 ChatML prompt、平衡 A/B 位置和 DeepSeek V4 Flash/豆包两个独立 Judge；reference assistant 标签对生成模型和 Judge 都不可见。
+- **决定**：最终教学评测固定比较 Base/SFT/GRPO，使用同题 ChatML prompt、平衡 A/B 位置和 DeepSeek V4 Flash/Qwen3.8 Max 两个独立 Judge；reference assistant 标签对生成模型和 Judge 都不可见。
 - **评分边界**：一次 pairwise 请求同时产出 winner 与五维 absolute score；程序从维度分重算 weighted score。回答长度、标题数量和排版不得直接形成优势。
 - **数据边界**：默认 Blind50 来自冻结 TACO-515 池，不进入训练或 GRPO checkpoint selection。现有 TACO/EvalPlus 继续负责可执行代码能力，LLM-as-Judge 分数只代表教学质量测量。
-- **证据边界**：流水线通过本地合同测试不等于模型教学能力已经提升；只有正式 checkpoint 的落盘 generation、两个 Judge 原始结果和报告齐全后才能形成对比 claim。
+- **证据边界**：流水线通过本地合同测试不等于模型教学能力已经提升；只有三个阶段的落盘 generation、两个 Judge 原始结果和报告齐全后才能形成对比 claim。
+- **本地复用**：云端关闭后不重新生成回答；Blind50 导入同一 `compact-code-first-taco515-selected-v1` 协议下已落盘的 Base、SFT best-overall (`mixed_lr2e4_step050`) 和 `grpo_best` TACO-515 generation。
+- **Judge 隔离**：复用不改变回答正文。Judge 仍只看到题面和匿名 A/B 回答，不看到 reference、variant 名称或既有 Docker 执行结果。
+- **千问选型**：第二 Judge 使用 `qwen3.8-max`，不使用 Coder 专项模型。最终 Blind50 只有 150 次千问调用，优先评判能力和 JSON 稳定性；固定关闭 thinking，避免不可控的思考 token 成本。预算消融可另用 `qwen3.7-plus`，不得在同一主报告中混用。

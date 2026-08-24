@@ -757,6 +757,13 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 新增唯一入口 `scripts/evaluate_teaching.py` 与配置 `configs/eval/teaching_eval.yaml`，不修改训练代码。Base/SFT/GRPO 加载复用 `evaluate_sft_matrix.load_model_for_variant`，没有新增 Transformers/PEFT loader。
 - 默认从 canonical SFT 的冻结 515 dev/TACO final ID 池中按 metadata 分层抽取 Blind50；三个模型使用完全相同的原始 ChatML `system + user`，末尾 assistant/reference 标签在构造 prompt 前被强制剥离。
 - 每题执行 Base vs SFT、Base vs GRPO、SFT vs GRPO 三组比较；固定种子为每组生成近似精确 50/50 的 A/B 交换。Judge prompt 不包含阶段名称，也不提供 reference answer。
-- DeepSeek V4 Flash 与豆包通过各自 OpenAI-compatible API 独立评分。单次调用同时返回 winner、五维分数和理由，50 条完整运行需要 300 个成功 judgment，不再为 absolute score 增加 API 调用；API/schema 失败的有限重试可能增加实际请求数。
+- DeepSeek V4 Flash 与 Qwen3.8 Max 通过各自 OpenAI-compatible API 独立评分。单次调用同时返回 winner、五维分数和理由，50 条完整运行需要 300 个成功 judgment，不再为 absolute score 增加 API 调用；API/schema 失败的有限重试可能增加实际请求数。千问固定 `enable_thinking=false` 并请求 JSON object。
 - 五维权重固定为题意理解 0.20、算法讲解 0.30、推导流程 0.20、代码一致性 0.20、初学者友好 0.10。程序按维度重算 weighted score，不盲信 Judge 自报总分。
-- `outputs/teaching_eval/results.json` 是唯一可恢复运行状态，`report.md` 汇总三模型平均分、三组胜率、维度均分与双 Judge winner disagreement。当前只完成静态/离线合同验证，尚未加载三个正式 checkpoint 或产生真实盲评分数。
+- `outputs/teaching_eval/results.json` 是唯一可恢复运行状态，`report.md` 汇总三模型平均分、三组胜率、维度均分与双 Judge winner disagreement。当前只完成静态/离线合同验证，尚未产生真实盲评分数。
+
+## 2026-08-24：Blind50 复用冻结 TACO-515 生成结果
+
+- 云端已关闭，教学评测默认不再重新加载 Base/SFT/GRPO。配置直接读取 `outputs/eval/taco515_selected_bs16/generations/` 下三份 515 条 generation：`base`、正式记录中的 SFT best-overall `mixed_lr2e4_step050`、`grpo_best`。
+- 新增 `--stage import`。导入时校验来源 variant、重复/空/缺失 ID、已有结果冲突和生成协议；固定 seed 20260728 从 dev515 分层选出 50 条，写入 `outputs/teaching_eval/results.json`。
+- 三份来源各 515 条、ID 交集 515、空回答 0，统一协议为 `compact-code-first-taco515-selected-v1`。本地实测导入 50/50/50 成功，不加载模型、不调用 Docker 或 Judge API。
+- 该口径比较的是同一 compact-code-first 协议下的相对教学质量，不能冒充原始长教学 prompt 下重新生成的结果。代码正确性仍引用已落盘的 TACO-515 Docker verification，教学 Judge 不重复执行代码。

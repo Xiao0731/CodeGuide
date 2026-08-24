@@ -4,6 +4,7 @@ selection_ids_path: data/splits/sft_dev_ids.json
 output_dir: outputs/teaching_eval
 evaluation_size: 50
 seed: 20260728
+generation_protocol: compact-code-first-taco515-selected-v1
 
 model:
   name: Qwen/Qwen2.5-Coder-7B-Instruct
@@ -16,6 +17,21 @@ adapters:
   # Supply the selected checkpoints by CLI or set portable relative paths here.
   sft: null
   grpo: null
+
+# Reuse the frozen TACO-515 outputs already generated and Docker-evaluated.
+# `--stage all` imports these files instead of loading any model when this
+# complete mapping is present. The SFT source is the selected best-overall
+# checkpoint recorded in outputs/eval/taco515_selected_bs16/selected_variants.tsv.
+generation_sources:
+  base:
+    path: outputs/eval/taco515_selected_bs16/generations/base.jsonl
+    expected_variant: base
+  sft:
+    path: outputs/eval/taco515_selected_bs16/generations/mixed_lr2e4_step050.jsonl
+    expected_variant: mixed_lr2e4_step050
+  grpo:
+    path: outputs/eval/taco515_selected_bs16/generations/grpo_best.jsonl
+    expected_variant: grpo_best
 
 generation_config:
   max_new_tokens: 2048
@@ -40,13 +56,16 @@ judge_api:
       base_url_default: https://api.deepseek.com/v1
       model_env: [DEEPSEEK_JUDGE_MODEL, DISTILL_MODEL]
       model_default: deepseek-v4-flash
-    doubao:
-      display_name: Doubao
-      api_key_env: [DOUBAO_JUDGE_API_KEY, ARK_API_KEY]
-      base_url_env: [DOUBAO_JUDGE_BASE_URL]
-      base_url_default: https://ark.cn-beijing.volces.com/api/v3
-      model_env: [DOUBAO_JUDGE_MODEL, ARK_MODEL]
-      model_default: null
+    qwen:
+      display_name: Qwen3.8 Max
+      api_key_env: [QWEN_JUDGE_API_KEY, DASHSCOPE_API_KEY]
+      base_url_env: [QWEN_JUDGE_BASE_URL, DASHSCOPE_BASE_URL]
+      base_url_default: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model_env: [QWEN_JUDGE_MODEL]
+      model_default: qwen3.8-max
+      response_format: json_object
+      extra_body:
+        enable_thinking: false
 
 criteria:
   problem_understanding:

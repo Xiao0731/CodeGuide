@@ -77,4 +77,5 @@
 ### 2026-08-24
 
 - Blind Teaching Evaluation 已实现为单脚本、单配置流水线，具备 reference 隔离、Base/SFT/GRPO 同题生成、双 Judge、平衡盲序、五维评分、胜率和 disagreement 聚合。
-- 当前只能声明“评测协议实现并通过离线合同验证”；尚无正式 GRPO best adapter 和双 Judge 完整结果，因此不得声明 GRPO 教学能力优于 SFT/Base。
+- 已确认本地存在 Base/SFT best-overall/GRPO best 的同协议 TACO-515 generation，各 515 条且 ID 完全一致；Blind50 已无模型生成依赖。
+- 当前只能声明“评测协议和三阶段回答导入已通过离线合同验证”；尚无双 Judge 完整结果，因此不得声明 GRPO 教学能力优于 SFT/Base。

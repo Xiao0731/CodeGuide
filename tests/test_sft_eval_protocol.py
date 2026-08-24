@@ -5,6 +5,7 @@ from scripts.evaluate_teaching import (
     aggregate_report,
     balanced_blind_orders,
     build_judge_prompt,
+    import_generated_answers,
     parse_judgment,
     prompt_messages,
 )
@@ -147,17 +148,17 @@ def test_report_uses_model_winners_and_counts_judge_disagreement():
         "base_vs_grpo": _judgment("base", "grpo", "grpo", 5, 9),
         "sft_vs_grpo": _judgment("sft", "grpo", "grpo", 8, 9),
     }
-    doubao = {
+    qwen = {
         "base_vs_sft": _judgment("base", "sft", "sft", 6, 8),
         "base_vs_grpo": _judgment("base", "grpo", "base", 7, 6),
         "sft_vs_grpo": _judgment("sft", "grpo", "grpo", 8, 9),
     }
     config = {
-        "judge_api": {"judges": {"deepseek": {}, "doubao": {}}},
+        "judge_api": {"judges": {"deepseek": {}, "qwen": {}}},
         "criteria": CRITERIA,
     }
     summary = aggregate_report(
-        [{"id": "p", "judgments": {"deepseek": deepseek, "doubao": doubao}}],
+        [{"id": "p", "judgments": {"deepseek": deepseek, "qwen": qwen}}],
         config,
     )
     assert summary["judge_disagreement"] == {
@@ -167,3 +168,46 @@ def test_report_uses_model_winners_and_counts_judge_disagreement():
     }
     assert summary["pairwise"]["base_vs_sft"]["right_win_rate"] == 1.0
     assert summary["teaching_scores"]["combined"]["grpo"] > 0
+
+
+def test_import_generated_answers_reuses_frozen_jsonl(tmp_path):
+    results = [
+        {"id": "p1", "question": "q1", "base": "", "sft": "", "grpo": ""},
+        {"id": "p2", "question": "q2", "base": "", "sft": "", "grpo": ""},
+    ]
+    source_plan = {}
+    for variant, expected in (
+        ("base", "base"),
+        ("sft", "selected_sft"),
+        ("grpo", "grpo_best"),
+    ):
+        path = tmp_path / f"{variant}.jsonl"
+        rows = [
+            {
+                "problem_id": problem_id,
+                "variant": expected,
+                "protocol_name": "frozen-protocol",
+                "text": f"{variant}-{problem_id}",
+            }
+            for problem_id in ("p1", "p2")
+        ]
+        path.write_text(
+            "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+        )
+        source_plan[variant] = {
+            "path": str(path),
+            "expected_variant": expected,
+        }
+
+    output = tmp_path / "results.json"
+    summary = import_generated_answers(
+        results=results,
+        results_path=output,
+        source_plan=source_plan,
+    )
+
+    assert summary["protocols"] == ["frozen-protocol"]
+    assert results[0]["base"] == "base-p1"
+    assert results[1]["sft"] == "sft-p2"
+    assert results[1]["grpo"] == "grpo-p2"
+    assert json.loads(output.read_text(encoding="utf-8"))[0]["base"] == "base-p1"

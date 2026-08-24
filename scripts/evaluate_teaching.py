@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--stage",
-        choices=("validate", "generate", "judge", "report", "all"),
+        choices=("validate", "import", "generate", "judge", "report", "all"),
         default="all",
     )
     parser.add_argument(
@@ -65,6 +65,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-model")
     parser.add_argument("--sft-adapter")
     parser.add_argument("--grpo-adapter")
+    parser.add_argument("--base-results")
+    parser.add_argument("--sft-results")
+    parser.add_argument("--grpo-results")
     parser.add_argument("--num-samples", type=int)
     parser.add_argument("--cache-dir")
     return parser.parse_args()
@@ -205,6 +208,120 @@ def initialize_results(
         for key in ("base", "sft", "grpo"):
             current.setdefault(key, "")
     return existing
+
+
+def generation_source_plan(
+    config: Mapping[str, Any], args: argparse.Namespace
+) -> dict[str, dict[str, str]]:
+    configured = config.get("generation_sources") or {}
+    if configured and not isinstance(configured, dict):
+        raise ValueError("generation_sources must be a mapping")
+    overrides = {
+        "base": args.base_results,
+        "sft": args.sft_results,
+        "grpo": args.grpo_results,
+    }
+    plan: dict[str, dict[str, str]] = {}
+    for variant in VARIANTS:
+        source = configured.get(variant) or {}
+        if isinstance(source, str):
+            source = {"path": source}
+        if not isinstance(source, dict):
+            raise ValueError(f"invalid generation source for {variant}")
+        path = overrides[variant] or source.get("path")
+        if not path:
+            continue
+        plan[variant] = {
+            "path": str(path),
+            "expected_variant": str(source.get("expected_variant") or variant),
+        }
+    return plan
+
+
+def load_generation_source(
+    path: Path, *, expected_variant: str
+) -> tuple[dict[str, str], set[str]]:
+    if not path.exists():
+        raise FileNotFoundError(path)
+    answers: dict[str, str] = {}
+    protocols: set[str] = set()
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            problem_id = str(row.get("problem_id") or row.get("id") or "").strip()
+            answer = str(row.get("text") or row.get("answer") or "").strip()
+            actual_variant = str(row.get("variant") or expected_variant)
+            if not problem_id:
+                raise ValueError(f"missing problem_id at {path}:{line_number}")
+            if not answer:
+                raise ValueError(f"empty answer for {problem_id} at {path}:{line_number}")
+            if actual_variant != expected_variant:
+                raise ValueError(
+                    f"variant mismatch at {path}:{line_number}: "
+                    f"expected {expected_variant}, got {actual_variant}"
+                )
+            if problem_id in answers:
+                raise ValueError(f"duplicate problem_id {problem_id} in {path}")
+            answers[problem_id] = answer
+            protocol = str(row.get("protocol_name") or "").strip()
+            if protocol:
+                protocols.add(protocol)
+    return answers, protocols
+
+
+def import_generated_answers(
+    *,
+    results: list[dict[str, Any]],
+    results_path: Path,
+    source_plan: Mapping[str, Mapping[str, str]],
+) -> dict[str, Any]:
+    if set(source_plan) != set(VARIANTS):
+        missing = sorted(set(VARIANTS) - set(source_plan))
+        raise ValueError(f"generation sources missing variants: {missing}")
+
+    selected = {str(item["id"]) for item in results}
+    imported: dict[str, Any] = {}
+    protocols: set[str] = set()
+    for variant in VARIANTS:
+        source = source_plan[variant]
+        path = resolve_path(source["path"])
+        answers, source_protocols = load_generation_source(
+            path, expected_variant=source["expected_variant"]
+        )
+        missing = sorted(selected - set(answers))
+        if missing:
+            raise RuntimeError(
+                f"generation source {path} is missing {len(missing)} selected IDs: "
+                f"{missing[:5]}"
+            )
+        for item in results:
+            problem_id = str(item["id"])
+            current = str(item.get(variant) or "").strip()
+            incoming = answers[problem_id]
+            if current and current != incoming:
+                raise RuntimeError(
+                    f"existing {variant} answer differs for {problem_id}; "
+                    "use a new output directory instead of overwriting it"
+                )
+            item[variant] = incoming
+        protocols.update(source_protocols)
+        imported[variant] = {
+            "path": str(path),
+            "available_records": len(answers),
+            "imported_records": len(results),
+            "expected_variant": source["expected_variant"],
+            "protocols": sorted(source_protocols),
+        }
+    if len(protocols) > 1:
+        raise RuntimeError(f"generation sources use different protocols: {sorted(protocols)}")
+    atomic_write_json(results_path, results)
+    return {
+        "mode": "existing_generations",
+        "protocols": sorted(protocols),
+        "sources": imported,
+    }
 
 
 def model_protocol(config: Mapping[str, Any], base_model: str | None) -> dict[str, Any]:
@@ -471,8 +588,8 @@ async def run_judges(
 
     api_cfg = config["judge_api"]
     judge_cfgs = api_cfg.get("judges")
-    if not isinstance(judge_cfgs, dict) or set(judge_cfgs) != {"deepseek", "doubao"}:
-        raise ValueError("exactly the deepseek and doubao judges must be configured")
+    if not isinstance(judge_cfgs, dict) or set(judge_cfgs) != {"deepseek", "qwen"}:
+        raise ValueError("exactly the deepseek and qwen judges must be configured")
     connections = {
         name: judge_connection(name, settings)
         for name, settings in judge_cfgs.items()
@@ -528,14 +645,22 @@ async def run_judges(
         for attempt in range(int(api_cfg["max_retries"]) + 1):
             try:
                 async with semaphore:
-                    response = await clients[judge_name].chat.completions.create(
-                        model=connection["model"],
-                        messages=[
+                    request: dict[str, Any] = {
+                        "model": connection["model"],
+                        "messages": [
                             {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
                             {"role": "user", "content": prompt},
                         ],
-                        temperature=float(api_cfg["temperature"]),
-                        max_tokens=int(api_cfg["max_tokens"]),
+                        "temperature": float(api_cfg["temperature"]),
+                        "max_tokens": int(api_cfg["max_tokens"]),
+                    }
+                    settings = judge_cfgs[judge_name]
+                    if settings.get("response_format") == "json_object":
+                        request["response_format"] = {"type": "json_object"}
+                    if settings.get("extra_body"):
+                        request["extra_body"] = dict(settings["extra_body"])
+                    response = await clients[judge_name].chat.completions.create(
+                        **request
                     )
                 content = response.choices[0].message.content or ""
                 parsed = parse_judgment(content, criteria)
@@ -700,7 +825,8 @@ def write_report(
         "",
         f"- Samples: {summary['samples']}",
         "- Models: Base / SFT / GRPO",
-        "- Judges: DeepSeek V4 Flash and Doubao",
+        "- Judges: DeepSeek V4 Flash and Qwen3.8 Max",
+        f"- Generation protocol: {config.get('generation_protocol', 'configured ChatML')}",
         "- Protocol: the same frozen prompts, hidden model identities, balanced A/B order",
         "- Reference teaching answers were not provided to either judge.",
         "",
@@ -757,7 +883,7 @@ def write_report(
             "",
             "## Judge Disagreement",
             "",
-            f"DeepSeek and Doubao selected different winners in "
+            f"DeepSeek and Qwen selected different winners in "
             f"{disagreement['disagreements']}/{disagreement['comparisons']} comparisons "
             f"({disagreement['rate']:.2%}).",
             "",
@@ -781,8 +907,10 @@ def validate_summary(
         "selection_ids_path": str(resolve_path(str(config["selection_ids_path"]))),
         "samples": len(selected),
         "base_model": args.base_model or config["model"]["name"],
+        "generation_protocol": config.get("generation_protocol"),
         "sft_adapter": sft,
         "grpo_adapter": grpo,
+        "generation_sources": generation_source_plan(config, args),
         "judges": list(config["judge_api"]["judges"]),
         "planned_successful_judgments": len(selected) * len(PAIR_SPECS) * 2,
         "results": str(resolve_path(str(config["output_dir"])) / "results.json"),
@@ -805,7 +933,16 @@ def main() -> None:
     report_path = output_dir / "report.md"
     results = initialize_results(results_path, selected, canonical)
 
-    if args.stage in {"generate", "all"}:
+    source_plan = generation_source_plan(config, args)
+    if args.stage == "import" or (args.stage == "all" and source_plan):
+        import_summary = import_generated_answers(
+            results=results,
+            results_path=results_path,
+            source_plan=source_plan,
+        )
+        print(json.dumps(import_summary, ensure_ascii=False, indent=2))
+
+    if args.stage == "generate" or (args.stage == "all" and not source_plan):
         adapters = config["adapters"]
         generation_plan = (
             ("base", None),
