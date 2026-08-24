@@ -1,8 +1,10 @@
 import json
+import os
 
 from scripts.evaluate_sft_matrix import build_eval_messages, trim_completion_ids
 from scripts.evaluate_teaching import (
     aggregate_report,
+    atomic_write_json,
     balanced_blind_orders,
     build_judge_prompt,
     import_generated_answers,
@@ -211,3 +213,24 @@ def test_import_generated_answers_reuses_frozen_jsonl(tmp_path):
     assert results[1]["sft"] == "sft-p2"
     assert results[1]["grpo"] == "grpo-p2"
     assert json.loads(output.read_text(encoding="utf-8"))[0]["base"] == "base-p1"
+
+
+def test_atomic_write_json_retries_transient_windows_lock(tmp_path, monkeypatch):
+    output = tmp_path / "results.json"
+    real_replace = os.replace
+    attempts = 0
+
+    def flaky_replace(source, target):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise PermissionError(5, "temporary Windows file lock")
+        real_replace(source, target)
+
+    monkeypatch.setattr("scripts.evaluate_teaching.os.replace", flaky_replace)
+    monkeypatch.setattr("scripts.evaluate_teaching.time.sleep", lambda _: None)
+    atomic_write_json(output, {"saved": True})
+
+    assert attempts == 2
+    assert json.loads(output.read_text(encoding="utf-8")) == {"saved": True}
+    assert list(tmp_path.glob("results.json.*.tmp")) == []

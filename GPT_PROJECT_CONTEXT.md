@@ -767,3 +767,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 新增 `--stage import`。导入时校验来源 variant、重复/空/缺失 ID、已有结果冲突和生成协议；固定 seed 20260728 从 dev515 分层选出 50 条，写入 `outputs/teaching_eval/results.json`。
 - 三份来源各 515 条、ID 交集 515、空回答 0，统一协议为 `compact-code-first-taco515-selected-v1`。本地实测导入 50/50/50 成功，不加载模型、不调用 Docker 或 Judge API。
 - 该口径比较的是同一 compact-code-first 协议下的相对教学质量，不能冒充原始长教学 prompt 下重新生成的结果。代码正确性仍引用已落盘的 TACO-515 Docker verification，教学 Judge 不重复执行代码。
+
+## 2026-08-24：Blind Judge Windows 落盘恢复
+
+- 双 Judge 首次运行在 142/300 时因 Windows 短时锁住 `results.json`，固定 `.tmp -> results.json` 的 `Path.replace` 报 `WinError 5`。主文件保留 142 条，临时文件保留 143 条，证明问题位于原子替换而非 API/评分解析。
+- `atomic_write_json` 改为每次唯一临时文件、写入后 flush+fsync、`os.replace` 最多 8 次指数退避，并容忍扫描器短时占用临时文件。新增模拟首轮 `PermissionError` 的回归测试。
+- Judge 结果仍逐条落盘并按 `judge/pair` 断点跳过；故障后不从零调用。正在运行的旧 Python 进程不会热加载修复，只有下一次重启才使用新逻辑。

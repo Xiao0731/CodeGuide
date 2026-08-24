@@ -12,6 +12,7 @@ import os
 import random
 import statistics
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -167,12 +168,30 @@ def select_records(
 
 def atomic_write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+    temporary = path.with_suffix(
+        f"{path.suffix}.{os.getpid()}.{time.time_ns()}.tmp"
     )
-    temporary.replace(path)
+    try:
+        with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        for attempt in range(8):
+            try:
+                os.replace(temporary, path)
+                return
+            except PermissionError:
+                if attempt == 7:
+                    raise
+                time.sleep(min(0.05 * (2**attempt), 1.0))
+    finally:
+        try:
+            temporary.unlink(missing_ok=True)
+        except PermissionError:
+            # A scanner may briefly retain the temporary file after a failed
+            # replace. It is uniquely named and safe to clean up later.
+            pass
 
 
 def initialize_results(

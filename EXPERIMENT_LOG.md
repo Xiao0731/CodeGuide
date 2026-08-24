@@ -285,3 +285,10 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 成本：本步骤没有模型推理、Docker 执行或 Judge API 请求。后续双 Judge 预计 `50×3×2=300` 个成功 judgment。
 - 边界：现有回答共享 compact-code-first prompt，因此可做公平的阶段相对比较；不能解释为换用原始长教学 prompt 后的新一轮生成。
 - Judge 更正：第二 Judge 从误记的豆包更正为 Qwen3.8 Max；选择最高能力通用模型而非 Coder 专项模型，关闭 thinking，并使用结构化 JSON 输出。本次仅修改配置和调用语义，尚未产生 API 请求。
+
+# EXP-027：Blind Judge 断点落盘故障
+
+- 现象：Judge 运行到 142/300 后，Windows `os.replace(results.json.tmp, results.json)` 返回 `PermissionError: WinError 5`。
+- 证据：崩溃后主文件 JSON 合法且含 142 条 judgment；遗留 tmp JSON 合法且含 143 条。DeepSeek/Qwen API 与 judgment schema 不是根因。
+- 修复：唯一临时文件、flush/fsync、8 次指数退避原子替换；测试注入一次 PermissionError 后第二次替换成功且无残留临时文件。
+- 恢复：结果按已存在的 judge/pair 跳过，不会重跑已落盘的 142 条；崩溃时仍在途但未落盘的少量请求可能重新计费。
