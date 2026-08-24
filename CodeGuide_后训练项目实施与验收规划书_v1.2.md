@@ -1834,6 +1834,15 @@ Codex 必须先回答：
 4. TACO train 与 reference cache 已在下游 source bank/manifest/hash 验证后本地删除；如重新构造数据可按来源下载，但训练与评测不得依赖项目根目录外的绝对路径。
 5. 下一阶段继续以 full SFT adapter 暖启动 GRPO，不因清理重新运行 SFT、API 蒸馏或已完成评测。
 
+## 2026-08-24 Blind Teaching Evaluation 执行协议
+
+1. 最终教学评测固定比较 Base、最佳 SFT 与最佳 GRPO；三者接收相同的冻结 ChatML `system + user`，canonical assistant/reference 标签不得进入模型输入或 Judge prompt。
+2. 默认从与 GRPO train/dev 隔离的 TACO-515 池分层冻结 Blind50。该集合不能反向用于 checkpoint 选择或超参数调整。
+3. 每题比较 Base/SFT、Base/GRPO、SFT/GRPO，按固定种子平衡交换 A/B；DeepSeek V4 Flash 与豆包独立评分，Judge 不得看到模型阶段名称。
+4. 单次 Judge 调用同时返回 pairwise winner 与题意理解、算法讲解、推导流程、代码一致性、初学者友好五维 0-10 分；程序按 0.20/0.30/0.20/0.20/0.10 重算总分。
+5. 报告必须同时给出三模型平均分、三组胜率、五维均分和 Judge winner disagreement。不得因回答更长、标题更多或格式更漂亮直接加分。
+6. 教学盲评与执行正确性评测相互独立：TACO/EvalPlus 负责代码能力，双 Judge 负责教学质量；任何最终结论都必须同时保留 generation、原始 Judge JSON 和汇总报告。
+
 ## 2026-08-15 训练实现基线更新
 
 1. 训练依赖以根目录唯一 `requirements.txt` 为准，不再维护阶段性 requirements 文件。

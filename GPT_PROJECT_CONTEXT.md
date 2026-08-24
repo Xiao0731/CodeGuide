@@ -751,3 +751,12 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 正式奖励为 `code=.05*static+.70*pass_rate+.25*strict`，`gated_contract=contract*(.25+.75*pass_rate)`，`total=.60*code+.40*gated_contract`。static 只检查 AST、安全和接口；执行正确性只来自统一 `verify_code()`；training backend 固定 subprocess，Docker 仅用于最终严格离线评测。
 - teaching surface heuristic 仅作 diagnostic，不进入梯度。contract 固定为实质步骤 0.40、Python 代码块 0.30、复杂度 0.20、合理长度 0.05、教学词 0.05，并保留每步至少 50 字符和 Jaccard 去重。
 - 本轮没有启动训练，也没有修改冻结数据、已有 generation、verification 或实验报告。
+
+## 2026-08-24：最终 Blind Teaching Evaluation 流水线
+
+- 新增唯一入口 `scripts/evaluate_teaching.py` 与配置 `configs/eval/teaching_eval.yaml`，不修改训练代码。Base/SFT/GRPO 加载复用 `evaluate_sft_matrix.load_model_for_variant`，没有新增 Transformers/PEFT loader。
+- 默认从 canonical SFT 的冻结 515 dev/TACO final ID 池中按 metadata 分层抽取 Blind50；三个模型使用完全相同的原始 ChatML `system + user`，末尾 assistant/reference 标签在构造 prompt 前被强制剥离。
+- 每题执行 Base vs SFT、Base vs GRPO、SFT vs GRPO 三组比较；固定种子为每组生成近似精确 50/50 的 A/B 交换。Judge prompt 不包含阶段名称，也不提供 reference answer。
+- DeepSeek V4 Flash 与豆包通过各自 OpenAI-compatible API 独立评分。单次调用同时返回 winner、五维分数和理由，50 条完整运行需要 300 个成功 judgment，不再为 absolute score 增加 API 调用；API/schema 失败的有限重试可能增加实际请求数。
+- 五维权重固定为题意理解 0.20、算法讲解 0.30、推导流程 0.20、代码一致性 0.20、初学者友好 0.10。程序按维度重算 weighted score，不盲信 Judge 自报总分。
+- `outputs/teaching_eval/results.json` 是唯一可恢复运行状态，`report.md` 汇总三模型平均分、三组胜率、维度均分与双 Judge winner disagreement。当前只完成静态/离线合同验证，尚未加载三个正式 checkpoint 或产生真实盲评分数。

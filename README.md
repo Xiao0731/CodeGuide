@@ -91,6 +91,28 @@ accelerate launch --config_file configs/accelerate/dual_gpu_deepspeed.yaml \
 - 正式 Docker 镜像必须固定 digest
 - reference 只属于 teacher-side privileged context，不进入 student user message
 
+## Teaching Evaluation
+
+`scripts/evaluate_teaching.py` 使用同一批冻结 ChatML prompt 比较 Base、SFT 和 GRPO。生成阶段只保留原始 `system + user`，不会把 canonical assistant/reference 标签交给模型或 Judge；模型加载直接复用正式 checkpoint-matrix evaluator。
+
+两位独立 Judge 为 DeepSeek V4 Flash 和豆包。每道题分别评估 Base vs SFT、Base vs GRPO、SFT vs GRPO，A/B 位置按固定种子平衡交换。一次 Judge 响应同时返回 pairwise winner 和五个教学维度的 0-10 分，避免为了 absolute score 再调用一次 API。Blind50 需要 300 个成功 judgment；只有 API 或 JSON schema 失败时才按配置进行有限重试。Judge prompt 明确禁止偏爱更长、更多标题或更漂亮的回答。
+
+```bash
+# 只验证数据、配置和预计 API 请求数，不加载模型
+python scripts/evaluate_teaching.py --stage validate
+
+# 单卡依次生成 Base/SFT/GRPO；结果可断点续跑
+CUDA_VISIBLE_DEVICES=0 python scripts/evaluate_teaching.py --stage generate \
+  --sft-adapter /path/to/best_sft_adapter \
+  --grpo-adapter /path/to/best_grpo_adapter
+
+# 配置 DEEPSEEK_JUDGE_*、DOUBAO_JUDGE_* 环境变量后运行双 Judge
+python scripts/evaluate_teaching.py --stage judge
+python scripts/evaluate_teaching.py --stage report
+```
+
+唯一运行数据文件为 `outputs/teaching_eval/results.json`，包含三阶段回答、盲序和原始 Judge 评分；汇总写入 `outputs/teaching_eval/report.md`。评分衡量教学质量，不替代 TACO/EvalPlus 的执行正确性评测。
+
 ## 项目记录
 
 - `GPT_PROJECT_CONTEXT.md`：实现与技术上下文

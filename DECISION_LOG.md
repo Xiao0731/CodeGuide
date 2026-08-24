@@ -624,3 +624,11 @@
 - **课程边界**：easy 3,228/512、medium 1,735/768、hard 1,488/1024，固定三阶段各 1 epoch。curriculum 不得作为普通开关关闭。
 - **算法边界**：TRL 0.22.2、`loss_type=grpo`、`scale_rewards=false`、beta 0.05；不得因 API 迁移改成 DR-GRPO、DAPO 或 GSPO。
 - **奖励边界**：梯度只接收冻结公式的单一 composite total reward；执行正确性统一调用 `verify_code()` 且每 completion 一次。static 不冒充 correctness，teaching heuristic 只作 diagnostic，训练 backend 为 subprocess。
+
+# DEC-036：教学能力使用双盲双 Judge，与代码正确性评测分离
+
+- **日期**：2026-08-24
+- **决定**：最终教学评测固定比较 Base/SFT/GRPO，使用同题 ChatML prompt、平衡 A/B 位置和 DeepSeek V4 Flash/豆包两个独立 Judge；reference assistant 标签对生成模型和 Judge 都不可见。
+- **评分边界**：一次 pairwise 请求同时产出 winner 与五维 absolute score；程序从维度分重算 weighted score。回答长度、标题数量和排版不得直接形成优势。
+- **数据边界**：默认 Blind50 来自冻结 TACO-515 池，不进入训练或 GRPO checkpoint selection。现有 TACO/EvalPlus 继续负责可执行代码能力，LLM-as-Judge 分数只代表教学质量测量。
+- **证据边界**：流水线通过本地合同测试不等于模型教学能力已经提升；只有正式 checkpoint 的落盘 generation、两个 Judge 原始结果和报告齐全后才能形成对比 claim。

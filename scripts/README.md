@@ -10,6 +10,7 @@
 | SFT | `train_sft.py` | TRL SFTTrainer + PEFT QLoRA |
 | GRPO | `train_grpo.py` | TRL GRPOTrainer + 单次执行的 formal composite reward |
 | TACO 评测 | `evaluate_sft_matrix.py` | 配置驱动的 Base/SFT/GRPO 生成与复验 |
+| 教学盲评 | `evaluate_teaching.py` | Base/SFT/GRPO 同题生成 + DeepSeek/豆包双盲 Judge |
 | EvalPlus | `prepare_evalplus_datasets_offline.py`、`generate_evalplus_code_capability.py` | HumanEval(+)/MBPP(+) |
 | Verifier | `validate_docker_verifier.py` | standard-input/call-based Docker smoke |
 | 推理 | `inference_demo.py` | adapter/merged model CLI 推理 |

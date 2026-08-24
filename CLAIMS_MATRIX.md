@@ -73,3 +73,8 @@
 - SFT/GRPO 数据数量、配置和 CLI 已完成本地合同验证，但重构后的入口尚未在云端 GPU 重新运行，因此不新增训练效果声明。
 - 正式历史 generation、Docker verification 和报告继续作为实验结果；删除的是一次性入口与被替代的中间产物，不是实验结论。
 - GRPO formal config 已静态锁定为 6,451 train、dev50 选优、TACO-515 最终评测；正式三阶段 curriculum 和 composite reward 均有测试，但尚未形成新的 GPU 训练结果，因此只能声明“实现与合同验证通过”。
+
+### 2026-08-24
+
+- Blind Teaching Evaluation 已实现为单脚本、单配置流水线，具备 reference 隔离、Base/SFT/GRPO 同题生成、双 Judge、平衡盲序、五维评分、胜率和 disagreement 聚合。
+- 当前只能声明“评测协议实现并通过离线合同验证”；尚无正式 GRPO best adapter 和双 Judge 完整结果，因此不得声明 GRPO 教学能力优于 SFT/Base。

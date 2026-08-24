@@ -1,0 +1,66 @@
+schema_version: codeguide-teaching-eval-v1
+dataset_path: data/final/sft_accepted.jsonl
+selection_ids_path: data/splits/sft_dev_ids.json
+output_dir: outputs/teaching_eval
+evaluation_size: 50
+seed: 20260728
+
+model:
+  name: Qwen/Qwen2.5-Coder-7B-Instruct
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+  dtype: bfloat16
+
+adapters:
+  # Supply the selected checkpoints by CLI or set portable relative paths here.
+  sft: null
+  grpo: null
+
+generation_config:
+  max_new_tokens: 2048
+  do_sample: false
+  temperature: null
+  top_p: null
+  num_beams: 1
+  batch_size: 1
+  length_bucket: true
+
+judge_api:
+  concurrency: 8
+  timeout_seconds: 120
+  max_retries: 2
+  temperature: 0.0
+  max_tokens: 1200
+  judges:
+    deepseek:
+      display_name: DeepSeek V4 Flash
+      api_key_env: [DEEPSEEK_JUDGE_API_KEY, DISTILL_API_KEY]
+      base_url_env: [DEEPSEEK_JUDGE_BASE_URL, DISTILL_BASE_URL]
+      base_url_default: https://api.deepseek.com/v1
+      model_env: [DEEPSEEK_JUDGE_MODEL, DISTILL_MODEL]
+      model_default: deepseek-v4-flash
+    doubao:
+      display_name: Doubao
+      api_key_env: [DOUBAO_JUDGE_API_KEY, ARK_API_KEY]
+      base_url_env: [DOUBAO_JUDGE_BASE_URL]
+      base_url_default: https://ark.cn-beijing.volces.com/api/v3
+      model_env: [DOUBAO_JUDGE_MODEL, ARK_MODEL]
+      model_default: null
+
+criteria:
+  problem_understanding:
+    label: Problem Understanding
+    weight: 0.20
+  algorithm_explanation:
+    label: Algorithm Explanation
+    weight: 0.30
+  reasoning_flow:
+    label: Reasoning Flow
+    weight: 0.20
+  code_alignment:
+    label: Code Alignment
+    weight: 0.20
+  beginner_friendly:
+    label: Beginner Friendly
+    weight: 0.10

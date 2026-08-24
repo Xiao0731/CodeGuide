@@ -266,3 +266,11 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 训练：Qwen2.5-Coder-7B-Instruct + 用户指定最佳 SFT adapter；TRL 0.22.2，`loss_type=grpo`、`scale_rewards=false`，generations 4、temperature .8、top-p .95、LR `1e-5`、beta .05、batch/device 1、accumulation 8。
 - reward：单个 canonical composite callable 对每条 completion 只执行一次 verifier，并按冻结公式返回 total；pass-rate、static、code、contract 仅记录诊断。training verifier 为 subprocess，Docker 不进入在线训练。
 - 验证：compileall、完整 pytest 和 `train_grpo.py --validate-only` 均通过；没有启动模型训练或覆盖任何历史结果。
+
+# EXP-025：Blind Teaching Evaluation 流水线合同验证
+
+- 范围：实现 Base/SFT/GRPO 同题生成、DeepSeek/豆包双盲 pairwise + absolute scoring 和 Markdown 聚合；不修改训练代码，不运行模型或调用 Judge API。
+- 数据：默认从冻结 SFT dev/TACO-515 ID 池分层抽取 50 条；离线 validate 确认 canonical 与 selection IDs 可读取，参考 assistant 标签不进入生成消息或 Judge prompt。
+- 盲评：每个模型对的 A/B 位置按种子平衡；测试确认 10 条时每组正反各 5 条。winner 映射回真实模型后再计算胜率和 Judge disagreement。
+- 成本：50 条完整评测为 `50 × 3 pairs × 2 judges = 300` 个成功 judgment；五维绝对分与 pairwise winner 共用同一次请求，API/schema 失败重试会增加实际请求数。
+- 验证边界：新增离线测试覆盖 reference 剥离、盲序、加权分重算和 disagreement；真实教学提升结论必须等最佳 SFT/GRPO checkpoint 生成并由两位 Judge 完成后才能填写。
