@@ -7,6 +7,7 @@ import pytest
 
 from scripts.evaluate_sft_matrix import build_eval_messages, trim_completion_ids
 from scripts.evaluate_teaching import (
+    FatalJudgeError,
     aggregate_report,
     atomic_write_json,
     balanced_blind_orders,
@@ -334,5 +335,96 @@ def test_judge_failure_isolated_until_batch_finishes(tmp_path, monkeypatch):
     assert len(results[0]["judgments"]["qwen"]) == 3
     assert len(results[0]["judgments"]["deepseek"]) == 0
     assert len(results[0]["judge_errors"]["deepseek"]) == 3
+    persisted = json.loads(output.read_text(encoding="utf-8"))
+    assert len(persisted[0]["judgments"]["qwen"]) == 3
+
+
+def test_fatal_judge_failure_stops_queued_provider_calls(tmp_path, monkeypatch):
+    valid = json.dumps(
+        {
+            "winner": "A",
+            "score_A": 8,
+            "score_B": 6,
+            "dimensions": {
+                key: {"A": 8, "B": 6}
+                for key in CRITERIA
+            },
+            "reason": "A is clearer.",
+        }
+    )
+    calls = {"deepseek-key": 0, "qwen-key": 0}
+
+    class PaymentRequired(Exception):
+        status_code = 402
+
+    class FakeCompletions:
+        def __init__(self, api_key):
+            self.api_key = api_key
+
+        async def create(self, **request):
+            calls[self.api_key] += 1
+            if self.api_key == "deepseek-key":
+                raise PaymentRequired("Insufficient Balance")
+            message = type("Message", (), {"content": valid})()
+            choice = type(
+                "Choice", (), {"message": message, "finish_reason": "stop"}
+            )()
+            return type("Response", (), {"choices": [choice]})()
+
+    class FakeClient:
+        def __init__(self, api_key, **_):
+            self.chat = type(
+                "Chat", (), {"completions": FakeCompletions(api_key)}
+            )()
+
+        async def close(self):
+            return None
+
+    monkeypatch.setattr("openai.AsyncOpenAI", FakeClient)
+    monkeypatch.setenv("DEEPSEEK_TEST_KEY", "deepseek-key")
+    monkeypatch.setenv("QWEN_TEST_KEY", "qwen-key")
+    results = [
+        {
+            "id": "p1",
+            "question": "problem",
+            "base": "base answer",
+            "sft": "sft answer",
+            "grpo": "grpo answer",
+        }
+    ]
+    config = {
+        "seed": 20260728,
+        "criteria": CRITERIA,
+        "judge_api": {
+            "concurrency": 1,
+            "timeout_seconds": 1,
+            "max_retries": 2,
+            "temperature": 0,
+            "max_tokens": 100,
+            "judges": {
+                "deepseek": {
+                    "api_key_env": ["DEEPSEEK_TEST_KEY"],
+                    "base_url_default": "https://deepseek.invalid",
+                    "model_default": "deepseek",
+                },
+                "qwen": {
+                    "api_key_env": ["QWEN_TEST_KEY"],
+                    "base_url_default": "https://qwen.invalid",
+                    "model_default": "qwen",
+                },
+            },
+        },
+    }
+    output = tmp_path / "results.json"
+
+    with pytest.raises(FatalJudgeError, match="insufficient_balance"):
+        asyncio.run(run_judges(results=results, results_path=output, config=config))
+
+    # A 402 is attempted once, not max_retries + 1 times. The independent
+    # Qwen provider still finishes all three comparisons.
+    assert calls == {"deepseek-key": 1, "qwen-key": 3}
+    assert len(results[0]["judgments"]["deepseek"]) == 0
+    assert len(results[0]["judgments"]["qwen"]) == 3
+    assert len(results[0]["judge_errors"]["deepseek"]) == 1
     persisted = json.loads(output.read_text(encoding="utf-8"))
     assert len(persisted[0]["judgments"]["qwen"]) == 3

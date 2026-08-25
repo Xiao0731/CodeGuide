@@ -53,6 +53,30 @@ and is genuinely useful to a beginner.
 Return one JSON object only. Do not use Markdown fences or add prose outside it."""
 
 
+class FatalJudgeError(RuntimeError):
+    """A provider-level failure that cannot be fixed by retrying comparisons."""
+
+
+def fatal_judge_error_reason(exc: Exception) -> str | None:
+    """Classify account/auth failures that should trip a provider circuit breaker."""
+    status_code = getattr(exc, "status_code", None)
+    if status_code is None:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+    reasons = {
+        401: "unauthorized",
+        402: "insufficient_balance",
+        403: "forbidden",
+        404: "endpoint_or_model_not_found",
+    }
+    if status_code in reasons:
+        return reasons[status_code]
+
+    message = str(exc).lower()
+    if "insufficient balance" in message or "insufficient_balance" in message:
+        return "insufficient_balance"
+    return None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -622,6 +646,8 @@ async def run_judges(
         for name, connection in connections.items()
     }
     semaphore = asyncio.Semaphore(int(api_cfg["concurrency"]))
+    fatal_events = {name: asyncio.Event() for name in judge_cfgs}
+    fatal_errors: dict[str, dict[str, Any]] = {}
     orders = balanced_blind_orders(
         [str(item["id"]) for item in results], int(config["seed"])
     )
@@ -651,6 +677,9 @@ async def run_judges(
 
     async def execute(job: tuple[int, str, str, str, str, str, str]):
         index, judge_name, pair_name, model_a, model_b, answer_a, answer_b = job
+        fatal_event = fatal_events[judge_name]
+        if fatal_event.is_set():
+            return index, judge_name, pair_name, None, {"skipped": True}
         if not answer_a.strip() or not answer_b.strip():
             raise RuntimeError(f"missing generated answer for {results[index]['id']} {pair_name}")
         prompt = build_judge_prompt(
@@ -666,6 +695,11 @@ async def run_judges(
         for attempt in range(int(api_cfg["max_retries"]) + 1):
             try:
                 async with semaphore:
+                    # Tasks are created eagerly. Check again after waiting for a
+                    # slot so queued calls do not reach a provider after its
+                    # account/auth circuit breaker has tripped.
+                    if fatal_event.is_set():
+                        return index, judge_name, pair_name, None, {"skipped": True}
                     request: dict[str, Any] = {
                         "model": connection["model"],
                         "messages": [
@@ -701,6 +735,28 @@ async def run_judges(
                 return index, judge_name, pair_name, parsed, None
             except Exception as exc:  # API and schema failures share bounded retry.
                 last_error = exc
+                fatal_reason = fatal_judge_error_reason(exc)
+                if fatal_reason is not None:
+                    fatal_errors.setdefault(
+                        judge_name,
+                        {
+                            "reason": fatal_reason,
+                            "error_type": type(exc).__name__,
+                            "error": str(exc),
+                            "problem_id": str(results[index]["id"]),
+                            "pair": pair_name,
+                        },
+                    )
+                    fatal_event.set()
+                    return index, judge_name, pair_name, None, {
+                        "fatal": True,
+                        "fatal_reason": fatal_reason,
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                        "attempts": attempt + 1,
+                        "finish_reason": last_finish_reason,
+                        "response_preview": last_content[:300],
+                    }
                 if attempt < int(api_cfg["max_retries"]):
                     await asyncio.sleep(2**attempt)
         return index, judge_name, pair_name, None, {
@@ -714,9 +770,14 @@ async def run_judges(
     tasks = [asyncio.create_task(execute(job)) for job in jobs]
     completed = 0
     failures = 0
+    skipped = 0
     try:
         for task in asyncio.as_completed(tasks):
             index, judge_name, pair_name, parsed, error = await task
+            if error and error.get("skipped"):
+                skipped += 1
+                completed += 1
+                continue
             if parsed is None:
                 failures += 1
                 errors = results[index].setdefault("judge_errors", {})
@@ -743,6 +804,17 @@ async def run_judges(
         for client in clients.values():
             await client.close()
     if failures:
+        if fatal_errors:
+            detail = "; ".join(
+                f"{name}={error['reason']} ({error['error']})"
+                for name, error in sorted(fatal_errors.items())
+            )
+            raise FatalJudgeError(
+                f"fatal judge provider failure: {detail}. "
+                f"Stopped {skipped} queued comparisons without calling the API; "
+                "successful judgments were preserved. Fix the account/configuration "
+                "and rerun --stage judge to process only missing pairs."
+            )
         raise RuntimeError(
             f"{failures} judge comparisons failed after retries; successful results "
             "were saved and the next --stage judge run will retry only missing pairs"
