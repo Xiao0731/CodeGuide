@@ -661,6 +661,8 @@ async def run_judges(
         )
         connection = connections[judge_name]
         last_error: Exception | None = None
+        last_content = ""
+        last_finish_reason = ""
         for attempt in range(int(api_cfg["max_retries"]) + 1):
             try:
                 async with semaphore:
@@ -682,6 +684,8 @@ async def run_judges(
                         **request
                     )
                 content = response.choices[0].message.content or ""
+                last_content = content
+                last_finish_reason = str(response.choices[0].finish_reason or "")
                 parsed = parse_judgment(content, criteria)
                 parsed.update(
                     {
@@ -694,21 +698,40 @@ async def run_judges(
                         "judge_model": connection["model"],
                     }
                 )
-                return index, judge_name, pair_name, parsed
+                return index, judge_name, pair_name, parsed, None
             except Exception as exc:  # API and schema failures share bounded retry.
                 last_error = exc
                 if attempt < int(api_cfg["max_retries"]):
                     await asyncio.sleep(2**attempt)
-        raise RuntimeError(
-            f"judge {judge_name} failed for {results[index]['id']} {pair_name}: {last_error}"
-        ) from last_error
+        return index, judge_name, pair_name, None, {
+            "error_type": type(last_error).__name__ if last_error else "unknown",
+            "error": str(last_error or "unknown judge failure"),
+            "attempts": int(api_cfg["max_retries"]) + 1,
+            "finish_reason": last_finish_reason,
+            "response_preview": last_content[:300],
+        }
 
     tasks = [asyncio.create_task(execute(job)) for job in jobs]
     completed = 0
+    failures = 0
     try:
         for task in asyncio.as_completed(tasks):
-            index, judge_name, pair_name, parsed = await task
-            results[index]["judgments"][judge_name][pair_name] = parsed
+            index, judge_name, pair_name, parsed, error = await task
+            if parsed is None:
+                failures += 1
+                errors = results[index].setdefault("judge_errors", {})
+                errors.setdefault(judge_name, {})[pair_name] = error
+                print(
+                    f"[judge-failed] {results[index]['id']} {judge_name} "
+                    f"{pair_name}: {error['error']}",
+                    flush=True,
+                )
+            else:
+                results[index]["judgments"][judge_name][pair_name] = parsed
+                judge_errors = (results[index].get("judge_errors") or {}).get(
+                    judge_name, {}
+                )
+                judge_errors.pop(pair_name, None)
             completed += 1
             atomic_write_json(results_path, results)
             print(f"[judge] {completed}/{len(tasks)}", flush=True)
@@ -719,6 +742,11 @@ async def run_judges(
         await asyncio.gather(*tasks, return_exceptions=True)
         for client in clients.values():
             await client.close()
+    if failures:
+        raise RuntimeError(
+            f"{failures} judge comparisons failed after retries; successful results "
+            "were saved and the next --stage judge run will retry only missing pairs"
+        )
 
 
 def _mean(values: Iterable[float]) -> float:

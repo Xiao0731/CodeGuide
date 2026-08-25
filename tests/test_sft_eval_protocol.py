@@ -1,5 +1,9 @@
+import asyncio
 import json
 import os
+from pathlib import Path
+
+import pytest
 
 from scripts.evaluate_sft_matrix import build_eval_messages, trim_completion_ids
 from scripts.evaluate_teaching import (
@@ -8,8 +12,10 @@ from scripts.evaluate_teaching import (
     balanced_blind_orders,
     build_judge_prompt,
     import_generated_answers,
+    load_config,
     parse_judgment,
     prompt_messages,
+    run_judges,
 )
 
 
@@ -234,3 +240,99 @@ def test_atomic_write_json_retries_transient_windows_lock(tmp_path, monkeypatch)
     assert attempts == 2
     assert json.loads(output.read_text(encoding="utf-8")) == {"saved": True}
     assert list(tmp_path.glob("results.json.*.tmp")) == []
+
+
+def test_teaching_judges_disable_hidden_reasoning():
+    config = load_config(Path("configs/eval/teaching_eval.yaml"))
+    judges = config["judge_api"]["judges"]
+    assert judges["deepseek"]["extra_body"] == {
+        "thinking": {"type": "disabled"}
+    }
+    assert judges["qwen"]["extra_body"] == {"enable_thinking": False}
+
+
+def test_judge_failure_isolated_until_batch_finishes(tmp_path, monkeypatch):
+    valid = json.dumps(
+        {
+            "winner": "A",
+            "score_A": 8,
+            "score_B": 6,
+            "dimensions": {
+                key: {"A": 8, "B": 6}
+                for key in CRITERIA
+            },
+            "reason": "A is clearer.",
+        }
+    )
+
+    class FakeCompletions:
+        def __init__(self, api_key):
+            self.api_key = api_key
+
+        async def create(self, **request):
+            content = "not JSON" if self.api_key == "deepseek-key" else valid
+            message = type("Message", (), {"content": content})()
+            choice = type(
+                "Choice", (), {"message": message, "finish_reason": "stop"}
+            )()
+            return type("Response", (), {"choices": [choice]})()
+
+    class FakeClient:
+        def __init__(self, api_key, **_):
+            self.chat = type(
+                "Chat", (), {"completions": FakeCompletions(api_key)}
+            )()
+
+        async def close(self):
+            return None
+
+    monkeypatch.setattr("openai.AsyncOpenAI", FakeClient)
+    results = [
+        {
+            "id": "p1",
+            "question": "problem",
+            "base": "base answer",
+            "sft": "sft answer",
+            "grpo": "grpo answer",
+        }
+    ]
+    config = {
+        "seed": 20260728,
+        "criteria": CRITERIA,
+        "judge_api": {
+            "concurrency": 6,
+            "timeout_seconds": 1,
+            "max_retries": 0,
+            "temperature": 0,
+            "max_tokens": 100,
+            "judges": {
+                "deepseek": {
+                    "api_key_env": [],
+                    "api_key_default": "unused",
+                    "base_url_default": "https://deepseek.invalid",
+                    "model_default": "deepseek",
+                },
+                "qwen": {
+                    "api_key_env": [],
+                    "base_url_default": "https://qwen.invalid",
+                    "model_default": "qwen",
+                },
+            },
+        },
+    }
+    monkeypatch.setenv("DEEPSEEK_TEST_KEY", "deepseek-key")
+    monkeypatch.setenv("QWEN_TEST_KEY", "qwen-key")
+    config["judge_api"]["judges"]["deepseek"]["api_key_env"] = [
+        "DEEPSEEK_TEST_KEY"
+    ]
+    config["judge_api"]["judges"]["qwen"]["api_key_env"] = ["QWEN_TEST_KEY"]
+    output = tmp_path / "results.json"
+
+    with pytest.raises(RuntimeError, match="3 judge comparisons failed"):
+        asyncio.run(run_judges(results=results, results_path=output, config=config))
+
+    assert len(results[0]["judgments"]["qwen"]) == 3
+    assert len(results[0]["judgments"]["deepseek"]) == 0
+    assert len(results[0]["judge_errors"]["deepseek"]) == 3
+    persisted = json.loads(output.read_text(encoding="utf-8"))
+    assert len(persisted[0]["judgments"]["qwen"]) == 3

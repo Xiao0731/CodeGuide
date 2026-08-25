@@ -773,3 +773,9 @@ small smoke outputs, and small reference-cache examples. It excludes:
 - 双 Judge 首次运行在 142/300 时因 Windows 短时锁住 `results.json`，固定 `.tmp -> results.json` 的 `Path.replace` 报 `WinError 5`。主文件保留 142 条，临时文件保留 143 条，证明问题位于原子替换而非 API/评分解析。
 - `atomic_write_json` 改为每次唯一临时文件、写入后 flush+fsync、`os.replace` 最多 8 次指数退避，并容忍扫描器短时占用临时文件。新增模拟首轮 `PermissionError` 的回归测试。
 - Judge 结果仍逐条落盘并按 `judge/pair` 断点跳过；故障后不从零调用。正在运行的旧 Python 进程不会热加载修复，只有下一次重启才使用新逻辑。
+
+## 2026-08-25：DeepSeek Judge 空 content 恢复
+
+- 断点重跑从 174 个剩余任务开始，成功新增 6 条后，`taco_0ef4dbfd1e/base_vs_sft` 的 DeepSeek 响应连续三次不含 JSON，旧实现再次中止整批。落盘状态为 180/300：Qwen 150/150、DeepSeek 30/150。
+- 根因是教学配置遗漏了蒸馏主流程已经验证过的 DeepSeek V4 参数 `extra_body.thinking.type=disabled`。服务端 thinking 可能消耗输出预算或只留下非 JSON/空 content；Judge 的 1200 token 预算下更易暴露。
+- DeepSeek 与 Qwen 现均显式关闭 thinking。单条比较重试耗尽后写入 `judge_errors` 并继续其他任务；整批结束才报告失败，下一次仍只调缺失 pair。错误摘要保留 error type、finish reason 和最多 300 字符响应预览。

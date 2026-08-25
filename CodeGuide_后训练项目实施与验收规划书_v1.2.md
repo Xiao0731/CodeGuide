@@ -1860,3 +1860,4 @@ Codex 必须先回答：
 4. 最终报告必须注明 generation protocol。该结果衡量 compact-code-first 协议下三阶段的相对教学质量，不能冒充其他 system prompt 下的新生成实验。
 5. Qwen Judge 固定 `qwen3.8-max`、`enable_thinking=false`、JSON object 输出；同一正式报告不得中途切换到 Plus/Flash。若做成本消融，使用独立输出目录和报告。
 6. Judge 每个成功比较必须立即原子落盘并支持按 judge/pair 断点续跑；Windows 原子替换使用唯一临时文件、fsync 和有界退避，不得因短时文件锁从零重跑或覆盖已保存评分。
+7. DeepSeek 与 Qwen Judge 均显式关闭 thinking；单个 pair 重试耗尽后记录错误并继续批次，批次结束后只重试缺失 pair，不得因一条非 JSON 响应取消其他在途请求。

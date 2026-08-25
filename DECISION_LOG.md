@@ -636,3 +636,5 @@
 - **Judge 隔离**：复用不改变回答正文。Judge 仍只看到题面和匿名 A/B 回答，不看到 reference、variant 名称或既有 Docker 执行结果。
 - **千问选型**：第二 Judge 使用 `qwen3.8-max`，不使用 Coder 专项模型。最终 Blind50 只有 150 次千问调用，优先评判能力和 JSON 稳定性；固定关闭 thinking，避免不可控的思考 token 成本。预算消融可另用 `qwen3.7-plus`，不得在同一主报告中混用。
 - **Judge 状态持久化**：Windows 下禁止复用固定临时文件并只尝试一次替换。正式评测状态采用唯一临时文件、fsync 和有界指数退避；每个成功 judgment 继续立即落盘，以最小化 API 故障后的重复调用。
+- **Judge thinking**：DeepSeek V4 Flash 与 Qwen3.8 Max 均显式关闭 thinking。教学评分要求短小、严格 JSON 的可复现结论，不为隐藏推理 token 付费，也不允许服务端默认值改变实验语义。
+- **局部失败隔离**：单个 Judge pair 在有限重试后失败时记录结构化诊断并继续整批；只有批次结束仍存在失败才返回非零状态。成功 judgment 永不因另一条失败而回滚。

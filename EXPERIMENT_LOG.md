@@ -292,3 +292,11 @@ SFT 标签生成阶段通过。10,340 条执行完全通过的教学样本足以
 - 证据：崩溃后主文件 JSON 合法且含 142 条 judgment；遗留 tmp JSON 合法且含 143 条。DeepSeek/Qwen API 与 judgment schema 不是根因。
 - 修复：唯一临时文件、flush/fsync、8 次指数退避原子替换；测试注入一次 PermissionError 后第二次替换成功且无残留临时文件。
 - 恢复：结果按已存在的 judge/pair 跳过，不会重跑已落盘的 142 条；崩溃时仍在途但未落盘的少量请求可能重新计费。
+
+# EXP-028：DeepSeek Judge 非 JSON 故障
+
+- 现象：断点运行显示 126 个待处理；落盘 6 条后，DeepSeek 对 `taco_0ef4dbfd1e/base_vs_sft` 连续三次返回不含 JSON 的 content，整批中止。
+- 断点：当前 180/300，其中 Qwen 150/150 已完成，DeepSeek 30/150；后续不再请求千问。
+- 根因：Judge 配置未继承正式 DeepSeek V4 蒸馏调用中的 `thinking.type=disabled`，而服务端 thinking 默认行为与 1200 token 严格 JSON 输出不匹配。
+- 修复：DeepSeek 显式关闭 thinking；单个 pair 重试耗尽时持久化诊断并继续批次，避免一个异常响应取消其他已付费在途请求。
+- 验证：教学协议定向测试 11 passed，覆盖 DeepSeek/Qwen thinking 均关闭的配置合同；未在 Codex 环境重复调用付费 API。

@@ -56,6 +56,9 @@ judge_api:
       base_url_default: https://api.deepseek.com/v1
       model_env: [DEEPSEEK_JUDGE_MODEL, DISTILL_MODEL]
       model_default: deepseek-v4-flash
+      extra_body:
+        thinking:
+          type: disabled
     qwen:
       display_name: Qwen3.8 Max
       api_key_env: [QWEN_JUDGE_API_KEY, DASHSCOPE_API_KEY]

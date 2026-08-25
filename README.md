@@ -95,7 +95,7 @@ accelerate launch --config_file configs/accelerate/dual_gpu_deepspeed.yaml \
 
 `scripts/evaluate_teaching.py` 使用同一批冻结题目比较 Base、SFT 和 GRPO。新生成时只保留 `system + user`，不会把 canonical assistant/reference 标签交给模型或 Judge；模型加载直接复用正式 checkpoint-matrix evaluator。当前默认配置不再重新加载模型，而是导入已经生成并完成 Docker 代码评测的 TACO-515 三阶段回答：Base、SFT best-overall (`mixed_lr2e4_step050`) 和 `grpo_best`。三份回答共享 `compact-code-first-taco515-selected-v1` 协议。
 
-两位独立 Judge 为 DeepSeek V4 Flash 和 Qwen3.8 Max。每道题分别评估 Base vs SFT、Base vs GRPO、SFT vs GRPO，A/B 位置按固定种子平衡交换。一次 Judge 响应同时返回 pairwise winner 和五个教学维度的 0-10 分，避免为了 absolute score 再调用一次 API。Blind50 需要 300 个成功 judgment；只有 API 或 JSON schema 失败时才按配置进行有限重试。Judge prompt 明确禁止偏爱更长、更多标题或更漂亮的回答。千问固定关闭 thinking 并启用 JSON object 输出，减少成本和解析波动。
+两位独立 Judge 为 DeepSeek V4 Flash 和 Qwen3.8 Max。每道题分别评估 Base vs SFT、Base vs GRPO、SFT vs GRPO，A/B 位置按固定种子平衡交换。一次 Judge 响应同时返回 pairwise winner 和五个教学维度的 0-10 分，避免为了 absolute score 再调用一次 API。Blind50 需要 300 个成功 judgment；只有 API 或 JSON schema 失败时才按配置进行有限重试。Judge prompt 明确禁止偏爱更长、更多标题或更漂亮的回答。两位 Judge 均显式关闭隐藏 thinking；千问额外启用 JSON object 输出，减少成本和解析波动。单条比较重试耗尽时记录错误并继续整批，下一次只重试缺失 pair。
 
 ```bash
 # 只验证数据、配置和预计 API 请求数，不加载模型
